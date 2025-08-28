@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
 import { useAuthStore } from '../stores/auth';
 
@@ -67,9 +67,21 @@ function revealHint() {
   showHint.value = true;
 }
 
+function handleKeydown(event) {
+  if (event.altKey && event.key === 'h') {
+    event.preventDefault();
+    revealHint();
+  }
+}
+
 // Fetch the first exercise when the component is mounted
 onMounted(() => {
   fetchNewExercise();
+  window.addEventListener('keydown', handleKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown);
 });
 </script>
 
@@ -135,7 +147,7 @@ onMounted(() => {
         </section>
 
         <!-- Footer helper -->
-        <p class="mt-6 text-center text-xs text-zinc-500">Press <kbd class="rounded bg-zinc-800 px-1">Enter</kbd> to check.</p>
+        <p class="mt-6 text-center text-xs text-zinc-500">Press <kbd class="rounded bg-zinc-800 px-1">Enter</kbd> to check. Press <kbd class="rounded bg-zinc-800 px-1">Alt</kbd>+<kbd class="rounded bg-zinc-800 px-1">H</kbd> for hint.</p>
       </div>
 
       <div v-else class="error-message">
