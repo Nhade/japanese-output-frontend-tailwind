@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
 import { useAuthStore } from '../stores/auth';
 
@@ -11,6 +11,7 @@ const auth = useAuthStore();
 const userAnswer = ref('');
 const showHint = ref(false);
 const nextQuestionButton = ref(null);
+const answerInput = ref(null);
 
 // --- API Interaction ---
 
@@ -32,6 +33,8 @@ async function fetchNewExercise() {
     console.error('Failed to fetch exercise:', error);
   } finally {
     isLoading.value = false;
+    await nextTick();
+    answerInput.value?.focus();
   }
 }
 
@@ -52,21 +55,33 @@ async function handleAnswerSubmit() {
     if (!response.ok) throw new Error('Submission failed');
     feedback.value = await response.json();
     await nextTick();
-    if (nextQuestionButton.value) {
-      nextQuestionButton.value.focus();
-    }
+    nextQuestionButton.value?.focus();
   } catch (error) {
     console.error('Failed to submit answer:', error);
   }
 }
 
-function revealHint() {
+async function revealHint() {
   showHint.value = true;
+  await nextTick();
+  answerInput.value?.focus();
+}
+
+function handleKeydown(event) {
+  if (event.altKey && event.key === 'h') {
+    event.preventDefault();
+    revealHint();
+  }
 }
 
 // Fetch the first exercise when the component is mounted
 onMounted(() => {
   fetchNewExercise();
+  window.addEventListener('keydown', handleKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown);
 });
 </script>
 
@@ -95,6 +110,7 @@ onMounted(() => {
             <label class="block text-sm text-zinc-300" for="answer">Your Answer</label>
             <input
               id="answer"
+              ref="answerInput"
               v-model.trim="userAnswer"
               class="w-full rounded-xl border border-white/10 bg-zinc-800 px-4 py-3 text-base text-white placeholder-zinc-500 outline-none focus:ring-2 focus:ring-emerald-400"
               placeholder="Type here"
@@ -131,7 +147,7 @@ onMounted(() => {
         </section>
 
         <!-- Footer helper -->
-        <p class="mt-6 text-center text-xs text-zinc-500">Press <kbd class="rounded bg-zinc-800 px-1">Enter</kbd> to check.</p>
+        <p class="mt-6 text-center text-xs text-zinc-500">Press <kbd class="rounded bg-zinc-800 px-1">Enter</kbd> to check. Press <kbd class="rounded bg-zinc-800 px-1">Alt</kbd>+<kbd class="rounded bg-zinc-800 px-1">H</kbd> for hint.</p>
       </div>
 
       <div v-else class="error-message">
