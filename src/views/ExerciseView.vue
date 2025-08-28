@@ -55,9 +55,7 @@ async function handleAnswerSubmit() {
     if (!response.ok) throw new Error('Submission failed');
     feedback.value = await response.json();
     await nextTick();
-    if (nextQuestionButton.value) {
-      nextQuestionButton.value.focus();
-    }
+    nextQuestionButton.value?.focus();
   } catch (error) {
     console.error('Failed to submit answer:', error);
   }
