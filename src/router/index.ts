@@ -29,6 +29,12 @@ const router = createRouter({
       name: 'mistakes',
       component: MistakesView,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/statistics',
+      name: 'statistics',
+      component: () => import('../views/StatisticsView.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })
