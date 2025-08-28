@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, nextTick } from 'vue';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
 import { useAuthStore } from '../stores/auth';
 
@@ -10,6 +10,7 @@ const isLoading = ref(true); // Controls the loading spinner visibility
 const auth = useAuthStore();
 const userAnswer = ref('');
 const showHint = ref(false);
+const nextQuestionButton = ref(null);
 
 // --- API Interaction ---
 
@@ -50,6 +51,10 @@ async function handleAnswerSubmit() {
     });
     if (!response.ok) throw new Error('Submission failed');
     feedback.value = await response.json();
+    await nextTick();
+    if (nextQuestionButton.value) {
+      nextQuestionButton.value.focus();
+    }
   } catch (error) {
     console.error('Failed to submit answer:', error);
   }
@@ -119,7 +124,7 @@ onMounted(() => {
                 <div class="text-rose-200/90">Correct answer: <span class="font-semibold">{{ feedback.correct_answer }}</span></div>
               </div>
               <div class="mt-4">
-                <button @click="fetchNewExercise" class="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20">Next Question →</button>
+                <button ref="nextQuestionButton" @click="fetchNewExercise" class="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20">Next Question →</button>
               </div>
             </div>
           </transition>
