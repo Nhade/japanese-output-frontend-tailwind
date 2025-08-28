@@ -63,8 +63,10 @@ async function handleAnswerSubmit() {
   }
 }
 
-function revealHint() {
+async function revealHint() {
   showHint.value = true;
+  await nextTick();
+  answerInput.value?.focus();
 }
 
 function handleKeydown(event) {
