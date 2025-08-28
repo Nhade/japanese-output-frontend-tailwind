@@ -11,6 +11,7 @@ const auth = useAuthStore();
 const userAnswer = ref('');
 const showHint = ref(false);
 const nextQuestionButton = ref(null);
+const answerInput = ref(null);
 
 // --- API Interaction ---
 
@@ -32,6 +33,8 @@ async function fetchNewExercise() {
     console.error('Failed to fetch exercise:', error);
   } finally {
     isLoading.value = false;
+    await nextTick();
+    answerInput.value?.focus();
   }
 }
 
@@ -95,6 +98,7 @@ onMounted(() => {
             <label class="block text-sm text-zinc-300" for="answer">Your Answer</label>
             <input
               id="answer"
+              ref="answerInput"
               v-model.trim="userAnswer"
               class="w-full rounded-xl border border-white/10 bg-zinc-800 px-4 py-3 text-base text-white placeholder-zinc-500 outline-none focus:ring-2 focus:ring-emerald-400"
               placeholder="Type here"
