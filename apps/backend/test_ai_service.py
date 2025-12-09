@@ -7,12 +7,12 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from ai_service import evaluate_submission
 
 def test_ai():
-    print("Testing AI Service with Local Ollama...")
+    print("Testing AI Service with server...")
     
     # Test Case 1: Typography Error
     question_1 = "日本語を[＿＿＿]。"
     correct_answer_1 = "勉強します"
-    user_answer_1 = "勉強てます" # conjugation error or typp? "shimasu" vs "temasu" -> probably conjugation or nonsense
+    user_answer_1 = "勉強てます"
     
     print(f"\nTest 1 (Conjugation/Typo):")
     print(f"Q: {question_1}")
@@ -24,7 +24,7 @@ def test_ai():
     
     # Test Case 2: Particle Error
     question_2 = "日本語[＿＿＿]勉強します。"
-    user_answer_2 = "が" # Wrong particle
+    user_answer_2 = "が"
     correct_answer_2 = "を"
     print(f"\nTest 2 (Particle):")
     print(f"Q: {question_2}")
