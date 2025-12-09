@@ -19,6 +19,18 @@
             <div class="font-medium">Correct Answer:</div>
             <div class="font-semibold">{{ mistake.correct_answer }}</div>
           </div>
+
+          <!-- AI Feedback -->
+          <div v-if="mistake.feedback" class="mt-3 border-t border-white/5 pt-3">
+             <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-medium text-indigo-300 uppercase tracking-widest">AI Feedback</span>
+                <div class="flex gap-2">
+                    <span v-if="mistake.score !== null" class="text-xs bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-200">Score: {{ mistake.score }}</span>
+                    <span v-if="mistake.error_type" class="text-xs bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-200 uppercase">{{ mistake.error_type }}</span>
+                </div>
+             </div>
+             <p class="text-sm text-zinc-300">{{ mistake.feedback }}</p>
+          </div>
         </article>
       </div>
       

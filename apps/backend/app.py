@@ -37,7 +37,8 @@ def get_random_exercise():
 def get_mistakes(user_id):
     conn = get_db_connection()
     mistakes = conn.execute('''
-        SELECT al.log_id, e.question_sentence, al.user_answer, e.correct_answer
+        SELECT al.log_id, e.question_sentence, al.user_answer, e.correct_answer,
+               al.feedback, al.score, al.error_type
         FROM answer_log al
         JOIN exercise e ON al.exercise_id = e.exercise_id
         WHERE al.user_id = ? AND al.is_correct = 0
