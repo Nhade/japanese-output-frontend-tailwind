@@ -83,20 +83,16 @@ def submit_answer():
 
         if user_answer_hira == correct_answer_hira:
             is_correct = True
-        else:
-            # 2. Second Layer: AI Evaluation
-            print("Calling AI for evaluation...")
-            ai_result = evaluate_submission(question_sentence, user_answer, correct_answer)
-            
-            is_correct = ai_result['is_correct']
-            score = ai_result['score']
-            feedback = ai_result['feedback']
-            error_type = ai_result['error_type']
-
-        # Log to database with new fields
+        
+        # Log to database with new fields (Initial)
         log_id = str(uuid.uuid4())
         answered_timestamp = datetime.now().isoformat()
         
+        # Default empty values for AI fields
+        feedback = None
+        score = 100 if is_correct else 0
+        error_type = "none" if is_correct else None
+
         conn.execute('''
             INSERT INTO answer_log 
             (log_id, user_id, exercise_id, user_answer, is_correct, answered_timestamp, feedback, score, error_type) 
@@ -110,10 +106,49 @@ def submit_answer():
     return jsonify({
         "is_correct": is_correct,
         "correct_answer": correct_answer,
-        "score": score,
-        "feedback": feedback,
-        "error_type": error_type
+        "log_id": log_id
     })
+
+@app.route('/api/exercise/explain', methods=['POST'])
+def explain_answer():
+    data = request.get_json()
+    log_id = data.get('log_id')
+    
+    if not log_id:
+        return jsonify({"error": "log_id is required"}), 400
+        
+    conn = get_db_connection()
+    try:
+        # Fetch details to ensure data integrity
+        row = conn.execute('''
+            SELECT al.user_answer, e.question_sentence, e.correct_answer 
+            FROM answer_log al
+            JOIN exercise e ON al.exercise_id = e.exercise_id
+            WHERE al.log_id = ?
+        ''', (log_id,)).fetchone()
+        
+        if not row:
+            return jsonify({"error": "Log entry not found"}), 404
+            
+        question = row['question_sentence']
+        user_answer = row['user_answer']
+        correct_answer = row['correct_answer']
+        
+        print(f"Calling AI for evaluation (Log ID: {log_id})...")
+        ai_result = evaluate_submission(question, user_answer, correct_answer)
+        
+        # Update record
+        conn.execute('''
+            UPDATE answer_log 
+            SET feedback = ?, score = ?, error_type = ?
+            WHERE log_id = ?
+        ''', (ai_result['feedback'], ai_result['score'], ai_result['error_type'], log_id))
+        conn.commit()
+        
+        return jsonify(ai_result)
+        
+    finally:
+        conn.close()
 
 @app.route('/api/users/register', methods=['POST'])
 def register_user():

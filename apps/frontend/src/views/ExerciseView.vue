@@ -39,10 +39,14 @@ async function fetchNewExercise() {
 }
 
 // Submits the user's answer to the backend
+// Submits the user's answer to the backend
+const isExplaining = ref(false); // New state for AI loading
+
 async function handleAnswerSubmit() {
   if (!exercise.value || !userAnswer.value.trim()) return;
 
   try {
+    // Step 1: Submit for immediate correctness check
     const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -53,9 +57,35 @@ async function handleAnswerSubmit() {
       }),
     });
     if (!response.ok) throw new Error('Submission failed');
-    feedback.value = await response.json();
+    
+    // Immediate feedback
+    const result = await response.json();
+    feedback.value = result; 
+    
     await nextTick();
     nextQuestionButton.value?.focus();
+
+    // Step 2: If we have a log_id AND it's incorrect, fetch AI explanation (async)
+    if (result.log_id && !result.is_correct) {
+        isExplaining.value = true;
+        try {
+            const explainResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/explain`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ log_id: result.log_id }),
+            });
+            if (explainResponse.ok) {
+                const explanation = await explainResponse.json();
+                // Merge explanation into feedback object
+                feedback.value = { ...feedback.value, ...explanation };
+            }
+        } catch (err) {
+            console.error('AI explanation failed:', err);
+        } finally {
+            isExplaining.value = false;
+        }
+    }
+
   } catch (error) {
     console.error('Failed to submit answer:', error);
   }
@@ -127,10 +157,21 @@ onUnmounted(() => {
             <div v-if="feedback" class="mt-4">
               <div
                 v-if="feedback.is_correct"
-                class="flex items-center gap-2 rounded-xl bg-emerald-500/15 px-3 py-2 text-emerald-300"
+                class="flex flex-col items-stretch gap-2 rounded-xl bg-emerald-500/15 px-3 py-2 text-emerald-300"
               >
-                <span>✅ Correct!</span>
-                <span class="text-emerald-200/80">{{ feedback.correct_answer }}</span>
+                <div>
+                  <span class="font-bold">✅ Correct!</span>
+                  <span class="ml-2 text-emerald-200/80">{{ feedback.correct_answer }}</span>
+                </div>
+                
+                <!-- Correct Feedback Section -->
+                <div class="mt-2 pt-2 border-t border-emerald-500/20">
+                    <div class="flex justify-between items-start">
+                        <span class="text-sm font-medium text-emerald-200">Feedback:</span>
+                        <span class="text-xs bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-100">Score: 100</span>
+                    </div>
+                    <p class="text-sm mt-1 text-emerald-100/90">完全正確！🎉</p>
+                </div>
               </div>
               <div
                 v-else
@@ -138,6 +179,25 @@ onUnmounted(() => {
               >
                 <div>❌ Not quite.</div>
                 <div class="text-rose-200/90">Correct answer: <span class="font-semibold">{{ feedback.correct_answer }}</span></div>
+                
+                <!-- AI Feedback Section -->
+                <div v-if="feedback.feedback" class="mt-2 pt-2 border-t border-rose-500/20">
+                    <div class="flex justify-between items-start">
+                        <span class="text-sm font-medium text-rose-200">AI Feedback:</span>
+                        <span v-if="feedback.score" class="text-xs bg-rose-500/20 px-2 py-0.5 rounded text-rose-100">Score: {{ feedback.score }}</span>
+                    </div>
+                    <p class="text-sm mt-1 text-rose-100/90">{{ feedback.feedback }}</p>
+                    <div v-if="feedback.error_type && feedback.error_type !== 'none'" class="mt-1 text-xs text-rose-400 uppercase tracking-wider">
+                        Type: {{ feedback.error_type }}
+                    </div>
+                </div>
+                
+                <!-- Loading State -->
+                <div v-else-if="isExplaining" class="mt-2 pt-2 border-t border-rose-500/20 flex items-center justify-center gap-2 text-rose-200/50 text-sm">
+                   <div class="scale-50 origin-center -ml-2"><LoadingSpinner /></div>
+                   <span>Analyzing details...</span>
+                </div>
+
               </div>
               <div class="mt-4">
                 <button ref="nextQuestionButton" @click="fetchNewExercise" class="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20">Next Question →</button>
