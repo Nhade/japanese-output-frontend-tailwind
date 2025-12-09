@@ -73,7 +73,7 @@ const jlptAccuracyData = ref({
 onMounted(async () => {
   if (auth.user_id) {
     try {
-      const response = await fetch(`/api/statistics/${auth.user_id}`);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/statistics/${auth.user_id}`);
       if (response.ok) {
         const stats = await response.json();
         

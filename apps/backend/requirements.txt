@@ -1,0 +1,9 @@
+Flask
+Flask-Cors
+pwdlib[argon2]
+pykakasi
+google-cloud-translate
+janome
+python-dotenv
+requests
+beautifulsoup4

@@ -1,7 +1,7 @@
 <template>
   <main class="min-h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-100">
     <div class="mx-auto max-w-5xl px-4 pb-24 pt-10">
-      <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div class="my-6 flex flex-wrap items-center justify-between gap-3">
         <h1 class="text-xl font-semibold tracking-wide">Past Mistakes</h1>
       </div>
 
@@ -39,7 +39,7 @@ const auth = useAuthStore();
 onMounted(async () => {
   if (auth.user_id) {
     try {
-      const response = await fetch(`/api/mistakes/${auth.user_id}`);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/mistakes/${auth.user_id}`);
       if (response.ok) {
         mistakes.value = await response.json();
       } else {
