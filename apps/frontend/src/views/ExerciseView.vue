@@ -67,6 +67,10 @@ async function handleAnswerSubmit() {
 
     // Step 2: If we have a log_id AND it's incorrect, fetch AI explanation (async)
     if (result.log_id && !result.is_correct) {
+        
+        // Capture the exercise ID to prevent race conditions
+        const currentExerciseId = exercise.value.exercise_id;
+        
         isExplaining.value = true;
         try {
             const explainResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/explain`, {
@@ -74,15 +78,24 @@ async function handleAnswerSubmit() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ log_id: result.log_id }),
             });
+            
             if (explainResponse.ok) {
                 const explanation = await explainResponse.json();
-                // Merge explanation into feedback object
-                feedback.value = { ...feedback.value, ...explanation };
+                
+                // Guard: Only update UI if the user is still on the same exercise
+                if (exercise.value && exercise.value.exercise_id === currentExerciseId) {
+                    // Merge explanation into feedback object
+                    feedback.value = { ...feedback.value, ...explanation };
+                }
             }
         } catch (err) {
             console.error('AI explanation failed:', err);
         } finally {
-            isExplaining.value = false;
+            // Only turn off loading if we are still on the same exercise 
+            // (or if we want to be clean, we can always turn it off, but consistency matters)
+            if (exercise.value && exercise.value.exercise_id === currentExerciseId) {
+                isExplaining.value = false;
+            }
         }
     }
 
