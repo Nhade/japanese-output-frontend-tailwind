@@ -24,7 +24,7 @@ async function fetchNewExercise() {
   showHint.value = false;
 
   try {
-    const response = await fetch('/api/exercise/random', {headers: {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/random`, {headers: {
       'Content-Type': 'application/json',
     }});
     if (!response.ok) throw new Error('Network response was not ok');
@@ -43,7 +43,7 @@ async function handleAnswerSubmit() {
   if (!exercise.value || !userAnswer.value.trim()) return;
 
   try {
-    const response = await fetch('/api/exercise/submit', {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
