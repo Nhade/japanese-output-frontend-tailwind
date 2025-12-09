@@ -15,7 +15,7 @@ k = kakasi()
 password_hash = PasswordHash.recommended()
 
 # Make the database path absolute
-DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'news_corpus.db')
+DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'news_corpus.db')
 
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_PATH)
@@ -46,40 +46,73 @@ def get_mistakes(user_id):
 
     return jsonify([dict(mistake) for mistake in mistakes])
 
+from ai_service import evaluate_submission
+
+# ... (existing imports)
+
 @app.route('/api/exercise/submit', methods=['POST'])
 def submit_answer():
     data = request.get_json()
     exercise_id = data.get('exercise_id')
     user_answer = data.get('user_answer', '').strip()
-    user_id = data.get('user_id')  # TODO: Get user_id from session/JWT instead of request body
+    user_id = data.get('user_id')
 
     if not exercise_id or not user_id:
         return jsonify({"error": "exercise_id and user_id are required"}), 400
 
     conn = get_db_connection()
     try:
-        correct_answer_row = conn.execute('SELECT correct_answer FROM exercise WHERE exercise_id = ?', (exercise_id,)).fetchone()
+        # Fetch question_sentence as well
+        row = conn.execute('SELECT question_sentence, correct_answer FROM exercise WHERE exercise_id = ?', (exercise_id,)).fetchone()
 
-        if correct_answer_row is None:
+        if row is None:
             return jsonify({"error": "Exercise not found"}), 404
 
-        correct_answer = correct_answer_row['correct_answer']
+        correct_answer = row['correct_answer']
+        question_sentence = row['question_sentence']
         
+        # 1. First Layer: Simple String Matching (Kakasi)
         user_answer_hira = "".join([item['hira'] for item in k.convert(user_answer)])
         correct_answer_hira = "".join([item['hira'] for item in k.convert(correct_answer)])
-        is_correct = (user_answer_hira == correct_answer_hira)
+        
+        # Default values
+        score = 100
+        feedback = "完全正確！"
+        error_type = "none"
+        is_correct = False
 
-        # Log the answer to the database
+        if user_answer_hira == correct_answer_hira:
+            is_correct = True
+        else:
+            # 2. Second Layer: AI Evaluation
+            print("Calling AI for evaluation...")
+            ai_result = evaluate_submission(question_sentence, user_answer, correct_answer)
+            
+            is_correct = ai_result['is_correct']
+            score = ai_result['score']
+            feedback = ai_result['feedback']
+            error_type = ai_result['error_type']
+
+        # Log to database with new fields
         log_id = str(uuid.uuid4())
         answered_timestamp = datetime.now().isoformat()
-        conn.execute('INSERT INTO answer_log (log_id, user_id, exercise_id, user_answer, is_correct, answered_timestamp) VALUES (?, ?, ?, ?, ?, ?)', (log_id, user_id, exercise_id, user_answer, is_correct, answered_timestamp))
+        
+        conn.execute('''
+            INSERT INTO answer_log 
+            (log_id, user_id, exercise_id, user_answer, is_correct, answered_timestamp, feedback, score, error_type) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (log_id, user_id, exercise_id, user_answer, is_correct, answered_timestamp, feedback, score, error_type))
         conn.commit()
+        
     finally:
         conn.close()
         
     return jsonify({
         "is_correct": is_correct,
-        "correct_answer": correct_answer
+        "correct_answer": correct_answer,
+        "score": score,
+        "feedback": feedback,
+        "error_type": error_type
     })
 
 @app.route('/api/users/register', methods=['POST'])
