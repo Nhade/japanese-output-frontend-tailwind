@@ -15,6 +15,5 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-    allowedHosts: ['batman-memorabilia-alignment-sorted.trycloudflare.com'],
   },
 })
