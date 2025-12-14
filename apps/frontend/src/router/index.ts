@@ -35,6 +35,18 @@ const router = createRouter({
       name: 'statistics',
       component: () => import('../views/StatisticsView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/news',
+      name: 'news-list',
+      component: () => import('../views/NewsListView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/news/:id',
+      name: 'news-reader',
+      component: () => import('../views/NewsReaderView.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })
