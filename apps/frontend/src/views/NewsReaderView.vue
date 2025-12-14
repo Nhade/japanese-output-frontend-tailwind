@@ -30,10 +30,9 @@
             <div class="mt-3 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
               <button 
                 @click="playAudio(para.text)" 
-                :disabled="isPlaying"
                 class="flex items-center gap-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
               >
-                <span v-if="isPlaying && currentPlayingText === para.text">🔊 Playing...</span>
+                <span v-if="isPlaying && currentPlayingText === para.text">⏹️ Stop</span>
                 <span v-else>▶️ Listen</span>
               </button>
               
@@ -70,6 +69,7 @@ const article = ref(null);
 const loading = ref(true);
 const isPlaying = ref(false);
 const currentPlayingText = ref('');
+const currentAudio = ref(null);
 
 // Fetch Article
 onMounted(async () => {
@@ -119,7 +119,21 @@ const toggleTranslation = async (index) => {
 
 // TTS Logic
 const playAudio = async (text) => {
-  if (isPlaying.value) return; // Prevent overlapping
+  if (isPlaying.value) {
+      if (currentAudio.value) {
+          currentAudio.value.pause();
+          currentAudio.value = null;
+      }
+      
+      const wasPlayingSameText = currentPlayingText.value === text;
+      
+      isPlaying.value = false;
+      currentPlayingText.value = '';
+
+      if (wasPlayingSameText) {
+          return;
+      }
+  }
   
   isPlaying.value = true;
   currentPlayingText.value = text;
@@ -136,10 +150,12 @@ const playAudio = async (text) => {
     const blob = await res.blob();
     const audioUrl = URL.createObjectURL(blob);
     const audio = new Audio(audioUrl);
+    currentAudio.value = audio;
     
     audio.onended = () => {
       isPlaying.value = false;
       currentPlayingText.value = '';
+      currentAudio.value = null;
       URL.revokeObjectURL(audioUrl); // Cleanup memory
     };
     
@@ -148,6 +164,7 @@ const playAudio = async (text) => {
     console.error(e);
     isPlaying.value = false;
     currentPlayingText.value = '';
+    currentAudio.value = null;
     alert("Unable to play audio.");
   }
 };
