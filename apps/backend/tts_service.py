@@ -5,7 +5,6 @@ def generate_audio(text: str) -> bytes:
     Generates MP3 audio bytes from Japanese text using Google TTS (gTTS).
     """
     try:
-        # lang='ja' specifies Japanese
         tts = gTTS(text=text, lang='ja')
         
         # Write audio to memory (BytesIO) instead of a file to avoid disk I/O
