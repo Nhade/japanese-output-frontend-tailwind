@@ -1,41 +1,33 @@
 import unittest
-import sys
-import os
-
+from unittest.mock import patch, MagicMock
 from apps.backend.ai_service import evaluate_submission
 
 class TestAIService(unittest.TestCase):
-    def test_conjugation_typo(self):
-        print("\nTesting AI Service - Conjugation Typo...")
-        question = "日本語を[＿＿＿]。"
-        correct_answer = "勉強します"
-        user_answer = "勉強てます"
-        
-        print(f"Q: {question}")
-        print(f"Correct: {correct_answer}")
-        print(f"User:    {user_answer}")
-        
-        result = evaluate_submission(question, user_answer, correct_answer)
-        print("Result:", result)
-        
-        self.assertIsNotNone(result)
-        # Assuming result has some structure, effectively just ensuring no crash for now
-        # as the AI response itself is non-deterministic for strict assertions without mocking.
+    
+    @patch('apps.backend.ai_service.requests.post')
+    def test_typo_correction(self, mock_post):
+        print("\nTesting AI Service Logic (Mocked)...")
 
-    def test_particle_error(self):
-        print("\nTesting AI Service - Particle Error...")
-        question = "日本語[＿＿＿]勉強します。"
-        correct_answer = "を"
-        user_answer = "が"
+        # 1. Mock the API response
+        # We tell Python: "When requests.post is called, return this fake JSON"
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "message": {
+                "content": '{"error_type": "typo", "reasoning": "Fake reasoning"}'
+            }
+        }
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        # 2. Run your function
+        result = evaluate_submission("日本語を[＿＿＿]。", "勉強てます", "勉強します")
+
+        # 3. Verify that your function logic handled the JSON correctly
+        self.assertEqual(result['error_type'], 'typo')
+        self.assertEqual(result['score'], 99) # 100 - 1 for typo
         
-        print(f"Q: {question}")
-        print(f"Correct: {correct_answer}")
-        print(f"User:    {user_answer}")
-        
-        result = evaluate_submission(question, user_answer, correct_answer)
-        print("Result:", result)
-        
-        self.assertIsNotNone(result)
+        # Verify we actually called the API (even though it was mocked)
+        mock_post.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()
