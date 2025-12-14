@@ -1,6 +1,5 @@
 import os
 import sqlite3
-# import time
 import uuid
 from datetime import datetime
 from flask import Flask, jsonify, request
@@ -12,12 +11,11 @@ from tts_service import generate_audio
 from flask import Response
 
 app = Flask(__name__)
-CORS(app)  # This will enable CORS for all routes
+CORS(app)  # Enable CORS for all routes
 
 k = kakasi()
 password_hash = PasswordHash.recommended()
 
-# Make the database path absolute
 DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'news_corpus.db')
 
 def get_db_connection():
@@ -30,7 +28,6 @@ def get_random_exercise():
     conn = get_db_connection()
     exercise = conn.execute('SELECT exercise_id, question_sentence, hint_chinese FROM exercise ORDER BY RANDOM() LIMIT 1').fetchone()
     conn.close()
-    # time.sleep(1)
     if exercise is None:
         return jsonify({"error": "No exercises found"}), 404
     
@@ -51,8 +48,6 @@ def get_mistakes(user_id):
     return jsonify([dict(mistake) for mistake in mistakes])
 
 from ai_service import evaluate_submission
-
-# ... (existing imports)
 
 @app.route('/api/exercise/submit', methods=['POST'])
 def submit_answer():

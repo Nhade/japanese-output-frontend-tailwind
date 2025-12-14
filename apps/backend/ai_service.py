@@ -1,26 +1,20 @@
 import os
 import json
+import requests
 from enum import Enum
 from typing import Optional
-
 from dotenv import load_dotenv
 
-# Load environment variables
-import requests
-
-# Load environment variables
 load_dotenv()
 
-# Configuration
 # Users should set API_BASE_URL to the root of their Ollama instance (e.g. http://localhost:11434)
-# If the path ends in /v1, we strip it to access the native /api/chat endpoint
 BASE_URL = os.getenv("API_BASE_URL", "http://localhost:11434").rstrip("/")
 if BASE_URL.endswith("/v1"):
     BASE_URL = BASE_URL[:-3]
 
 API_KEY = os.getenv("API_KEY", "ollama")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-oss:120b")
-# Default timeout to 120s for larger models like gpt-oss:120b
+# Allow longer timeout for cold start
 AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "120"))
 
 # Define Error Types
