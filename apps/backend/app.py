@@ -7,6 +7,9 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from pwdlib import PasswordHash, exceptions
 from pykakasi import kakasi
+from translation_service import translate_text
+from tts_service import generate_audio
+from flask import Response
 
 app = Flask(__name__)
 CORS(app)  # This will enable CORS for all routes
@@ -268,6 +271,80 @@ def get_user_statistics(user_id):
         processed_stats["jlpt_level_accuracy"][jlpt_level] = (totals['correct'] / totals['total']) * 100 if totals['total'] > 0 else 0
 
     return jsonify(processed_stats)
+
+@app.route('/api/news', methods=['GET'])
+def get_news_list():
+    conn = get_db_connection()
+    # Limit to 20 recent processed articles
+    articles = conn.execute('''
+        SELECT article_id, title, category, publish_timestamp 
+        FROM articles 
+        WHERE status = 'processed' 
+        ORDER BY publish_timestamp DESC 
+        LIMIT 20
+    ''').fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in articles])
+
+@app.route('/api/news/<article_id>', methods=['GET'])
+def get_news_detail(article_id):
+    conn = get_db_connection()
+    article = conn.execute('SELECT * FROM articles WHERE article_id = ?', (article_id,)).fetchone()
+    conn.close()
+    
+    if not article:
+        return jsonify({"error": "Article not found"}), 404
+    
+    data = dict(article)
+    
+    # Process paragraphs: split by newline, filter empty
+    paragraphs = []
+    raw_paragraphs = data['body_text'].split('\n')
+    
+    for p in raw_paragraphs:
+        p = p.strip()
+        # Filter out separators or empty lines
+        if p and not p.startswith('---'): 
+            paragraphs.append({
+                "text": p,
+                "translation": None,
+                "loadingTranslation": False
+            })
+    
+    return jsonify({
+        "info": {
+            "title": data['title'],
+            "category": data['category'],
+            "date": data['publish_timestamp']
+        },
+        "paragraphs": paragraphs
+    })
+
+@app.route('/api/translate', methods=['POST'])
+def translate_paragraph():
+    data = request.get_json()
+    text = data.get('text')
+    
+    if not text:
+        return jsonify({"error": "Text is required"}), 400
+    
+    translated = translate_text(text)
+    return jsonify({"translated_text": translated})
+
+@app.route('/api/tts', methods=['POST'])
+def get_tts():
+    data = request.get_json()
+    text = data.get('text')
+    
+    if not text:
+        return jsonify({"error": "Text is required"}), 400
+    
+    audio_content = generate_audio(text)
+    
+    if not audio_content:
+        return jsonify({"error": "TTS generation failed"}), 500
+
+    return Response(audio_content, mimetype="audio/mpeg")
 
 if __name__ == '__main__':
     app.run(debug=True)

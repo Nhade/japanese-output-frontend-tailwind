@@ -47,6 +47,13 @@ const isActive = (path: string) => route.path === path
               :class="isActive('/statistics') ? 'bg-emerald-500/20 text-emerald-300' : ''"
             >Statistics</router-link>
           </li>
+          <li>
+            <router-link
+              to="/news"
+              class="rounded-lg px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/5"
+              :class="isActive('/news') ? 'bg-emerald-500/20 text-emerald-300' : ''"
+            >News</router-link>
+          </li>
           <li class="ml-1 hidden sm:block">
             <a
               href="#"
