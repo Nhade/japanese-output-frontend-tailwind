@@ -47,7 +47,7 @@ def get_mistakes(user_id):
 
     return jsonify([dict(mistake) for mistake in mistakes])
 
-from ai_service import evaluate_submission
+from ai_service import evaluate_submission, get_detailed_feedback
 
 @app.route('/api/exercise/submit', methods=['POST'])
 def submit_answer():
@@ -145,6 +145,37 @@ def explain_answer():
         conn.commit()
         
         return jsonify(ai_result)
+        
+    finally:
+        conn.close()
+
+@app.route('/api/exercise/explain-detailed', methods=['POST'])
+def explain_answer_detailed():
+    data = request.get_json()
+    log_id = data.get('log_id')
+    
+    if not log_id:
+        return jsonify({"error": "log_id is required"}), 400
+        
+    conn = get_db_connection()
+    try:
+        row = conn.execute('''
+            SELECT al.user_answer, e.question_sentence, e.correct_answer 
+            FROM answer_log al
+            JOIN exercise e ON al.exercise_id = e.exercise_id
+            WHERE al.log_id = ?
+        ''', (log_id,)).fetchone()
+        
+        if not row:
+            return jsonify({"error": "Log entry not found"}), 404
+            
+        question = row['question_sentence']
+        user_answer = row['user_answer']
+        correct_answer = row['correct_answer']
+        
+        detailed_feedback = get_detailed_feedback(question, user_answer, correct_answer)
+        
+        return jsonify({"detailed_feedback": detailed_feedback})
         
     finally:
         conn.close()

@@ -1,12 +1,24 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
+import Modal from '../components/Modal.vue';
 import { useAuthStore } from '../stores/auth';
+import MarkdownIt from 'markdown-it';
+
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true
+});
 
 // Reactive state for the view
 const exercise = ref(null); // Holds the current exercise data
 const feedback = ref(null); // Holds the feedback from the server after submission
+const detailedFeedback = ref(null); // Holds the detailed explanation
+const showDetailModal = ref(false);
+const detailedError = ref(null);
 const isLoading = ref(true); // Controls the loading spinner visibility
+const isLoadingDetailed = ref(false); // Controls the detailed feedback spinner
 const auth = useAuthStore();
 const userAnswer = ref('');
 const showHint = ref(false);
@@ -19,6 +31,9 @@ const answerInput = ref(null);
 async function fetchNewExercise() {
   isLoading.value = true;
   feedback.value = null; // Reset feedback for the new question
+  detailedFeedback.value = null; // Reset detailed feedback
+  showDetailModal.value = false;
+  detailedError.value = null;
   exercise.value = null; // Clear old exercise
   userAnswer.value = '';
   showHint.value = false;
@@ -108,7 +123,37 @@ async function revealHint() {
   showHint.value = true;
   await nextTick();
   answerInput.value?.focus();
+  answerInput.value?.focus();
 }
+
+async function fetchDetailedFeedback() {
+  if (!feedback.value || !feedback.value.log_id) return;
+  
+  isLoadingDetailed.value = true;
+  detailedError.value = null;
+  try {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/explain-detailed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ log_id: feedback.value.log_id }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      detailedFeedback.value = data.detailed_feedback;
+      showDetailModal.value = true;
+    } else {
+        const err = await response.json();
+        detailedError.value = err.error || 'Failed to fetch explanation';
+    }
+  } catch (error) {
+    console.error('Failed to fetch detailed feedback:', error);
+    detailedError.value = 'Network error or server unavailable.';
+  } finally {
+    isLoadingDetailed.value = false;
+  }
+}
+
 
 function handleKeydown(event) {
   if (event.altKey && event.key === 'h') {
@@ -204,7 +249,29 @@ onUnmounted(() => {
                         Type: {{ feedback.error_type }}
                     </div>
                 </div>
-                
+
+                <!-- Detailed Feedback Section -->
+                <div v-if="feedback.feedback && !feedback.is_correct" class="mt-4 pt-2 border-t border-rose-500/20">
+                    
+                    <div v-if="!detailedFeedback && !isLoadingDetailed">
+                         <button 
+                            @click="fetchDetailedFeedback"
+                            class="text-xs flex items-center gap-1 text-rose-300 hover:text-rose-100 transition-colors underline decoration-rose-500/30 underline-offset-2"
+                        >
+                            <span>Need more explanation?</span>
+                         </button>
+                    </div>
+
+                    <div v-if="isLoadingDetailed" class="flex items-center gap-2 text-rose-200/50 text-xs mt-2">
+                         <div class="scale-50 origin-left"><LoadingSpinner /></div>
+                         <span>Generating detailed explanation...</span>
+                    </div>
+
+
+                    <div v-if="detailedError" class="mt-2 text-xs text-rose-400 bg-rose-500/10 p-2 rounded">
+                        {{ detailedError }}
+                    </div>
+                </div>
                 <!-- Loading State -->
                 <div v-else-if="isExplaining" class="mt-2 pt-2 border-t border-rose-500/20 flex items-center justify-center gap-2 text-rose-200/50 text-sm">
                    <div class="scale-50 origin-center -ml-2"><LoadingSpinner /></div>
@@ -217,7 +284,21 @@ onUnmounted(() => {
               </div>
             </div>
           </transition>
+          
+          <!-- Detailed Feedback Modal -->
+          <Modal 
+            :show="showDetailModal" 
+            title="Detailed AI Explanation" 
+            @close="showDetailModal = false"
+          >
+            <div v-if="detailedFeedback" class="prose prose-invert prose-sm max-w-none text-zinc-300">
+              <div v-html="md.render(detailedFeedback)"></div>
+            </div>
+          </Modal>
+
         </section>
+
+
 
         <!-- Footer helper -->
         <p class="mt-6 text-center text-xs text-zinc-500">Press <kbd class="rounded bg-zinc-800 px-1">Enter</kbd> to check. Press <kbd class="rounded bg-zinc-800 px-1">Alt</kbd>+<kbd class="rounded bg-zinc-800 px-1">H</kbd> for hint.</p>
@@ -233,4 +314,54 @@ onUnmounted(() => {
 <style scoped>
 .fade-enter-active, .fade-leave-active { transition: opacity .2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* Custom Markdown Styles (since we don't have @tailwindcss/typography installed yet, or just to be safe) */
+:deep(.prose h1), :deep(.prose h2), :deep(.prose h3) {
+  color: #e4e4e7; /* zinc-200 */
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+:deep(.prose p) {
+  margin-bottom: 1em;
+  line-height: 1.75;
+}
+:deep(.prose ul) {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+:deep(.prose ol) {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+:deep(.prose li) {
+  margin-bottom: 0.25em;
+}
+:deep(.prose strong) {
+  color: #a7f3d0; /* emerald-200 */
+  font-weight: 600;
+}
+:deep(.prose blockquote) {
+  border-left: 4px solid #34d399;
+  padding-left: 1em;
+  color: #d1d5db;
+  font-style: italic;
+  margin-bottom: 1em;
+}
+:deep(.prose table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1em;
+}
+:deep(.prose th), :deep(.prose td) {
+  border: 1px solid #3f3f46; /* zinc-700 */
+  padding: 0.5em;
+  text-align: left;
+}
+:deep(.prose th) {
+  background-color: #27272a; /* zinc-800 */
+  font-weight: 600;
+}
 </style>
