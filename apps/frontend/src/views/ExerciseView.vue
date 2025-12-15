@@ -261,6 +261,14 @@ onUnmounted(() => {
                             <span>Need more explanation?</span>
                          </button>
                     </div>
+                    <div v-else-if="detailedFeedback">
+                         <button 
+                            @click="showDetailModal = true"
+                            class="text-xs flex items-center gap-1 text-emerald-300 hover:text-emerald-100 transition-colors underline decoration-emerald-500/30 underline-offset-2"
+                        >
+                            <span>View detailed explanation</span>
+                         </button>
+                    </div>
 
                     <div v-if="isLoadingDetailed" class="flex items-center gap-2 text-rose-200/50 text-xs mt-2">
                          <div class="scale-50 origin-left"><LoadingSpinner /></div>
