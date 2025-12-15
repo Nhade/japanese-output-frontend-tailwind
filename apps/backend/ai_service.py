@@ -153,3 +153,55 @@ def evaluate_submission(question: str, user_answer: str, correct_answer: str) ->
         "feedback": reasoning,
         "deduction": deduction
     }
+
+def get_detailed_feedback(question: str, user_answer: str, correct_answer: str) -> str:
+    """
+    Ask AI for a detailed grammatical explanation.
+    """
+    system_prompt = f"""
+    You are a helpful Japanese language teacher.
+    The user has answered a Japanese grammar question incorrectly (or partially incorrectly).
+    
+    Provide a detailed explanation in Traditional Chinese (繁體中文).
+    - Analyze the user's mistake.
+    - Explain the grammar point involved in the correct answer.
+    - Provide 1-2 example sentences using the correct grammar.
+    
+    Keep the tone encouraging. Use Markdown formatting (bullet points, bold text) for readability.
+    """
+
+    user_prompt = f"""
+    Question: {question}
+    Correct Answer: {correct_answer}
+    User Answer: {user_answer}
+    """
+
+    url = f"{BASE_URL}/api/chat"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "stream": False
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
+        response.raise_for_status()
+        
+        # Parse Ollama response
+        data = response.json()
+        content = data.get("message", {}).get("content", "")
+        if not content:
+             content = data.get("response", "")
+        
+        return content
+
+    except Exception as e:
+        print(f"Failed to get detailed feedback. Error: {e}")
+        return "抱歉，目前無法取得詳細解說。"
