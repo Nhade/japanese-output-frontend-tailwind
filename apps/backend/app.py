@@ -48,6 +48,7 @@ def get_mistakes(user_id):
     return jsonify([dict(mistake) for mistake in mistakes])
 
 from ai_service import evaluate_submission, get_detailed_feedback
+from agent_service import generate_daily_review_agent
 
 @app.route('/api/exercise/submit', methods=['POST'])
 def submit_answer():
@@ -384,6 +385,15 @@ def get_tts():
         return jsonify({"error": "TTS generation failed"}), 500
 
     return Response(audio_content, mimetype="audio/wav")
+
+@app.route('/api/agent/daily_review/<user_id>', methods=['GET'])
+def get_daily_review(user_id):
+    try:
+        review_content = generate_daily_review_agent(user_id, DATABASE_PATH)
+        return jsonify({"review": review_content})
+    except Exception as e:
+        print(f"Agent Error: {e}")
+        return jsonify({"error": "Agent 正在忙碌中，請稍後再試"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
