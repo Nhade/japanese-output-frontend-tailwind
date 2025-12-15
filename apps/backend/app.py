@@ -42,6 +42,7 @@ def get_mistakes(user_id):
         FROM answer_log al
         JOIN exercise e ON al.exercise_id = e.exercise_id
         WHERE al.user_id = ? AND al.is_correct = 0
+        ORDER BY al.answered_timestamp DESC
     ''', (user_id,)).fetchall()
     conn.close()
 
