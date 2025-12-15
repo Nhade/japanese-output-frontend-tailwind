@@ -300,15 +300,28 @@ def get_user_statistics(user_id):
 
 @app.route('/api/news', methods=['GET'])
 def get_news_list():
+    category = request.args.get('category')
+    date_str = request.args.get('date')  # Expected format YYYY-MM-DD
+
     conn = get_db_connection()
-    # Limit to 20 recent processed articles
-    articles = conn.execute('''
-        SELECT article_id, title, category, publish_timestamp 
-        FROM articles 
-        WHERE status = 'processed' 
-        ORDER BY publish_timestamp DESC 
-        LIMIT 20
-    ''').fetchall()
+    
+    query = "SELECT article_id, title, category, publish_timestamp FROM articles WHERE status = 'processed'"
+    params = []
+
+    if category:
+        query += " AND category = ?"
+        params.append(category)
+    
+    if date_str:
+        # Assuming publish_timestamp is ISO string, we try to match the date part.
+        # SQLite's date function might be useful, or simple string matching if format is consistent.
+        # Timestamps are like '2024-12-14T...' so 'LIKE date_str%' works.
+        query += " AND publish_timestamp LIKE ?"
+        params.append(f"{date_str}%")
+
+    query += " ORDER BY publish_timestamp DESC LIMIT 20"
+
+    articles = conn.execute(query, params).fetchall()
     conn.close()
     return jsonify([dict(row) for row in articles])
 
