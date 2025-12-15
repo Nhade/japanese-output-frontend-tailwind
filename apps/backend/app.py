@@ -370,7 +370,7 @@ def get_tts():
     if not audio_content:
         return jsonify({"error": "TTS generation failed"}), 500
 
-    return Response(audio_content, mimetype="audio/mpeg")
+    return Response(audio_content, mimetype="audio/wav")
 
 if __name__ == '__main__':
     app.run(debug=True)
