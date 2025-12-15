@@ -35,7 +35,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
       <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="close"></div>
 
       <!-- Modal Card -->
-      <div class="relative w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden rounded-2xl bg-zinc-900 border border-white/10 shadow-2xl shadow-black/50">
+      <div class="relative w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden rounded-2xl bg-zinc-900/95 border border-white/10 shadow-2xl shadow-black/50">
         
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-zinc-900/95 sticky top-0 z-10">

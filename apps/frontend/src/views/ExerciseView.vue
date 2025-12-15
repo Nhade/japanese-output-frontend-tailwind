@@ -253,28 +253,53 @@ onUnmounted(() => {
                 <!-- Detailed Feedback Section -->
                 <div v-if="feedback.feedback && !feedback.is_correct" class="mt-4 pt-2 border-t border-rose-500/20">
                     
-                    <div v-if="!detailedFeedback && !isLoadingDetailed">
-                         <button 
-                            @click="fetchDetailedFeedback"
-                            class="text-xs flex items-center gap-1 text-rose-300 hover:text-rose-100 transition-colors underline decoration-rose-500/30 underline-offset-2"
+                    <!-- Smart Action Card -->
+                    <div class="mt-4">
+                        <button 
+                            @click="!detailedFeedback ? fetchDetailedFeedback() : (showDetailModal = true)"
+                            :disabled="isLoadingDetailed"
+                            class="group relative flex w-full items-center justify-between rounded-xl border border-white/5 bg-zinc-900/80 p-4 transition-all hover:bg-zinc-800 hover:border-indigo-500/30 active:scale-[0.99] shadow-lg shadow-black/20"
                         >
-                            <span>Need more explanation?</span>
-                         </button>
-                    </div>
-                    <div v-else-if="detailedFeedback">
-                         <button 
-                            @click="showDetailModal = true"
-                            class="text-xs flex items-center gap-1 text-emerald-300 hover:text-emerald-100 transition-colors underline decoration-emerald-500/30 underline-offset-2"
-                        >
-                            <span>View detailed explanation</span>
-                         </button>
-                    </div>
+                            <div class="flex items-center gap-4">
+                                <!-- Icon Container -->
+                                <div class="relative flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
+                                    <template v-if="isLoadingDetailed">
+                                        <div class="h-5 w-5 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent"></div>
+                                    </template>
+                                    <template v-else-if="detailedFeedback">
+                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                        </svg>
+                                    </template>
+                                    <template v-else>
+                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        </svg>
+                                    </template>
+                                </div>
+                                
+                                <div class="text-left">
+                                    <div class="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors">
+                                        <span v-if="isLoadingDetailed">Analyzing details...</span>
+                                        <span v-else-if="detailedFeedback">View Detailed Explanation</span>
+                                        <span v-else>Explain this answer</span>
+                                    </div>
+                                    <div class="text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors">
+                                        <span v-if="isLoadingDetailed">AI is generating a breakdown</span>
+                                        <span v-else-if="detailedFeedback">Review grammar and examples</span>
+                                        <span v-else>Get detailed grammar breakdown with AI</span>
+                                    </div>
+                                </div>
+                            </div>
 
-                    <div v-if="isLoadingDetailed" class="flex items-center gap-2 text-rose-200/50 text-xs mt-2">
-                         <div class="scale-50 origin-left"><LoadingSpinner /></div>
-                         <span>Generating detailed explanation...</span>
+                            <!-- Chevron/Action Icon -->
+                            <div class="text-zinc-600 group-hover:text-indigo-400 transition-all duration-300 group-hover:translate-x-1">
+                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                        </button>
                     </div>
-
 
                     <div v-if="detailedError" class="mt-2 text-xs text-rose-400 bg-rose-500/10 p-2 rounded">
                         {{ detailedError }}
