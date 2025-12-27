@@ -7,12 +7,9 @@
         <!-- Filter Controls -->
         <div class="flex gap-2">
           <input type="date" v-model="filterDate" @change="fetchArticles"
-            class="bg-white border-zinc-200 text-zinc-900 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-200 border rounded px-3 py-1 text-sm focus:outline-none focus:border-emerald-500 transition-colors" />
-          <select v-model="filterCategory" @change="fetchArticles"
-            class="bg-white border-zinc-200 text-zinc-900 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-200 border rounded px-3 py-1 text-sm focus:outline-none focus:border-emerald-500 transition-colors">
-            <option value="">{{ $t('news.filter_all_categories') }}</option>
-            <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-          </select>
+            class="bg-white border-zinc-200 text-zinc-900 dark:bg-zinc-900/50 dark:border-white/10 dark:text-zinc-200 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors shadow-sm" />
+          <BaseSelect v-model="filterCategory" :options="categoryOptions" @update:model-value="fetchArticles"
+            class="w-40" placeholder="All Categories" />
         </div>
       </div>
 
@@ -39,6 +36,7 @@
 </template>
 <script setup>
 import { ref, onMounted } from 'vue';
+import BaseSelect from '../components/BaseSelect.vue';
 
 const articles = ref([]);
 const loading = ref(true);
@@ -47,6 +45,11 @@ const filterCategory = ref('');
 
 // Common categories found in the database
 const categories = ['国際', '社会', '気象・災害', '科学・文化', '政治', '経済', '暮らし'];
+
+const categoryOptions = [
+  { value: '', label: 'All Categories' },
+  ...categories.map(c => ({ value: c, label: c }))
+];
 
 const formatDate = (ts) => {
   if (!ts) return '';
