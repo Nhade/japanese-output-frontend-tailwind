@@ -1,0 +1,14 @@
+{
+    "nav": {
+        "exercise": "練習",
+        "mistakes": "間違い",
+        "statistics": "統計",
+        "news": "ニュース",
+        "login": "ログイン",
+        "logout": "ログアウト",
+        "register": "登録"
+    },
+    "common": {
+        "language": "言語"
+    }
+}

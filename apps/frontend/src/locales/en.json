@@ -1,0 +1,14 @@
+{
+    "nav": {
+        "exercise": "Exercise",
+        "mistakes": "Mistakes",
+        "statistics": "Statistics",
+        "news": "News",
+        "login": "Login",
+        "logout": "Logout",
+        "register": "Register"
+    },
+    "common": {
+        "language": "Language"
+    }
+}

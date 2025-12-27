@@ -2,6 +2,7 @@
 import { useAuthStore } from '../stores/auth'
 import { useThemeStore } from '../stores/theme'
 import ThemeToggle from './ThemeToggle.vue'
+import LanguageSelector from './LanguageSelector.vue'
 import { computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
@@ -39,43 +40,51 @@ const isActive = (path: string) => route.path === path
           <template v-if="isLoggedIn">
             <li>
               <router-link to="/" class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">Exercise</router-link>
+                :class="isActive('/') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
+                  $t('nav.exercise') }}</router-link>
             </li>
             <li>
               <router-link to="/mistakes"
                 class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/mistakes') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">Mistakes</router-link>
+                :class="isActive('/mistakes') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
+                  $t('nav.mistakes') }}</router-link>
             </li>
             <li>
               <router-link to="/statistics"
                 class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/statistics') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">Statistics</router-link>
+                :class="isActive('/statistics') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
+                  $t('nav.statistics') }}</router-link>
             </li>
             <li>
               <router-link to="/news"
                 class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/news') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">News</router-link>
+                :class="isActive('/news') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
+                  $t('nav.news') }}</router-link>
             </li>
             <li class="ml-1 hidden sm:block">
               <a href="#" @click.prevent="logout"
-                class="rounded-lg px-3 py-2 text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/7 transition-colors">Logout</a>
+                class="rounded-lg px-3 py-2 text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/7 transition-colors">{{
+                  $t('nav.logout') }}</a>
             </li>
           </template>
           <template v-else>
             <li class="ml-1 hidden sm:block">
               <router-link to="/login"
                 class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/login') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">Login</router-link>
+                :class="isActive('/login') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
+                  $t('nav.login') }}</router-link>
             </li>
             <li class="hidden sm:block">
               <router-link to="/register"
                 class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/register') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">Register</router-link>
+                :class="isActive('/register') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
+                  $t('nav.register') }}</router-link>
             </li>
           </template>
         </ul>
         <!-- Theme Toggle -->
-        <div class="ml-2 pl-2 border-l border-zinc-200 dark:border-white/10">
+        <div class="ml-2 pl-2 border-l border-zinc-200 dark:border-white/10 flex items-center gap-2">
+          <LanguageSelector />
           <ThemeToggle />
         </div>
       </div>
