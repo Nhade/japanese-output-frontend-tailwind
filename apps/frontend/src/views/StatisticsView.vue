@@ -1,24 +1,24 @@
 <template>
   <div class="p-4 pt-10 text-zinc-900 dark:text-zinc-100">
-    <h1 class="text-xl font-bold my-6">Statistics</h1>
+    <h1 class="text-xl font-bold my-6">{{ $t('statistics.title') }}</h1>
     <div v-if="loading" class="flex justify-center items-center">
       <LoadingSpinner />
     </div>
     <div v-if="!loading && (posAccuracyData.labels.length > 0 || jlptAccuracyData.labels.length > 0)">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <h2 class="text-xl font-semibold mb-2">Accuracy by Part of Speech</h2>
+          <h2 class="text-xl font-semibold mb-2">{{ $t('statistics.accuracy_pos') }}</h2>
           <Bar :data="posAccuracyData" :options="chartOptions" />
         </div>
         <div>
-          <h2 class="text-xl font-semibold mb-2">Accuracy by JLPT Level</h2>
+          <h2 class="text-xl font-semibold mb-2">{{ $t('statistics.accuracy_jlpt') }}</h2>
           <Bar :data="jlptAccuracyData" :options="chartOptions" />
         </div>
       </div>
     </div>
     <div v-if="!loading && posAccuracyData.labels.length === 0 && jlptAccuracyData.labels.length === 0"
       class="text-center text-zinc-600 dark:text-zinc-500">
-      <p>No statistics available yet. Complete some exercises to see your progress.</p>
+      <p>{{ $t('statistics.no_data') }}</p>
     </div>
   </div>
 </template>

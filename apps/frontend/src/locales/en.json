@@ -9,6 +9,84 @@
         "register": "Register"
     },
     "common": {
-        "language": "Language"
+        "language": "Language",
+        "loading": "Loading..."
+    },
+    "auth": {
+        "login_title": "Login to OWO",
+        "register_title": "Create an account",
+        "username": "Username",
+        "password": "Password",
+        "username_placeholder": "Your Username",
+        "password_placeholder": "••••••••",
+        "create_password_placeholder": "Create a strong password",
+        "login_button": "Login",
+        "register_button": "Register",
+        "no_account": "Don’t have an account?",
+        "has_account": "Already have an account?",
+        "register_link": "Register here",
+        "login_link": "Login here",
+        "error_generic": "An error occurred. Please try again."
+    },
+    "exercise": {
+        "your_answer": "Your Answer",
+        "check_answer": "Check Answer",
+        "show_hint": "Show Hint",
+        "correct": "Correct!",
+        "incorrect": "Not quite.",
+        "correct_answer_label": "Correct answer:",
+        "feedback_label": "Feedback",
+        "score": "Score:",
+        "ai_analysis": "AI Analysis",
+        "explain_answer": "Explain this answer",
+        "view_detailed": "View Detailed Explanation",
+        "analyzing": "Analyzing details...",
+        "ai_generating_breakdown": "AI is generating a breakdown",
+        "review_grammar": "Review grammar and examples",
+        "get_detailed_breakdown": "Get detailed grammar breakdown with AI",
+        "next_question": "Next Question",
+        "detailed_modal_title": "Detailed AI Explanation",
+        "footer_helper": "Press {enter} to check. Press {alt_h} for hint.",
+        "error_submit": "Failed to submit answer",
+        "network_error": "Network error or server unavailable.",
+        "type_here": "Type here..."
+    },
+    "mistakes": {
+        "title": "Past Mistakes",
+        "generate_review": "Generate Daily Review",
+        "review_ready": "Daily Review Ready",
+        "get_advice": "Get personalized advice based on your recent mistakes",
+        "view_review": "Click to view your personalized study plan",
+        "analyzing": "AI is analyzing your mistakes...",
+        "your_answer": "Your Answer:",
+        "correct_answer": "Correct Answer:",
+        "ai_feedback": "AI Feedback",
+        "score": "Score:",
+        "no_mistakes": "No mistakes found. 🎉",
+        "login_required": "Please login to see your mistakes.",
+        "load_error": "Failed to load mistakes.",
+        "agent_working": "AI Agent Working..."
+    },
+    "statistics": {
+        "title": "Statistics",
+        "accuracy_pos": "Accuracy by Part of Speech",
+        "accuracy_jlpt": "Accuracy by JLPT Level",
+        "accuracy_label": "Accuracy",
+        "no_data": "No statistics available yet. Complete some exercises to see your progress."
+    },
+    "news": {
+        "title": "News Reading Practice",
+        "filter_all_categories": "All Categories",
+        "loading_articles": "Loading articles...",
+        "no_articles": "No articles found matching your criteria.",
+        "back_to_list": "← Back to list",
+        "loading_article": "Loading article...",
+        "article_not_found": "Article not found or failed to load.",
+        "stop_audio": "Stop",
+        "listen": "Listen",
+        "translate": "Translate",
+        "translating": "Translating...",
+        "translation_failed": "Translation failed.",
+        "audio_error": "Unable to play audio."
     }
 }

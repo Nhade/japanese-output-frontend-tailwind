@@ -234,17 +234,18 @@ onUnmounted(() => {
 
             <!-- Input -->
             <form @submit.prevent="handleAnswerSubmit" class="space-y-4" v-if="!feedback">
-              <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300" for="answer">Your Answer</label>
+              <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300" for="answer">{{
+                $t('exercise.your_answer') }}</label>
               <input id="answer" ref="answerInput" v-model.trim="userAnswer"
                 class="w-full rounded-xl px-5 py-4 text-lg outline-none transition-all shadow-inner border bg-white text-zinc-900 border-zinc-200 placeholder-zinc-400 focus:ring-2 focus:ring-emerald-500/40 dark:bg-zinc-900 dark:text-zinc-100 dark:border-white/15 dark:placeholder-zinc-500 dark:focus:ring-emerald-500/50"
-                placeholder="Type here..." autocomplete="off" />
+                :placeholder="$t('exercise.type_here')" autocomplete="off" />
               <div class="flex items-center gap-3 pt-2">
                 <button type="submit"
-                  class="rounded-xl px-6 py-2.5 font-medium text-white shadow-lg transition-all active:scale-95 bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-emerald-200/40 dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500 dark:shadow-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50">Check
-                  Answer</button>
+                  class="rounded-xl px-6 py-2.5 font-medium text-white shadow-lg transition-all active:scale-95 bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-emerald-200/40 dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500 dark:shadow-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50">{{
+                    $t('exercise.check_answer') }}</button>
                 <button type="button" @click="revealHint"
-                  class="rounded-xl px-4 py-2.5 text-sm border transition-colors bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:bg-white/5 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40">Show
-                  Hint</button>
+                  class="rounded-xl px-4 py-2.5 text-sm border transition-colors bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:bg-white/5 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40">{{
+                    $t('exercise.show_hint') }}</button>
                 <button type="button" @click="testMockModal"
                   class="rounded-xl px-4 py-2.5 text-sm border transition-colors bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:bg-white/5 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40">
                   Debug</button>
@@ -259,7 +260,8 @@ onUnmounted(() => {
                   <div class="flex items-center gap-2">
                     <span class="text-lg">✅</span>
                     <div>
-                      <span class="font-semibold text-emerald-800 dark:text-emerald-200">Correct!</span>
+                      <span class="font-semibold text-emerald-800 dark:text-emerald-200">{{ $t('exercise.correct')
+                        }}</span>
                       <span class="ml-2 text-emerald-700 dark:text-emerald-200">{{ feedback.correct_answer }}</span>
                     </div>
                   </div>
@@ -268,9 +270,11 @@ onUnmounted(() => {
                   <div class="mt-2 pt-3 border-t border-emerald-200 dark:border-emerald-400/25">
                     <div class="flex justify-between items-start mb-1">
                       <span
-                        class="text-xs font-medium text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">Feedback</span>
+                        class="text-xs font-medium text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">{{
+                          $t('exercise.feedback_label') }}</span>
                       <span
-                        class="text-xs bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20 px-2 py-0.5 rounded border font-mono">Score:
+                        class="text-xs bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20 px-2 py-0.5 rounded border font-mono">{{
+                          $t('exercise.score') }}
                         100</span>
                     </div>
                     <p class="text-sm text-emerald-900 dark:text-emerald-100/90 leading-relaxed">完全正確！🎉</p>
@@ -280,19 +284,20 @@ onUnmounted(() => {
                   class="rounded-xl border px-5 py-4 bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-500/10 dark:border-rose-400/25 dark:text-zinc-100">
                   <div class="flex items-center gap-2 mb-2">
                     <span class="text-lg">❌</span>
-                    <span class="font-medium text-rose-700 dark:text-rose-200">Not quite.</span>
+                    <span class="font-medium text-rose-700 dark:text-rose-200">{{ $t('exercise.incorrect') }}</span>
                   </div>
-                  <div class="text-rose-800 pl-7 dark:text-zinc-200">Correct answer: <span
+                  <div class="text-rose-800 pl-7 dark:text-zinc-200">{{ $t('exercise.correct_answer_label') }} <span
                       class="font-semibold text-rose-950 dark:text-zinc-100">{{ feedback.correct_answer }}</span></div>
 
                   <!-- AI Feedback Section -->
                   <div v-if="feedback.feedback" class="mt-4 pt-3 border-t border-rose-200 pl-1 dark:border-rose-400/25">
                     <div class="flex justify-between items-start mb-2">
-                      <span class="text-xs font-medium text-rose-800 dark:text-rose-300 uppercase tracking-wider">AI
-                        Analysis</span>
+                      <span class="text-xs font-medium text-rose-800 dark:text-rose-300 uppercase tracking-wider">{{
+                        $t('exercise.ai_analysis') }}</span>
                       <div class="flex gap-2">
                         <span v-if="feedback.score"
-                          class="text-xs bg-rose-100 text-rose-900 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/15 px-2 py-0.5 rounded border font-mono">Score:
+                          class="text-xs bg-rose-100 text-rose-900 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/15 px-2 py-0.5 rounded border font-mono">{{
+                          $t('exercise.score') }}
                           {{ feedback.score }}</span>
                         <span v-if="feedback.error_type && feedback.error_type !== 'none'"
                           class="text-xs bg-rose-100 text-rose-900 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/15 px-2 py-0.5 rounded border uppercase tracking-wider">
@@ -338,15 +343,15 @@ onUnmounted(() => {
                           <div class="text-left">
                             <div
                               class="text-sm font-medium text-zinc-800 group-hover:text-black dark:text-zinc-200 dark:group-hover:text-white transition-colors">
-                              <span v-if="isLoadingDetailed">Analyzing details...</span>
-                              <span v-else-if="detailedFeedback">View Detailed Explanation</span>
-                              <span v-else>Explain this answer</span>
+                              <span v-if="isLoadingDetailed">{{ $t('exercise.analyzing') }}</span>
+                              <span v-else-if="detailedFeedback">{{ $t('exercise.view_detailed') }}</span>
+                              <span v-else>{{ $t('exercise.explain_answer') }}</span>
                             </div>
                             <div
                               class="text-xs text-zinc-600 group-hover:text-zinc-700 dark:text-zinc-400 dark:group-hover:text-zinc-300 transition-colors">
-                              <span v-if="isLoadingDetailed">AI is generating a breakdown</span>
-                              <span v-else-if="detailedFeedback">Review grammar and examples</span>
-                              <span v-else>Get detailed grammar breakdown with AI</span>
+                              <span v-if="isLoadingDetailed">{{ $t('exercise.ai_generating_breakdown') }}</span>
+                              <span v-else-if="detailedFeedback">{{ $t('exercise.review_grammar') }}</span>
+                              <span v-else>{{ $t('exercise.get_detailed_breakdown') }}</span>
                             </div>
                           </div>
                         </div>
@@ -373,14 +378,14 @@ onUnmounted(() => {
                     <div class="scale-75 origin-center">
                       <LoadingSpinner />
                     </div>
-                    <span>Analyzing details...</span>
+                    <span>{{ $t('exercise.analyzing') }}</span>
                   </div>
 
                 </div>
                 <div class="mt-8 flex justify-end">
                   <button ref="nextQuestionButton" @click="fetchNewExercise"
                     class="group flex items-center gap-2 rounded-xl py-2.5 px-5 text-sm font-medium transition-all border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-zinc-900 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/7 dark:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/40 dark:focus-visible:ring-white/20">
-                    Next Question
+                    {{ $t('exercise.next_question') }}
                     <span class="group-hover:translate-x-0.5 transition-transform">→</span>
                   </button>
                 </div>
@@ -388,7 +393,8 @@ onUnmounted(() => {
             </transition>
 
             <!-- Detailed Feedback Modal -->
-            <Modal :show="showDetailModal" title="Detailed AI Explanation" @close="showDetailModal = false">
+            <Modal :show="showDetailModal" :title="$t('exercise.detailed_modal_title')"
+              @close="showDetailModal = false">
               <div v-if="detailedFeedback" class="prose prose-sm max-w-none prose-zinc dark:prose-invert">
                 <div v-html="md.render(detailedFeedback)"></div>
               </div>
@@ -398,16 +404,14 @@ onUnmounted(() => {
         </transition>
 
         <!-- Footer helper -->
-        <p class="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-400">Press <kbd
-            class="rounded px-1 bg-zinc-200 text-zinc-700 dark:bg-white/5 dark:border dark:border-white/10 dark:text-zinc-300">Enter</kbd>
-          to check. Press <kbd
-            class="rounded px-1 bg-zinc-200 text-zinc-700 dark:bg-white/5 dark:border dark:border-white/10 dark:text-zinc-300">Alt</kbd>+<kbd
-            class="rounded px-1 bg-zinc-200 text-zinc-700 dark:bg-white/5 dark:border dark:border-white/10 dark:text-zinc-300">H</kbd>
-          for hint.</p>
+        <p class="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-400">{{ $t('exercise.footer_helper', {
+          enter:
+            'Enter',
+          alt_h: 'Alt+H' }) }}</p>
       </div>
 
       <div v-else class="error-message">
-        <p>An error occurred. Please try again later.</p>
+        <p>{{ $t('auth.error_generic') }}</p>
       </div>
     </div>
   </main>

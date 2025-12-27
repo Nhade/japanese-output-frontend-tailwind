@@ -2,7 +2,7 @@
   <main class="min-h-[calc(100vh-4rem)] text-zinc-900 dark:text-zinc-100">
     <div class="mx-auto max-w-5xl px-4 pb-24 pt-10">
       <div class="my-6">
-        <h1 class="text-xl font-semibold tracking-wide mb-4">Past Mistakes</h1>
+        <h1 class="text-xl font-semibold tracking-wide mb-4">{{ $t('mistakes.title') }}</h1>
 
         <!-- Smart Action Card -->
         <button @click="!dailyReview ? generateReview() : (showReviewModal = true)"
@@ -34,14 +34,14 @@
               <div
                 class="text-base font-medium text-zinc-900 dark:text-zinc-200 group-hover:text-black dark:group-hover:text-white transition-colors">
                 <span v-if="isAgentWorking">{{ agentStatus }}</span>
-                <span v-else-if="dailyReview">Daily Review Ready</span>
-                <span v-else>Generate Daily Review</span>
+                <span v-else-if="dailyReview">{{ $t('mistakes.review_ready') }}</span>
+                <span v-else>{{ $t('mistakes.generate_review') }}</span>
               </div>
               <div
                 class="text-sm text-zinc-600 group-hover:text-zinc-800 dark:text-zinc-500 dark:group-hover:text-zinc-400 transition-colors">
-                <span v-if="isAgentWorking">AI is analyzing your mistakes...</span>
-                <span v-else-if="dailyReview">Click to view your personalized study plan</span>
-                <span v-else>Get personalized advice based on your recent mistakes</span>
+                <span v-if="isAgentWorking">{{ $t('mistakes.analyzing') }}</span>
+                <span v-else-if="dailyReview">{{ $t('mistakes.view_review') }}</span>
+                <span v-else>{{ $t('mistakes.get_advice') }}</span>
               </div>
             </div>
           </div>
@@ -58,13 +58,13 @@
       </div>
 
       <!-- Review Modal -->
-      <Modal :show="showReviewModal" title="📅 Daily Review" @close="showReviewModal = false">
+      <Modal :show="showReviewModal" :title="`📅 ${$t('mistakes.generate_review')}`" @close="showReviewModal = false">
         <div v-if="dailyReview" class="prose prose-sm max-w-none prose-zinc dark:prose-invert">
           <div v-html="md.render(dailyReview)"></div>
         </div>
       </Modal>
 
-      <div v-if="isLoading">Loading...</div>
+      <div v-if="isLoading">{{ $t('common.loading') }}</div>
       <div v-else-if="error">{{ error }}</div>
 
       <div v-else-if="mistakes.length > 0" class="grid gap-4 md:grid-cols-2">
@@ -72,23 +72,24 @@
           class="rounded-2xl border p-5 bg-white border-zinc-200 dark:bg-zinc-900/60 dark:border-white/5">
           <p class="text-sm leading-relaxed">{{ mistake.question_sentence }}</p>
           <div class="mt-3 rounded-lg p-3 text-sm bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
-            <div class="font-medium">Your Answer:</div>
+            <div class="font-medium">{{ $t('mistakes.your_answer') }}</div>
             <div>{{ mistake.user_answer }}</div>
           </div>
           <div
             class="mt-2 rounded-lg p-3 text-sm bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-            <div class="font-medium">Correct Answer:</div>
+            <div class="font-medium">{{ $t('mistakes.correct_answer') }}</div>
             <div class="font-semibold">{{ mistake.correct_answer }}</div>
           </div>
 
           <!-- AI Feedback -->
           <div v-if="mistake.feedback" class="mt-3 border-t pt-3 border-zinc-200 dark:border-white/5">
             <div class="flex items-center justify-between mb-1">
-              <span class="text-xs font-medium uppercase tracking-widest text-indigo-700 dark:text-indigo-300">AI
-                Feedback</span>
+              <span class="text-xs font-medium uppercase tracking-widest text-indigo-700 dark:text-indigo-300">{{
+                $t('mistakes.ai_feedback') }}</span>
               <div class="flex gap-2">
                 <span v-if="mistake.score !== null"
-                  class="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200">Score:
+                  class="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200">{{
+                    $t('mistakes.score') }}
                   {{ mistake.score }}</span>
                 <span v-if="mistake.error_type"
                   class="text-xs px-2 py-0.5 rounded uppercase bg-indigo-50 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200">{{
@@ -100,7 +101,7 @@
         </article>
       </div>
 
-      <p v-else class="mt-10 text-center text-sm text-zinc-500 dark:text-zinc-400">No mistakes found. 🎉</p>
+      <p v-else class="mt-10 text-center text-sm text-zinc-500 dark:text-zinc-400">{{ $t('mistakes.no_mistakes') }}</p>
     </div>
   </main>
 </template>
