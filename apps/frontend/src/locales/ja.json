@@ -46,7 +46,7 @@
         "get_detailed_breakdown": "AI による詳細な文法解説を取得",
         "next_question": "次の問題",
         "detailed_modal_title": "AI 詳細解説",
-        "footer_helper": "{enter} で確認。 {alt_h} でヒント。",
+        "footer_helper": "{enter} で確認。 {alt} + {h} でヒント。",
         "error_submit": "回答の送信に失敗しました",
         "network_error": "ネットワークエラーまたはサーバーが利用できません。",
         "type_here": "ここに入力..."

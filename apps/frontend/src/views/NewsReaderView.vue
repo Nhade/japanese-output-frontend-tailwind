@@ -60,7 +60,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const route = useRoute();
 const article = ref(null);
 const loading = ref(true);
@@ -101,7 +101,10 @@ const toggleTranslation = async (index) => {
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/translate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: para.text })
+        body: JSON.stringify({
+          text: para.text,
+          target: locale.value === 'ja' ? 'zh-TW' : locale.value
+        })
       });
       const data = await res.json();
       para.translation = data.translated_text;

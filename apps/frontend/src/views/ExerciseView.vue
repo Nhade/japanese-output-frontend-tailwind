@@ -163,42 +163,6 @@ function handleKeydown(event) {
 }
 
 // Fetch the first exercise when the component is mounted
-// Temporary Debug Function
-function testMockModal() {
-  detailedFeedback.value = `
-# AI Analysis (Mock)
-
-> "Language is the road map of a culture. It tells you where its people come from and where they are going."
-
-## Grammar Breakdown
-
-| Grammar Point | Meaning | JLPT Level |
-| :--- | :--- | :--- |
-| **〜なければなりません** | Must do (Objective) | N4 |
-| **〜てはいけません** | Must not do | N5 |
-| **〜たほうがいい** | Had better do | N4 |
-
-## Key Patterns
-
-1.  **Verb Conjugation**:
-    -   Group 1: \`kaki-masu\` → \`kaite\`
-    -   Group 2: \`tabe-masu\` → \`tabete\`
-2.  **Sentence Structure**:
-    -   Topic + Wa + Object + O + Verb.
-
-## Important Notes
-
--   **Particle Usage**: rarely omit particles in formal writing.
--   *Intonation*: Rising intonation turns a statement into a question.
-
----
-
-### Highlights
-
-This is a **crucial** point. Please pay attention to the \`te-form\` usage.
-  `;
-  showDetailModal.value = true;
-}
 
 onMounted(() => {
   fetchNewExercise();
@@ -246,9 +210,6 @@ onUnmounted(() => {
                 <button type="button" @click="revealHint"
                   class="rounded-xl px-4 py-2.5 text-sm border transition-colors bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:bg-white/5 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40">{{
                     $t('exercise.show_hint') }}</button>
-                <button type="button" @click="testMockModal"
-                  class="rounded-xl px-4 py-2.5 text-sm border transition-colors bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:bg-white/5 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40">
-                  Debug</button>
               </div>
             </form>
 
@@ -261,7 +222,7 @@ onUnmounted(() => {
                     <span class="text-lg">✅</span>
                     <div>
                       <span class="font-semibold text-emerald-800 dark:text-emerald-200">{{ $t('exercise.correct')
-                        }}</span>
+                      }}</span>
                       <span class="ml-2 text-emerald-700 dark:text-emerald-200">{{ feedback.correct_answer }}</span>
                     </div>
                   </div>
@@ -297,7 +258,7 @@ onUnmounted(() => {
                       <div class="flex gap-2">
                         <span v-if="feedback.score"
                           class="text-xs bg-rose-100 text-rose-900 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/15 px-2 py-0.5 rounded border font-mono">{{
-                          $t('exercise.score') }}
+                            $t('exercise.score') }}
                           {{ feedback.score }}</span>
                         <span v-if="feedback.error_type && feedback.error_type !== 'none'"
                           class="text-xs bg-rose-100 text-rose-900 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/15 px-2 py-0.5 rounded border uppercase tracking-wider">
@@ -404,10 +365,21 @@ onUnmounted(() => {
         </transition>
 
         <!-- Footer helper -->
-        <p class="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-400">{{ $t('exercise.footer_helper', {
-          enter:
-            'Enter',
-          alt_h: 'Alt+H' }) }}</p>
+        <i18n-t keypath="exercise.footer_helper" tag="p"
+          class="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-400">
+          <template #enter>
+            <kbd
+              class="rounded px-1 bg-zinc-200 text-zinc-700 dark:bg-white/5 dark:border dark:border-white/10 dark:text-zinc-300">Enter</kbd>
+          </template>
+          <template #alt>
+            <kbd
+              class="rounded px-1 bg-zinc-200 text-zinc-700 dark:bg-white/5 dark:border dark:border-white/10 dark:text-zinc-300">Alt</kbd>
+          </template>
+          <template #h>
+            <kbd
+              class="rounded px-1 bg-zinc-200 text-zinc-700 dark:bg-white/5 dark:border dark:border-white/10 dark:text-zinc-300">H</kbd>
+          </template>
+        </i18n-t>
       </div>
 
       <div v-else class="error-message">

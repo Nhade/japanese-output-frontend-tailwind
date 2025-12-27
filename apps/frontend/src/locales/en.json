@@ -46,7 +46,7 @@
         "get_detailed_breakdown": "Get detailed grammar breakdown with AI",
         "next_question": "Next Question",
         "detailed_modal_title": "Detailed AI Explanation",
-        "footer_helper": "Press {enter} to check. Press {alt_h} for hint.",
+        "footer_helper": "Press {enter} to check. Press {alt} + {h} for hint.",
         "error_submit": "Failed to submit answer",
         "network_error": "Network error or server unavailable.",
         "type_here": "Type here..."

@@ -46,7 +46,7 @@
         "get_detailed_breakdown": "透過 AI 獲取詳細文法解析",
         "next_question": "下一題",
         "detailed_modal_title": "AI 詳細解釋",
-        "footer_helper": "按 {enter} 檢查。按 {alt_h} 顯示提示。",
+        "footer_helper": "按 {enter} 檢查。按 {alt} + {h} 顯示提示。",
         "error_submit": "提交答案失敗",
         "network_error": "網路錯誤或伺服器無法連線。",
         "type_here": "在此輸入..."
