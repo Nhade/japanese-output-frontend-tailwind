@@ -70,15 +70,15 @@
       <div v-else-if="mistakes.length > 0" class="grid gap-4 md:grid-cols-2">
         <article v-for="mistake in mistakes" :key="mistake.log_id"
           class="rounded-2xl border p-5 bg-white border-zinc-200 dark:bg-zinc-900/60 dark:border-white/5">
-          <p class="text-sm leading-relaxed">{{ mistake.question_sentence }}</p>
+          <p class="text-sm leading-relaxed"><span lang="ja">{{ mistake.question_sentence }}</span></p>
           <div class="mt-3 rounded-lg p-3 text-sm bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
             <div class="font-medium">{{ $t('mistakes.your_answer') }}</div>
-            <div>{{ mistake.user_answer }}</div>
+            <div><span lang="ja">{{ mistake.user_answer }}</span></div>
           </div>
           <div
             class="mt-2 rounded-lg p-3 text-sm bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
             <div class="font-medium">{{ $t('mistakes.correct_answer') }}</div>
-            <div class="font-semibold">{{ mistake.correct_answer }}</div>
+            <div class="font-semibold"><span lang="ja">{{ mistake.correct_answer }}</span></div>
           </div>
 
           <!-- AI Feedback -->

@@ -184,9 +184,8 @@ onUnmounted(() => {
         <transition name="slide-up" mode="out-in">
           <section :key="exercise.exercise_id"
             class="rounded-xl border p-8 shadow-sm transition-all bg-white border-zinc-200 shadow-zinc-200/50 dark:bg-zinc-900/60 dark:border-white/10 dark:shadow-none">
-            <h1
-              class="text-2xl font-medium leading-relaxed tracking-wide font-serif mb-6 text-zinc-900 dark:text-zinc-100">
-              {{ exercise.question_sentence }}
+            <h1 class="text-2xl font-medium leading-relaxed tracking-wide mb-6 text-zinc-900 dark:text-zinc-100">
+              <span lang="ja">{{ exercise.question_sentence }}</span>
             </h1>
 
             <!-- Hint -->
@@ -223,7 +222,8 @@ onUnmounted(() => {
                     <div>
                       <span class="font-semibold text-emerald-800 dark:text-emerald-200">{{ $t('exercise.correct')
                       }}</span>
-                      <span class="ml-2 text-emerald-700 dark:text-emerald-200">{{ feedback.correct_answer }}</span>
+                      <span class="ml-2 text-emerald-700 dark:text-emerald-200" lang="ja">{{ feedback.correct_answer
+                        }}</span>
                     </div>
                   </div>
 
@@ -248,7 +248,8 @@ onUnmounted(() => {
                     <span class="font-medium text-rose-700 dark:text-rose-200">{{ $t('exercise.incorrect') }}</span>
                   </div>
                   <div class="text-rose-800 pl-7 dark:text-zinc-200">{{ $t('exercise.correct_answer_label') }} <span
-                      class="font-semibold text-rose-950 dark:text-zinc-100">{{ feedback.correct_answer }}</span></div>
+                      class="font-semibold text-rose-950 dark:text-zinc-100" lang="ja">{{ feedback.correct_answer
+                      }}</span></div>
 
                   <!-- AI Feedback Section -->
                   <div v-if="feedback.feedback" class="mt-4 pt-3 border-t border-rose-200 pl-1 dark:border-rose-400/25">
