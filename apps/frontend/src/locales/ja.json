@@ -72,7 +72,14 @@
         "accuracy_pos": "品詞別の正解率",
         "accuracy_jlpt": "JLPT レベル別の正解率",
         "accuracy_label": "正解率",
-        "no_data": "まだ統計データがありません。練習を完了して進捗を確認しましょう。"
+        "no_data": "まだ統計データがありません。練習を完了して進捗を確認しましょう。",
+        "subtitle": "学習の進捗と精度を追跡",
+        "history": "履歴",
+        "history_desc": "日ごとの正解率の推移",
+        "pos_desc": "文法タイプ別の正解率",
+        "total_exercises": "総練習数",
+        "total_correct": "総正解数",
+        "average_accuracy": "平均正解率"
     },
     "news": {
         "title": "ニュース読解練習",

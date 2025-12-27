@@ -72,7 +72,14 @@
         "accuracy_pos": "Accuracy by Part of Speech",
         "accuracy_jlpt": "Accuracy by JLPT Level",
         "accuracy_label": "Accuracy",
-        "no_data": "No statistics available yet. Complete some exercises to see your progress."
+        "no_data": "No statistics available yet. Complete some exercises to see your progress.",
+        "subtitle": "Track your learning progress and precision",
+        "history": "History",
+        "history_desc": "Daily accuracy trend over time",
+        "pos_desc": "Accuracy across grammar types",
+        "total_exercises": "Total Exercises",
+        "total_correct": "Total Correct",
+        "average_accuracy": "Average Accuracy"
     },
     "news": {
         "title": "News Reading Practice",

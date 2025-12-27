@@ -72,7 +72,14 @@
         "accuracy_pos": "依詞性準確率",
         "accuracy_jlpt": "依 JLPT 等級準確率",
         "accuracy_label": "準確率",
-        "no_data": "尚無統計資料。完成一些練習以查看您的進度。"
+        "no_data": "尚無統計資料。完成一些練習以查看您的進度。",
+        "subtitle": "追蹤您的學習進度與精確度",
+        "history": "歷史紀錄",
+        "history_desc": "每日準確率趨勢",
+        "pos_desc": "各文法類型的準確率",
+        "total_exercises": "總練習數",
+        "total_correct": "總正解數",
+        "average_accuracy": "平均準確率"
     },
     "news": {
         "title": "新聞閱讀練習",
