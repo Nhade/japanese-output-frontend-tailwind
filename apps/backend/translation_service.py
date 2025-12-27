@@ -1,6 +1,7 @@
 from google.cloud import translate_v2 as translate
 import os
 from dotenv import load_dotenv
+import html
 
 load_dotenv()
 
@@ -25,7 +26,7 @@ def translate_text(text: str, target='zh-TW') -> str:
 
     try:
         result = translate_client.translate(text, target_language=target, source_language='ja')
-        return result['translatedText']
+        return html.unescape(result['translatedText'])
     except Exception as e:
         print(f"Translation Service Error: {e}")
         return "翻譯服務出現錯誤，請稍後再試。"

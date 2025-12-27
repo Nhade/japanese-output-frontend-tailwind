@@ -365,11 +365,12 @@ def get_news_detail(article_id):
 def translate_paragraph():
     data = request.get_json()
     text = data.get('text')
+    target = data.get('target', 'zh-TW')  # Default to zh-TW if not provided
     
     if not text:
         return jsonify({"error": "Text is required"}), 400
     
-    translated = translate_text(text)
+    translated = translate_text(text, target)
     return jsonify({"translated_text": translated})
 
 @app.route('/api/tts', methods=['POST'])
