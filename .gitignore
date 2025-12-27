@@ -30,3 +30,7 @@ japanese-output-practice-3af0779cb130.json
 # Data
 data/
 
+
+# Scratch / Tests
+test_openai_tts.py
+*.wav
