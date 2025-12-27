@@ -42,6 +42,7 @@ def get_mistakes(user_id):
         FROM answer_log al
         JOIN exercise e ON al.exercise_id = e.exercise_id
         WHERE al.user_id = ? AND al.is_correct = 0
+        ORDER BY al.answered_timestamp DESC
     ''', (user_id,)).fetchall()
     conn.close()
 
@@ -259,12 +260,16 @@ def get_user_statistics(user_id):
         e.jlpt_level;
     """
     stats = conn.execute(query, (user_id,)).fetchall()
-    conn.close()
-
+    
     # Process the stats to create the desired JSON structure
     processed_stats = {
         "pos_accuracy": {},
-        "jlpt_level_accuracy": {}
+        "jlpt_level_accuracy": {},
+        "summary": {
+            "total_exercises": 0,
+            "total_correct": 0,
+            "average_accuracy": 0
+        }
     }
 
     # Temporary dictionaries to hold summed values for accuracy calculation
@@ -296,6 +301,53 @@ def get_user_statistics(user_id):
 
     for jlpt_level, totals in jlpt_totals.items():
         processed_stats["jlpt_level_accuracy"][jlpt_level] = (totals['correct'] / totals['total']) * 100 if totals['total'] > 0 else 0
+        
+    # --- Summary ---
+    # Use direct query to ensure we catch all answer logs, independent of joint constraints that might be tight
+    summary_query = """
+    SELECT 
+        COUNT(log_id) as total,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+    FROM answer_log
+    WHERE user_id = ?
+    """
+    summary_row = conn.execute(summary_query, (user_id,)).fetchone()
+    
+    if summary_row:
+        overall_total = summary_row['total']
+        overall_correct = summary_row['correct'] if summary_row['correct'] else 0
+        
+        processed_stats["summary"]["total_exercises"] = overall_total
+        processed_stats["summary"]["total_correct"] = overall_correct
+        processed_stats["summary"]["average_accuracy"] = (overall_correct / overall_total) * 100 if overall_total > 0 else 0
+
+    # --- History (Daily Accuracy) ---
+    history_query = """
+    SELECT 
+        DATE(answered_timestamp) as date,
+        COUNT(log_id) as total,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+    FROM answer_log
+    WHERE user_id = ?
+    GROUP BY DATE(answered_timestamp)
+    ORDER BY DATE(answered_timestamp) ASC
+    """
+    history_rows = conn.execute(history_query, (user_id,)).fetchall()
+    conn.close() # Close connection here
+    
+    history_data = []
+    for row in history_rows:
+        date_str = row['date']
+        total = row['total']
+        correct = row['correct']
+        accuracy = (correct / total) * 100 if total > 0 else 0
+        history_data.append({
+            "date": date_str,
+            "accuracy": accuracy,
+            "total": total
+        })
+    
+    processed_stats["history"] = history_data
 
     return jsonify(processed_stats)
 
@@ -364,11 +416,12 @@ def get_news_detail(article_id):
 def translate_paragraph():
     data = request.get_json()
     text = data.get('text')
+    target = data.get('target', 'zh-TW')  # Default to zh-TW if not provided
     
     if not text:
         return jsonify({"error": "Text is required"}), 400
     
-    translated = translate_text(text)
+    translated = translate_text(text, target)
     return jsonify({"translated_text": translated})
 
 @app.route('/api/tts', methods=['POST'])

@@ -5,7 +5,7 @@ export const useAuthStore = defineStore('auth', {
     user_id: null,
   }),
   actions: {
-    login(user_id) {
+    login(user_id: any) {
       this.user_id = user_id
     },
     logout() {

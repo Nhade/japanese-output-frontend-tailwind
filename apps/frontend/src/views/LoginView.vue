@@ -1,24 +1,35 @@
 <template>
-  <main class="grid min-h-[calc(100vh-4rem)] place-items-center bg-zinc-950 px-4 text-zinc-100">
-    <section class="w-full max-w-md rounded-2xl border border-white/5 bg-zinc-900/60 p-6 shadow-xl shadow-black/30">
+  <main class="grid min-h-[calc(100vh-4rem)] place-items-center px-4 text-zinc-900 dark:text-zinc-100">
+    <section
+      class="w-full max-w-md rounded-2xl border p-6 shadow-xl bg-white border-zinc-200 shadow-zinc-200/50 dark:bg-zinc-900/60 dark:border-white/5 dark:shadow-black/30">
       <div class="mb-6 flex items-center gap-2">
-        <div class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 font-bold">O</div>
-        <h1 class="text-lg font-semibold">Login to OWO</h1>
+        <div
+          class="inline-flex h-9 w-9 items-center justify-center rounded-lg font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+          O</div>
+        <h1 class="text-lg font-semibold">{{ $t('auth.login_title') }}</h1>
       </div>
       <form @submit.prevent="login" class="space-y-4">
         <div>
-          <label class="mb-1 block text-sm text-zinc-300" autocomplete="username">Username</label>
-          <input v-model="username" class="w-full rounded-xl border border-white/10 bg-zinc-800 px-4 py-3 text-base text-white placeholder-zinc-500 outline-none focus:ring-2 focus:ring-emerald-400" placeholder="Your Username" />
+          <label class="mb-1 block text-sm text-zinc-700 dark:text-zinc-300" autocomplete="username">{{
+            $t('auth.username') }}</label>
+          <input v-model="username"
+            class="w-full rounded-xl px-4 py-3 text-base outline-none focus:ring-2 border shadow-inner transition-all bg-white text-zinc-900 border-zinc-200 placeholder-zinc-400 focus:ring-emerald-500/40 dark:bg-zinc-800 dark:text-white dark:border-white/10 dark:placeholder-zinc-500 dark:focus:ring-emerald-400"
+            :placeholder="$t('auth.username_placeholder')" />
         </div>
         <div>
-          <label class="mb-1 block text-sm text-zinc-300">Password</label>
-          <input v-model="password" type="password" class="w-full rounded-xl border border-white/10 bg-zinc-800 px-4 py-3 text-base text-white placeholder-zinc-500 outline-none focus:ring-2 focus:ring-emerald-400" placeholder="••••••••" />
+          <label class="mb-1 block text-sm text-zinc-700 dark:text-zinc-300">{{ $t('auth.password') }}</label>
+          <input v-model="password" type="password"
+            class="w-full rounded-xl px-4 py-3 text-base outline-none focus:ring-2 border shadow-inner transition-all bg-white text-zinc-900 border-zinc-200 placeholder-zinc-400 focus:ring-emerald-500/40 dark:bg-zinc-800 dark:text-white dark:border-white/10 dark:placeholder-zinc-500 dark:focus:ring-emerald-400"
+            :placeholder="$t('auth.password_placeholder')" />
         </div>
-        <button type="submit" class="w-full rounded-xl bg-emerald-500 px-4 py-2.5 font-medium text-zinc-900 hover:bg-emerald-400">Login</button>
+        <button type="submit"
+          class="w-full rounded-xl px-4 py-2.5 font-medium shadow-lg transition-all active:scale-95 bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500">{{
+            $t('auth.login_button') }}</button>
       </form>
       <p v-if="error" class="mt-4 text-center text-sm text-red-400">{{ error }}</p>
-      <p class="mt-4 text-center text-sm text-zinc-400">Don’t have an account?
-        <router-link to="/register" class="text-emerald-300 hover:underline">Register here</router-link>
+      <p class="mt-4 text-center text-sm text-zinc-600 dark:text-zinc-400">{{ $t('auth.no_account') }}
+        <router-link to="/register" class="text-emerald-700 hover:underline dark:text-emerald-300">{{
+          $t('auth.register_link') }}</router-link>
       </p>
     </section>
   </main>
@@ -28,7 +39,9 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const username = ref('');
 const password = ref('');
 const error = ref('');
@@ -50,7 +63,7 @@ const login = async () => {
       error.value = data.error;
     }
   } catch (err) {
-    error.value = 'An error occurred. Please try again.';
+    error.value = t('auth.error_generic');
   }
 };
 </script>
