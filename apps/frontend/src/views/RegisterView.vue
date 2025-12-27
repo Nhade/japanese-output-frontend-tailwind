@@ -1,25 +1,25 @@
 <template>
-  <main class="grid min-h-[calc(100vh-4rem)] place-items-center bg-zinc-950 px-4 text-zinc-100">
-    <section class="w-full max-w-md rounded-2xl border border-white/5 bg-zinc-900/60 p-6 shadow-xl shadow-black/30">
+  <main class="grid min-h-[calc(100vh-4rem)] place-items-center px-4 text-zinc-900 dark:text-zinc-100">
+    <section class="w-full max-w-md rounded-2xl border p-6 shadow-xl bg-white border-zinc-200 shadow-zinc-200/50 dark:bg-zinc-900/60 dark:border-white/5 dark:shadow-black/30">
       <div class="mb-6 flex items-center gap-2">
-        <div class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 font-bold">O</div>
+        <div class="inline-flex h-9 w-9 items-center justify-center rounded-lg font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">O</div>
         <h1 class="text-lg font-semibold">Create an account</h1>
       </div>
       <form @submit.prevent="register" class="space-y-4">
         <div>
-          <label class="mb-1 block text-sm text-zinc-300">Username</label>
-          <input v-model="username" class="w-full rounded-xl border border-white/10 bg-zinc-800 px-4 py-3 text-base text-white placeholder-zinc-500 outline-none focus:ring-2 focus:ring-emerald-400" placeholder="Your Username" />
+          <label class="mb-1 block text-sm text-zinc-700 dark:text-zinc-300">Username</label>
+          <input v-model="username" class="w-full rounded-xl px-4 py-3 text-base outline-none focus:ring-2 border shadow-inner transition-all bg-white text-zinc-900 border-zinc-200 placeholder-zinc-400 focus:ring-emerald-500/40 dark:bg-zinc-800 dark:text-white dark:border-white/10 dark:placeholder-zinc-500 dark:focus:ring-emerald-400" placeholder="Your Username" />
         </div>
         <div>
-          <label class="mb-1 block text-sm text-zinc-300">Password</label>
-          <input v-model="password" type="password" class="w-full rounded-xl border border-white/10 bg-zinc-800 px-4 py-3 text-base text-white placeholder-zinc-500 outline-none focus:ring-2 focus:ring-emerald-400" placeholder="Create a strong password" />
+          <label class="mb-1 block text-sm text-zinc-700 dark:text-zinc-300">Password</label>
+          <input v-model="password" type="password" class="w-full rounded-xl px-4 py-3 text-base outline-none focus:ring-2 border shadow-inner transition-all bg-white text-zinc-900 border-zinc-200 placeholder-zinc-400 focus:ring-emerald-500/40 dark:bg-zinc-800 dark:text-white dark:border-white/10 dark:placeholder-zinc-500 dark:focus:ring-emerald-400" placeholder="Create a strong password" />
         </div>
-        <button type="submit" class="w-full rounded-xl bg-emerald-500 px-4 py-2.5 font-medium text-zinc-900 hover:bg-emerald-400">Register</button>
+        <button type="submit" class="w-full rounded-xl px-4 py-2.5 font-medium shadow-lg transition-all active:scale-95 bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500">Register</button>
       </form>
       <p v-if="error" class="mt-4 text-center text-sm text-red-400">{{ error }}</p>
-      <p v-if="message" class="mt-4 text-center text-sm text-emerald-400">{{ message }}</p>
-      <p class="mt-4 text-center text-sm text-zinc-400">Already have an account?
-        <router-link to="/login" class="text-emerald-300 hover:underline">Login here</router-link>
+      <p v-if="message" class="mt-4 text-center text-sm text-emerald-700 dark:text-emerald-400">{{ message }}</p>
+      <p class="mt-4 text-center text-sm text-zinc-600 dark:text-zinc-400">Already have an account?
+        <router-link to="/login" class="text-emerald-700 hover:underline dark:text-emerald-300">Login here</router-link>
       </p>
     </section>
   </main>

@@ -1,5 +1,5 @@
 <template>
-  <main class="min-h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-100 p-6 pt-24">
+  <main class="min-h-[calc(100vh-4rem)] p-6 pt-24 text-zinc-900 dark:text-zinc-100">
     <div class="mx-auto max-w-4xl">
       <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h1 class="text-2xl font-bold">News Reading Practice</h1>
@@ -10,12 +10,12 @@
             type="date" 
             v-model="filterDate" 
             @change="fetchArticles"
-            class="bg-zinc-900 border border-zinc-700 rounded px-3 py-1 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500"
+            class="bg-white border-zinc-200 text-zinc-900 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-200 border rounded px-3 py-1 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
           />
           <select 
             v-model="filterCategory" 
             @change="fetchArticles"
-            class="bg-zinc-900 border border-zinc-700 rounded px-3 py-1 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500"
+            class="bg-white border-zinc-200 text-zinc-900 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-200 border rounded px-3 py-1 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
           >
             <option value="">All Categories</option>
             <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
@@ -23,23 +23,23 @@
         </div>
       </div>
       
-      <div v-if="loading" class="text-center text-zinc-500">Loading articles...</div>
+      <div v-if="loading" class="text-center text-zinc-600 dark:text-zinc-500">Loading articles...</div>
       
       <div v-else class="grid gap-4">
-        <div v-if="articles.length === 0" class="text-center text-zinc-500 py-8">
+        <div v-if="articles.length === 0" class="text-center text-zinc-600 dark:text-zinc-500 py-8">
           No articles found matching your criteria.
         </div>
         <router-link 
           v-for="article in articles" 
           :key="article.article_id"
           :to="`/news/${article.article_id}`"
-          class="block p-5 rounded-xl border border-white/10 bg-zinc-900/50 hover:bg-zinc-800 transition"
+          class="block p-5 rounded-xl border transition bg-white border-zinc-200 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900/50 dark:hover:bg-zinc-800"
         >
           <div class="flex justify-between items-start mb-2">
-            <span class="text-xs font-mono text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">
+            <span class="text-xs font-mono px-2 py-1 rounded text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">
               {{ article.category || 'News' }}
             </span>
-            <span class="text-xs text-zinc-500">{{ formatDate(article.publish_timestamp) }}</span>
+            <span class="text-xs text-zinc-600 dark:text-zinc-500">{{ formatDate(article.publish_timestamp) }}</span>
           </div>
           <h2 class="text-lg font-semibold">{{ article.title }}</h2>
         </router-link>

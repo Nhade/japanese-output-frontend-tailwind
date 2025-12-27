@@ -1,5 +1,5 @@
 <template>
-  <div class="p-4 bg-zinc-950 text-zinc-100 pt-10">
+  <div class="p-4 pt-10 text-zinc-900 dark:text-zinc-100">
     <h1 class="text-xl font-bold my-6">Statistics</h1>
     <div v-if="loading" class="flex justify-center items-center">
       <LoadingSpinner />
@@ -16,7 +16,8 @@
         </div>
       </div>
     </div>
-    <div v-if="!loading && posAccuracyData.labels.length === 0 && jlptAccuracyData.labels.length === 0" class="text-center text-gray-500">
+    <div v-if="!loading && posAccuracyData.labels.length === 0 && jlptAccuracyData.labels.length === 0"
+      class="text-center text-zinc-600 dark:text-zinc-500">
       <p>No statistics available yet. Complete some exercises to see your progress.</p>
     </div>
   </div>
@@ -76,7 +77,7 @@ onMounted(async () => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/statistics/${auth.user_id}`);
       if (response.ok) {
         const stats = await response.json();
-        
+
         const posLabels = Object.keys(stats.pos_accuracy);
         const posData = Object.values(stats.pos_accuracy);
         posAccuracyData.value = {
@@ -108,8 +109,6 @@ onMounted(async () => {
     } finally {
       loading.value = false;
     }
-  }else{
-    console.log("no user");
   }
 });
 </script>

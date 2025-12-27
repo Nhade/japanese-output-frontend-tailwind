@@ -1,17 +1,17 @@
 <template>
-  <main class="min-h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-100 pb-20 pt-24">
+  <main class="min-h-[calc(100vh-4rem)] pb-20 pt-24 text-zinc-900 dark:text-zinc-100">
     <div class="mx-auto max-w-3xl px-4">
       
-      <router-link to="/news" class="inline-flex items-center text-sm text-zinc-400 hover:text-white mb-6">
+      <router-link to="/news" class="inline-flex items-center text-sm mb-6 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white">
         ← Back to list
       </router-link>
 
       <div v-if="loading" class="text-center py-10">Loading article...</div>
       
       <article v-else-if="article">
-        <header class="mb-8 border-b border-white/10 pb-6">
+        <header class="mb-8 border-b pb-6 border-zinc-200 dark:border-white/10">
           <h1 class="text-2xl font-bold leading-relaxed mb-4">{{ article.info.title }}</h1>
-          <div class="flex gap-4 text-sm text-zinc-500">
+          <div class="flex gap-4 text-sm text-zinc-600 dark:text-zinc-500">
             <span>{{ article.info.category }}</span>
             <span>{{ new Date(article.info.date).toLocaleString() }}</span>
           </div>
@@ -21,16 +21,16 @@
           <div 
             v-for="(para, index) in article.paragraphs" 
             :key="index"
-            class="group relative rounded-lg p-3 hover:bg-white/5 transition duration-300"
+            class="group relative rounded-lg p-3 transition duration-300 hover:bg-zinc-100 dark:hover:bg-white/5"
           >
-            <p class="text-lg leading-8 tracking-wide text-zinc-200">
+            <p class="text-lg leading-8 tracking-wide text-zinc-800 dark:text-zinc-200">
               {{ para.text }}
             </p>
 
             <div class="mt-3 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
               <button 
                 @click="playAudio(para.text)" 
-                class="flex items-center gap-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
+                class="flex items-center gap-1.5 text-xs font-medium disabled:opacity-50 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
               >
                 <span v-if="isPlaying && currentPlayingText === para.text">⏹️ Stop</span>
                 <span v-else>▶️ Listen</span>
@@ -38,7 +38,7 @@
               
               <button 
                 @click="toggleTranslation(index)" 
-                class="flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-300"
+                class="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
               >
                 文 Translate
               </button>
@@ -46,7 +46,7 @@
 
             <div v-if="para.showTranslation" class="mt-3 pl-3 border-l-2 border-blue-500/30">
                 <p v-if="para.loadingTranslation" class="text-sm text-zinc-500 animate-pulse">Translating...</p>
-                <p v-else class="text-base text-zinc-400">{{ para.translation }}</p>
+                <p v-else class="text-base text-zinc-600 dark:text-zinc-400">{{ para.translation }}</p>
             </div>
           </div>
         </div>

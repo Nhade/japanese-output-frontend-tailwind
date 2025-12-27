@@ -1,1 +1,158 @@
 @import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Global Markdown/Prose Styles (Refactored from ExerciseView.vue) */
+.prose {
+    line-height: 1.8;
+}
+
+/* Headings */
+.prose h1,
+.prose h2,
+.prose h3 {
+    font-weight: 700;
+    margin-top: 1.6em;
+    margin-bottom: 0.6em;
+    color: rgb(24 24 27);
+    /* zinc-900 */
+}
+
+@media (prefers-color-scheme: dark) {
+
+    .dark .prose h1,
+    .dark .prose h2,
+    .dark .prose h3 {
+        color: rgb(228 228 231);
+        /* zinc-200 */
+    }
+}
+
+/* Explicit dark class override */
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3 {
+    color: rgb(228 228 231);
+    /* zinc-200 */
+}
+
+
+/* Paragraphs */
+.prose p {
+    margin-bottom: 1em;
+}
+
+/* Lists */
+.prose ul {
+    list-style-type: disc;
+    padding-left: 1.5em;
+    margin-bottom: 1em;
+}
+
+.prose ol {
+    list-style-type: decimal;
+    padding-left: 1.5em;
+    margin-bottom: 1em;
+}
+
+.prose li {
+    margin-bottom: 0.35em;
+}
+
+/* Strong emphasis */
+.prose strong {
+    font-weight: 650;
+    color: rgb(5 150 105);
+    /* emerald-600 */
+}
+
+.dark .prose strong {
+    color: rgb(167 243 208);
+    /* emerald-200 */
+}
+
+/* Blockquotes */
+.prose blockquote {
+    border-left: 4px solid rgb(16 185 129 / 0.7);
+    /* emerald */
+    padding: 0.75em 1em;
+    margin: 1em 0;
+    border-radius: 0.75rem;
+    background: rgb(16 185 129 / 0.06);
+    color: rgb(63 63 70);
+    /* zinc-700 */
+}
+
+.dark .prose blockquote {
+    color: rgb(212 212 216);
+    /* zinc-300 */
+    background: rgb(16 185 129 / 0.08);
+}
+
+/* Images */
+.prose img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 1em auto;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(228 228 231);
+    /* zinc-200 */
+    background: white;
+}
+
+.dark .prose img {
+    border-color: rgb(255 255 255 / 0.12);
+    background: rgb(24 24 27);
+    /* zinc-900 */
+}
+
+/* Tables */
+.prose table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 1em 0;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(228 228 231);
+    /* zinc-200 */
+}
+
+.dark .prose table {
+    border-color: rgb(255 255 255 / 0.12);
+}
+
+.prose th,
+.prose td {
+    padding: 0.6em 0.75em;
+    text-align: left;
+    border-bottom: 1px solid rgb(228 228 231);
+}
+
+.dark .prose th,
+.dark .prose td {
+    border-bottom-color: rgb(255 255 255 / 0.10);
+}
+
+/* Table Header */
+.prose th {
+    background: rgb(244 244 245);
+    /* zinc-100 */
+    font-weight: 600;
+}
+
+.dark .prose th {
+    background: rgb(39 39 42);
+    /* zinc-800 */
+}
+
+/* Zebra Striping */
+.prose tbody tr:nth-child(even) td {
+    background: rgb(250 250 250);
+    /* zinc-50 */
+}
+
+/* Dark Mode Zebra Striping (Higher Contrast per user request) */
+.dark .prose tbody tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
