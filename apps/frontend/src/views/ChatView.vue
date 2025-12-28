@@ -20,7 +20,7 @@ interface Message {
     showFeedback?: boolean; // UI state
 }
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const messages = ref<Message[]>([]);
 const inputMessage = ref('');
 const isLoading = ref(false);
@@ -77,7 +77,8 @@ const sendMessage = async () => {
             },
             body: JSON.stringify({
                 message: userMsg,
-                history: historyPayload
+                history: historyPayload,
+                locale: locale.value // Send current locale
             })
         });
 
@@ -193,7 +194,7 @@ const toggleFeedback = (index: number) => {
                                         <div class="flex items-start gap-2 mb-1">
                                             <span class="text-red-500 font-mono text-xs mt-0.5">✖</span>
                                             <span class="line-through opacity-60" lang="ja">{{ correction.original
-                                                }}</span>
+                                            }}</span>
                                         </div>
                                         <div class="flex items-start gap-2 mb-2">
                                             <span class="text-green-500 font-mono text-xs mt-0.5">✔</span>

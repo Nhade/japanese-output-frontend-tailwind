@@ -206,13 +206,14 @@ def get_detailed_feedback(question: str, user_answer: str, correct_answer: str) 
         print(f"Failed to get detailed feedback. Error: {e}")
         return "抱歉，目前無法取得詳細解說。"
 
-def chat_with_ai(message: str, history: list) -> dict:
+def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
     """
     Chat with the AI in Japanese.
     
     Args:
         message: The latest user message.
         history: List of dictionary {'role': 'user'|'assistant', 'content': '...'}
+        locale: User's locale (e.g. 'en', 'ja', 'zh-tw').
         
     Returns:
         Dict with keys:
@@ -225,33 +226,41 @@ def chat_with_ai(message: str, history: list) -> dict:
     # We also need to trust that the history passed in is valid.
     trimmed_history = history[-20:] if len(history) > 20 else history
 
-    system_prompt = """
+    # 2. Determine Feedback Language
+    if locale == 'en':
+        feedback_intro = "Reply in Japanese (Natural). Feedback/Explanations MUST be in English."
+        feedback_lang = "English"
+    else:
+        # Default to Traditional Chinese for zh-tw and ja
+        feedback_intro = "Reply in Japanese (Natural). Feedback/Explanations MUST be in Traditional Chinese (繁體中文)."
+        feedback_lang = "Traditional Chinese"
+
+    system_prompt = f"""
     You are a friendly and helpful Japanese language tutor.
     Your goal is to have a natural conversation with the user in Japanese, while strictly evaluating their language skills.
     
     Instructions:
     1. **Role**: Act as a native Japanese speaker. Be polite and encouraging.
     2. **Language**: 
-       - Your conversational reply MUST be in Japanese (Natural, appropriate for context).
-       - Your feedback/analysis MUST be in Traditional Chinese (繁體中文).
+       - {feedback_intro}
     3. **Output Format**:
        - You MUST return a VALID JSON object.
        - DO NOT output any text outside the JSON block.
     
     JSON Structure:
-    {
+    {{
         "response": "Your natural Japanese reply to the user's message.",
-        "feedback": {
-            "overall": "A brief summary of their Japanese (in Traditional Chinese). E.g., '你的日文很自然', '注意助詞的使用'.",
+        "feedback": {{
+            "overall": "A brief summary of their Japanese (in {feedback_lang}). E.g., encouragement or pointing out key errors.",
             "corrections": [
-                {
+                {{
                     "original": "The part of user's message that was wrong",
                     "corrected": "The corrected Japanese version",
-                    "explanation": "Why it was wrong (in Traditional Chinese)"
-                }
+                    "explanation": "Why it was wrong (in {feedback_lang})"
+                }}
             ]
-        }
-    }
+        }}
+    }}
     
     If the user's Japanese is perfect, return an empty list for "corrections".
     If the user speaks English or Chinese, polite ask them to try speaking Japanese (in Japanese), but still analyze what they said if possible.

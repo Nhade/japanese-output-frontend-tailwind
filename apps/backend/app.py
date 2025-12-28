@@ -187,6 +187,7 @@ def chat_send():
     data = request.get_json()
     message = data.get('message')
     history = data.get('history', [])
+    locale = data.get('locale', 'en') # Default to English if not provided
     
     if not message:
         return jsonify({"error": "Message is required"}), 400
@@ -195,7 +196,7 @@ def chat_send():
     if not isinstance(history, list):
         return jsonify({"error": "History must be a list"}), 400
         
-    result = chat_with_ai(message, history)
+    result = chat_with_ai(message, history, locale)
     return jsonify(result)
 
 @app.route('/api/users/register', methods=['POST'])
