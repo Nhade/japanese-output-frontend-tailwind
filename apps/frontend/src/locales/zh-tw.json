@@ -3,7 +3,8 @@
         "exercise": "練習",
         "mistakes": "錯題集",
         "statistics": "統計",
-        "news": "新聞",
+        "news": "新聞閱讀",
+        "chat": "AI對話",
         "login": "登入",
         "logout": "登出",
         "register": "註冊"
@@ -95,5 +96,17 @@
         "translating": "翻譯中...",
         "translation_failed": "翻譯失敗。",
         "audio_error": "無法播放音訊。"
+    },
+    "chat": {
+        "title": "AI 日語對話",
+        "subtitle": "練習你的日語。AI 會用日語回答，並提供中文反饋。",
+        "welcome": "試著說聲「こんにちは」開始吧！",
+        "placeholder": "輸入日文訊息...",
+        "show_feedback": "顯示反饋",
+        "hide_feedback": "隱藏反饋",
+        "analysis": "分析",
+        "no_errors": "沒有發現主要錯誤。做得好！",
+        "error_response": "抱歉，發生了錯誤。",
+        "disclaimer": "AI 可能會犯錯。請核對重要資訊。"
     }
 }

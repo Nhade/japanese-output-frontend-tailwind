@@ -48,7 +48,7 @@ def get_mistakes(user_id):
 
     return jsonify([dict(mistake) for mistake in mistakes])
 
-from ai_service import evaluate_submission, get_detailed_feedback
+from ai_service import evaluate_submission, get_detailed_feedback, chat_with_ai
 from agent_service import generate_daily_review_agent
 
 @app.route('/api/exercise/submit', methods=['POST'])
@@ -181,6 +181,23 @@ def explain_answer_detailed():
         
     finally:
         conn.close()
+
+@app.route('/api/chat/send', methods=['POST'])
+def chat_send():
+    data = request.get_json()
+    message = data.get('message')
+    history = data.get('history', [])
+    locale = data.get('locale', 'en') # Default to English if not provided
+    
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+        
+    # Optional: Basic validation on history structure
+    if not isinstance(history, list):
+        return jsonify({"error": "History must be a list"}), 400
+        
+    result = chat_with_ai(message, history, locale)
+    return jsonify(result)
 
 @app.route('/api/users/register', methods=['POST'])
 def register_user():

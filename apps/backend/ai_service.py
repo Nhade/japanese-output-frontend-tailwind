@@ -205,3 +205,140 @@ def get_detailed_feedback(question: str, user_answer: str, correct_answer: str) 
     except Exception as e:
         print(f"Failed to get detailed feedback. Error: {e}")
         return "抱歉，目前無法取得詳細解說。"
+
+def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
+    """
+    Chat with the AI in Japanese.
+    
+    Args:
+        message: The latest user message.
+        history: List of dictionary {'role': 'user'|'assistant', 'content': '...'}
+        locale: User's locale (e.g. 'en', 'ja', 'zh-tw').
+        
+    Returns:
+        Dict with keys:
+        - response: Japanese reply
+        - feedback: Dict containing analysis of the user's Japanese
+    """
+    
+    # 1. Sliding Window for History (Keep last 10 turns to save tokens)
+    # Each turn is usually 2 messages (User + Assistant), so last 20 items.
+    # We also need to trust that the history passed in is valid.
+    trimmed_history = history[-20:] if len(history) > 20 else history
+
+    # 2. Determine Feedback Language
+    if locale == 'en':
+        feedback_intro = "Reply in Japanese (Natural). Feedback/Explanations MUST be in English."
+        feedback_lang = "English"
+    else:
+        # Default to Traditional Chinese for zh-tw and ja
+        feedback_intro = "Reply in Japanese (Natural). Feedback/Explanations MUST be in Traditional Chinese (繁體中文)."
+        feedback_lang = "Traditional Chinese"
+
+    system_prompt = f"""
+    You are a friendly and helpful Japanese language tutor.
+    Your goal is to have a natural conversation with the user in Japanese, while strictly evaluating their language skills.
+    
+    Instructions:
+    1. **Role**: Act as a native Japanese speaker. Be polite and encouraging.
+    2. **Language**: 
+       - {feedback_intro}
+    3. **Output Format**:
+       - You MUST return a VALID JSON object.
+       - DO NOT output any text outside the JSON block.
+    
+    JSON Structure:
+    {{
+        "response": "Your natural Japanese reply to the user's message.",
+        "feedback": {{
+            "overall": "A brief summary of their Japanese (in {feedback_lang}). E.g., encouragement or pointing out key errors.",
+            "corrections": [
+                {{
+                    "original": "The part of user's message that was wrong",
+                    "corrected": "The corrected Japanese version",
+                    "explanation": "Why it was wrong (in {feedback_lang})"
+                }}
+            ]
+        }}
+    }}
+    
+    If the user's Japanese is perfect, return an empty list for "corrections".
+    If the user speaks English or Chinese, polite ask them to try speaking Japanese (in Japanese), but still analyze what they said if possible.
+    """
+
+    messages = [{"role": "system", "content": system_prompt}]
+    
+    # Append history
+    for msg in trimmed_history:
+        # Sanitize role just in case
+        role = "assistant" if msg.get("role") == "assistant" else "user"
+        messages.append({"role": role, "content": msg.get("content", "")})
+    
+    # Append current message
+    messages.append({"role": "user", "content": message})
+
+    url = f"{BASE_URL}/api/chat"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    # Using json mode if supported by the model, otherwise reliant on prompt
+    payload = {
+        "model": MODEL_NAME,
+        "messages": messages,
+        "stream": False,
+        "options": {
+            "temperature": 0.7
+        }
+        # "format": "json" # REMOVED: causing empty output with some models
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
+        response.raise_for_status()
+        
+        data = response.json()
+        content = data.get("message", {}).get("content", "")
+        if not content:
+            content = data.get("response", "")
+            
+        # Parse JSON
+        import json
+        try:
+            result_json = json.loads(content)
+        except json.JSONDecodeError:
+            print("INFO: JSON Parse failed, attempting regex cleanup...")
+            # Cleanup common markdown code block issues
+            import re
+            content_clean = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE)
+            content_clean = re.sub(r'^```\s*', '', content_clean, flags=re.MULTILINE)
+            content_clean = re.sub(r'\s*```$', '', content_clean, flags=re.MULTILINE)
+            # Try to find the first { and last }
+            match = re.search(r'\{.*\}', content_clean, re.DOTALL)
+            if match:
+                 result_json = json.loads(match.group(0))
+            else:
+                 raise
+
+        # Validate keys
+        if "response" not in result_json:
+             result_json["response"] = "申し訳ありません、ちょっと考え込んでしまいました。(AI Error)"
+        
+        if "feedback" not in result_json:
+             result_json["feedback"] = {
+                 "overall": "無法取得回饋",
+                 "corrections": []
+             }
+             
+        return result_json
+
+    except Exception as e:
+        print(f"Chat error: {e}")
+        # Fallback response
+        return {
+            "response": f"Error: {str(e)}", # Exposed for debugging
+            "feedback": {
+                "overall": "AI 服務暫時無法回應",
+                "corrections": []
+            }
+        }
