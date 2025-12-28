@@ -4,6 +4,7 @@
         "mistakes": "間違い",
         "statistics": "統計",
         "news": "ニュース",
+        "chat": "AI会話",
         "login": "ログイン",
         "logout": "ログアウト",
         "register": "登録"
@@ -95,5 +96,17 @@
         "translating": "翻訳中...",
         "translation_failed": "翻訳に失敗しました。",
         "audio_error": "音声を再生できません。"
+    },
+    "chat": {
+        "title": "AI日本語会話",
+        "subtitle": "日本語を練習しましょう。AIは日本語で返答し、中国語でフィードバックを提供します。",
+        "welcome": "「こんにちは」と話しかけてみましょう！",
+        "placeholder": "日本語でメッセージを入力...",
+        "show_feedback": "フィードバックを表示",
+        "hide_feedback": "フィードバックを隠す",
+        "analysis": "分析結果",
+        "no_errors": "大きな間違いは見つかりませんでした。素晴らしい！",
+        "error_response": "すみません、エラーが発生しました。",
+        "disclaimer": "AIは間違いを犯す可能性があります。重要な情報は確認してください。"
     }
 }

@@ -61,6 +61,12 @@ const isActive = (path: string) => route.path === path
                 :class="isActive('/news') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
                   $t('nav.news') }}</router-link>
             </li>
+            <li>
+              <router-link to="/chat"
+                class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
+                :class="isActive('/chat') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
+                  $t('nav.chat') }}</router-link>
+            </li>
             <li class="ml-1 hidden sm:block">
               <a href="#" @click.prevent="logout"
                 class="rounded-lg px-3 py-2 text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/7 transition-colors">{{

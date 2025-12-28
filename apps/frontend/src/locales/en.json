@@ -4,6 +4,7 @@
         "mistakes": "Mistakes",
         "statistics": "Statistics",
         "news": "News",
+        "chat": "AI Chat",
         "login": "Login",
         "logout": "Logout",
         "register": "Register"
@@ -95,5 +96,17 @@
         "translating": "Translating...",
         "translation_failed": "Translation failed.",
         "audio_error": "Unable to play audio."
+    },
+    "chat": {
+        "title": "AI Japanese Chat",
+        "subtitle": "Practice your Japanese. AI will reply in Japanese and provide feedback in Chinese.",
+        "welcome": "Say \"Hello\" (こんにちは) to start!",
+        "placeholder": "Type a message in Japanese...",
+        "show_feedback": "Show Feedback",
+        "hide_feedback": "Hide Feedback",
+        "analysis": "Analysis",
+        "no_errors": "No major errors found. Good job!",
+        "error_response": "Sorry, an error occurred.",
+        "disclaimer": "AI can make mistakes. Please double check important information."
     }
 }
