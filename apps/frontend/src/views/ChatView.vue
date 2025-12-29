@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch } from 'vue';
+import { ref, nextTick, onMounted, watch, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 interface FeedbackCorrection {
@@ -20,16 +20,25 @@ interface Message {
     showFeedback?: boolean; // UI state
 }
 
+import LearningFocusCard from '../components/LearningFocusCard.vue';
+import { useAuthStore } from '../stores/auth';
+
 const { t, locale } = useI18n();
+const authStore = useAuthStore();
 const messages = ref<Message[]>([]);
 const inputMessage = ref('');
 const isLoading = ref(false);
 const chatContainer = ref<HTMLElement | null>(null);
+const learnerProfile = ref<any>(null);
+const currentFocus = computed(() => {
+    return learnerProfile.value?.current_focus || null;
+});
 
 // Load history from localStorage if available (Optional, but good for UX)
 const LOCAL_STORAGE_KEY = 'japanese_agent_chat_history';
 
-onMounted(() => {
+onMounted(async () => {
+    // History
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (saved) {
         try {
@@ -37,6 +46,18 @@ onMounted(() => {
             scrollToBottom();
         } catch (e) {
             console.error("Failed to load chat history", e);
+        }
+    }
+
+    // Fetch Profile
+    if (authStore.user_id) {
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/learner/profile/${authStore.user_id}`);
+            if (res.ok) {
+                learnerProfile.value = await res.json();
+            }
+        } catch (e) {
+            console.error("Failed to fetch learner profile", e);
         }
     }
 });
@@ -78,7 +99,8 @@ const sendMessage = async () => {
             body: JSON.stringify({
                 message: userMsg,
                 history: historyPayload,
-                locale: locale.value // Send current locale
+                locale: locale.value, // Send current locale
+                user_id: authStore.user_id
             })
         });
 
@@ -125,6 +147,18 @@ const toggleFeedback = (index: number) => {
             <p class="text-zinc-500 dark:text-zinc-400 text-sm">
                 {{ t('chat.subtitle') }}
             </p>
+        </div>
+
+        <!-- Personalized Hint / Learning Focus -->
+        <div v-if="currentFocus && currentFocus.tag" class="py-2 shrink-0">
+            <LearningFocusCard :focus="currentFocus" />
+        </div>
+        <div v-else-if="learnerProfile" class="py-2 shrink-0">
+            <!-- Fallback if no focus (shouldn't happen with P2 logic but safe to keep) -->
+            <div
+                class="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">
+                {{ t('chat.focus_default', 'Chat freely to build your profile.') }}
+            </div>
         </div>
 
         <!-- Chat Area -->
@@ -194,7 +228,7 @@ const toggleFeedback = (index: number) => {
                                         <div class="flex items-start gap-2 mb-1">
                                             <span class="text-red-500 font-mono text-xs mt-0.5">✖</span>
                                             <span class="line-through opacity-60" lang="ja">{{ correction.original
-                                            }}</span>
+                                                }}</span>
                                         </div>
                                         <div class="flex items-start gap-2 mb-2">
                                             <span class="text-green-500 font-mono text-xs mt-0.5">✔</span>

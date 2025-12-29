@@ -223,7 +223,7 @@ onUnmounted(() => {
                       <span class="font-semibold text-emerald-800 dark:text-emerald-200">{{ $t('exercise.correct')
                       }}</span>
                       <span class="ml-2 text-emerald-700 dark:text-emerald-200" lang="ja">{{ feedback.correct_answer
-                        }}</span>
+                      }}</span>
                     </div>
                   </div>
 
@@ -263,7 +263,7 @@ onUnmounted(() => {
                           {{ feedback.score }}</span>
                         <span v-if="feedback.error_type && feedback.error_type !== 'none'"
                           class="text-xs bg-rose-100 text-rose-900 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/15 px-2 py-0.5 rounded border uppercase tracking-wider">
-                          {{ feedback.error_type }}
+                          {{ $t('error_type.' + feedback.error_type, feedback.error_type) }}
                         </span>
                       </div>
                     </div>

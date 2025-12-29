@@ -206,7 +206,34 @@ def get_detailed_feedback(question: str, user_answer: str, correct_answer: str) 
         print(f"Failed to get detailed feedback. Error: {e}")
         return "抱歉，目前無法取得詳細解說。"
 
-def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
+def build_learner_context(profile: dict) -> dict:
+    """
+    Generate a short, human-readable block from the profile.
+    """
+    level = profile.get("level_est", "N5")
+    # Retrieve weak_points, defaulting to empty list if missing/None
+    weak = profile.get("weak_points", [])
+    if weak is None: weak = []
+    
+    # Take top 2 weak points
+    top_weak = weak[:2]
+    
+    pref = profile.get("feedback_preference", "gentle")
+
+    focus = ", ".join(top_weak) if top_weak else "general Japanese basics"
+
+    max_corrections = {
+        "gentle": 2,
+        "normal": 3,
+        "strict": 5
+    }.get(pref, 2)
+
+    return {
+        "summary": f"Learner profile:\n- Estimated level: {level}\n- Common weak points: {focus}\n- Feedback preference: {pref}\n- Max corrections: {max_corrections}",
+        "max_corrections": max_corrections
+    }
+
+def chat_with_ai(message: str, history: list, locale: str = 'en', learner_profile: dict = None) -> dict:
     """
     Chat with the AI in Japanese.
     
@@ -214,6 +241,7 @@ def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
         message: The latest user message.
         history: List of dictionary {'role': 'user'|'assistant', 'content': '...'}
         locale: User's locale (e.g. 'en', 'ja', 'zh-tw').
+        learner_profile: Dict containing learner stats and preferences.
         
     Returns:
         Dict with keys:
@@ -222,8 +250,6 @@ def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
     """
     
     # 1. Sliding Window for History (Keep last 10 turns to save tokens)
-    # Each turn is usually 2 messages (User + Assistant), so last 20 items.
-    # We also need to trust that the history passed in is valid.
     trimmed_history = history[-20:] if len(history) > 20 else history
 
     # 2. Determine Feedback Language
@@ -235,35 +261,77 @@ def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
         feedback_intro = "Reply in Japanese (Natural). Feedback/Explanations MUST be in Traditional Chinese (繁體中文)."
         feedback_lang = "Traditional Chinese"
 
+    # 3. Build Learner Context
+    if learner_profile:
+        context_data = build_learner_context(learner_profile)
+        learner_context = context_data["summary"]
+        max_corrections = context_data["max_corrections"]
+    else:
+        # Default generic context
+        learner_context = "Learner profile: User is a beginner. Treat as N5 level."
+        max_corrections = 2
+
     system_prompt = f"""
     You are a friendly and helpful Japanese language tutor.
-    Your goal is to have a natural conversation with the user in Japanese, while strictly evaluating their language skills.
-    
+
+    Your goal is to have a natural conversation with the user in Japanese,
+    while providing focused, level-appropriate feedback based on their learning profile.
+
+    {learner_context}
+
     Instructions:
-    1. **Role**: Act as a native Japanese speaker. Be polite and encouraging.
-    2. **Language**: 
-       - {feedback_intro}
-    3. **Output Format**:
-       - You MUST return a VALID JSON object.
-       - DO NOT output any text outside the JSON block.
-    
+
+    1. Role
+    - Act as a native Japanese speaker.
+    - Be polite, encouraging, and supportive.
+    - Match your Japanese difficulty to the learner’s estimated level.
+      - N5: short sentences, common words, です／ます form
+      - N4: slightly longer sentences, simple casual allowed if user uses it
+      - N3+: more natural expressions allowed
+
+    2. Language rules
+    - Your reply ("response") MUST be in Japanese only.
+    - All feedback content MUST be written in {feedback_lang}.
+    - {feedback_intro}
+
+    3. Feedback rules
+    - You MUST prioritize corrections related to the learner’s weak points.
+    - Do NOT correct everything.
+    - Focus on errors that affect clarity or sound unnatural.
+    - Limit the number of corrections to AT MOST {max_corrections}.
+    - If the learner’s Japanese is acceptable, keep feedback encouraging and minimal.
+
+    4. Correction format rules
+    - In each correction, quote ONLY the minimal incorrect part.
+    - Use clear and simple explanations suitable for the learner’s level.
+
+    5. Non-Japanese input handling
+    - If the user writes mostly in English or Chinese:
+      - Respond politely in Japanese encouraging them to try Japanese.
+      - Still provide brief feedback in {feedback_lang} if possible.
+
+    6. Output format (STRICT)
+    - You MUST return a VALID JSON object.
+    - DO NOT output any text outside the JSON.
+    - DO NOT include markdown or explanations outside JSON.
+
     JSON Structure:
     {{
-        "response": "Your natural Japanese reply to the user's message.",
-        "feedback": {{
-            "overall": "A brief summary of their Japanese (in {feedback_lang}). E.g., encouragement or pointing out key errors.",
-            "corrections": [
-                {{
-                    "original": "The part of user's message that was wrong",
-                    "corrected": "The corrected Japanese version",
-                    "explanation": "Why it was wrong (in {feedback_lang})"
-                }}
-            ]
-        }}
+      "response": "Your natural Japanese reply.",
+      "feedback": {{
+        "overall": "Brief evaluation or encouragement (in {feedback_lang}).",
+        "corrections": [
+          {{
+            "type": "particle | conjugation | word_choice | politeness | word_order | other",
+            "original": "incorrect part only",
+            "corrected": "corrected Japanese",
+            "explanation": "explanation in {feedback_lang}"
+          }}
+        ]
+      }}
     }}
-    
-    If the user's Japanese is perfect, return an empty list for "corrections".
-    If the user speaks English or Chinese, polite ask them to try speaking Japanese (in Japanese), but still analyze what they said if possible.
+
+    If the user's Japanese is correct or natural enough, return an empty list for "corrections".
     """
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -290,7 +358,6 @@ def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
         "options": {
             "temperature": 0.7
         }
-        # "format": "json" # REMOVED: causing empty output with some models
     }
 
     try:
@@ -318,11 +385,19 @@ def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
             if match:
                  result_json = json.loads(match.group(0))
             else:
-                 raise
+                 print(f"FAILED CONTENT: {content}") 
+                 # Final fallback if really broken
+                 return {
+                    "response": "申し訳ありません、ちょっと調子が悪いようです。(AI formatting error)",
+                    "feedback": {
+                        "overall": "系統暫時無法處理您的請求。",
+                        "corrections": []
+                    }
+                 }
 
         # Validate keys
         if "response" not in result_json:
-             result_json["response"] = "申し訳ありません、ちょっと考え込んでしまいました。(AI Error)"
+             result_json["response"] = "申し訳ありません、もう一度お願いします。"
         
         if "feedback" not in result_json:
              result_json["feedback"] = {
@@ -336,9 +411,9 @@ def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
         print(f"Chat error: {e}")
         # Fallback response
         return {
-            "response": f"Error: {str(e)}", # Exposed for debugging
+            "response": "すみません、エラーが発生しました。",
             "feedback": {
-                "overall": "AI 服務暫時無法回應",
+                "overall": f"AI 服務暫時無法回應 ({str(e)})",
                 "corrections": []
             }
         }

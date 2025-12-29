@@ -107,6 +107,32 @@
         "analysis": "Analysis",
         "no_errors": "No major errors found. Good job!",
         "error_response": "Sorry, an error occurred.",
-        "disclaimer": "AI can make mistakes. Please double check important information."
+        "disclaimer": "AI can make mistakes. Please double check important information.",
+        "focus_title": "Daily Focus",
+        "focus_default": "Chat freely, I'll find your weak points 🙂",
+        "focus_complete_msg": "Great job! Keep practicing or check back later for a new focus.",
+        "focus_explainer": "This focus is automatically selected based on recent errors."
+    },
+    "pos": {
+        "vocabulary": "Vocabulary",
+        "grammar": "Grammar",
+        "general": "General",
+        "verb": "Verb",
+        "adjective": "Adjective",
+        "noun": "Noun",
+        "adverb": "Adverb",
+        "particle": "Particle",
+        "katakana": "Katakana",
+        "kanji": "Kanji",
+        "sentence": "Sentence"
+    },
+    "error_type": {
+        "none": "Perfect",
+        "typo": "Typo",
+        "vocab": "Vocabulary",
+        "particle": "Particle",
+        "conjugation": "Conjugation",
+        "unnatural": "Unnatural",
+        "other": "Other"
     }
 }
