@@ -2,20 +2,34 @@ import os
 import json
 import requests
 from enum import Enum
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
-# Users should set API_BASE_URL to the root of their Ollama instance (e.g. http://localhost:11434)
-BASE_URL = os.getenv("API_BASE_URL", "http://localhost:11434").rstrip("/")
-if BASE_URL.endswith("/v1"):
-    BASE_URL = BASE_URL[:-3]
-
+# Configuration
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
 API_KEY = os.getenv("API_KEY", "ollama")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-oss:120b")
-# Allow longer timeout for cold start
 AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "120"))
+
+# Base URL handling
+# If OpenAI provider, allow API_BASE_URL to override default (e.g. for Groq), otherwise None uses default.
+# If Ollama, default to localhost.
+raw_base_url = os.getenv("API_BASE_URL")
+if LLM_PROVIDER == "openai":
+    BASE_URL = raw_base_url if raw_base_url else None 
+else:
+    # Ollama default
+    BASE_URL = raw_base_url if raw_base_url else "http://localhost:11434"
+    if BASE_URL.endswith("/v1"):
+        BASE_URL = BASE_URL[:-3]
+
+# Initialize OpenAI Client if needed (lazy init is also fine, but global is easier for now)
+openai_client = None
+if LLM_PROVIDER == "openai":
+    openai_client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
 # Define Error Types
 class ErrorType(str, Enum):
@@ -40,10 +54,92 @@ def calculate_score(error_type: ErrorType) -> int:
     }
     return mapping.get(error_type, -3)
 
+def query_llm(messages: List[Dict[str, str]], json_mode: bool = False, temperature: float = 0.7) -> str:
+    """
+    Unified function to query the configured LLM provider.
+    Returns the text content of the response.
+    """
+    if LLM_PROVIDER == "openai" and openai_client:
+        try:
+            response_format = {"type": "json_object"} if json_mode else {"type": "text"}
+            
+            completion = openai_client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=messages,
+                response_format=response_format,
+                temperature=temperature,
+                timeout=AI_TIMEOUT
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            print(f"OpenAI API Error: {e}")
+            raise e
+    else:
+        # Fallback to Ollama (requests)
+        url = f"{BASE_URL.rstrip('/')}/api/chat"
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": MODEL_NAME,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature
+            }
+        }
+        
+        # Ollama 'format' param for JSON mode
+        if json_mode:
+            payload["format"] = "json"
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
+            response.raise_for_status()
+            
+            data = response.json()
+            content = data.get("message", {}).get("content", "")
+            if not content:
+                content = data.get("response", "")
+            return content
+            
+        except requests.RequestException as e:
+            print(f"Ollama API Error: {e}")
+            raise e
+
+def _parse_json_safe(content: str) -> dict:
+    """Helper to parse JSON from LLM response with cleanup strategies."""
+    # 1. Direct try
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+        
+    # 2. Cleanup markdown code blocks
+    import re
+    cleaned = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE)
+    cleaned = re.sub(r'^```\s*', '', cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r'\s*```$', '', cleaned, flags=re.MULTILINE)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # 3. Find first { and last }
+    match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
+            
+    raise ValueError(f"Could not parse JSON from content: {content[:100]}...")
+
 def evaluate_submission(question: str, user_answer: str, correct_answer: str) -> dict:
     """
-    Call Server LLM (Ollama API) to evaluate the submission.
-    Uses native /api/chat endpoint via requests to avoid issues with /v1/chat/completions.
+    Call Server LLM to evaluate the submission.
     """
     system_prompt = f"""
     You are a strict Japanese language teacher. 
@@ -74,54 +170,14 @@ def evaluate_submission(question: str, user_answer: str, correct_answer: str) ->
     User Answer: {user_answer}
     """
 
-    url = f"{BASE_URL}/api/chat"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": MODEL_NAME,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "stream": False
-    }
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
 
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
-        response.raise_for_status()
-        
-        # Parse Ollama response
-        data = response.json()
-        
-        content = data.get("message", {}).get("content", "")
-        if not content:
-             # Fallback for other structures (e.g. if 'response' is used instead of 'message')
-             content = data.get("response", "")
-        
-        # Helper to strip markdown code blocks
-        if "```" in content:
-            # removing ```json ... ``` or just ``` ... ```
-            import re
-            content = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE)
-            content = re.sub(r'^```\s*', '', content, flags=re.MULTILINE)
-            content = re.sub(r'\s*```$', '', content, flags=re.MULTILINE)
-        
-        # Parse nested JSON in content
-        try:
-            result_json = json.loads(content)
-        except json.JSONDecodeError:
-            # Fallback: Try to find JSON structure in the text
-            import re
-            match = re.search(r'\{.*\}', content, re.DOTALL)
-            if match:
-                try:
-                    result_json = json.loads(match.group(0))
-                except json.JSONDecodeError:
-                    raise # Still failed
-            else:
-                raise # No JSON found
+        content = query_llm(messages, json_mode=True, temperature=0.1)
+        result_json = _parse_json_safe(content)
 
         error_type_str = result_json.get("error_type", "other").lower()
         reasoning = result_json.get("reasoning", "No feedback provided")
@@ -132,8 +188,8 @@ def evaluate_submission(question: str, user_answer: str, correct_answer: str) ->
         except ValueError:
             error_type_enum = ErrorType.OTHER
                 
-    except (json.JSONDecodeError, Exception) as e:
-        print(f"Failed to parse AI response JSON. Error: {e}")
+    except Exception as e:
+        print(f"Failed to evaluate submission. Error: {e}")
         return {
             "is_correct": False,
             "score": 0,
@@ -176,37 +232,47 @@ def get_detailed_feedback(question: str, user_answer: str, correct_answer: str) 
     User Answer: {user_answer}
     """
 
-    url = f"{BASE_URL}/api/chat"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": MODEL_NAME,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "stream": False
-    }
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
 
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
-        response.raise_for_status()
-        
-        # Parse Ollama response
-        data = response.json()
-        content = data.get("message", {}).get("content", "")
-        if not content:
-             content = data.get("response", "")
-        
+        content = query_llm(messages, json_mode=False, temperature=0.7)
         return content
 
     except Exception as e:
         print(f"Failed to get detailed feedback. Error: {e}")
         return "抱歉，目前無法取得詳細解說。"
 
-def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
+def build_learner_context(profile: dict) -> dict:
+    """
+    Generate a short, human-readable block from the profile.
+    """
+    level = profile.get("level_est", "N5")
+    # Retrieve weak_points, defaulting to empty list if missing/None
+    weak = profile.get("weak_points", [])
+    if weak is None: weak = []
+    
+    # Take top 2 weak points
+    top_weak = weak[:2]
+    
+    pref = profile.get("feedback_preference", "gentle")
+
+    focus = ", ".join(top_weak) if top_weak else "general Japanese basics"
+
+    max_corrections = {
+        "gentle": 2,
+        "normal": 3,
+        "strict": 5
+    }.get(pref, 2)
+
+    return {
+        "summary": f"Learner profile:\n- Estimated level: {level}\n- Common weak points: {focus}\n- Feedback preference: {pref}\n- Max corrections: {max_corrections}",
+        "max_corrections": max_corrections
+    }
+
+def chat_with_ai(message: str, history: list, locale: str = 'en', learner_profile: dict = None) -> dict:
     """
     Chat with the AI in Japanese.
     
@@ -214,6 +280,7 @@ def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
         message: The latest user message.
         history: List of dictionary {'role': 'user'|'assistant', 'content': '...'}
         locale: User's locale (e.g. 'en', 'ja', 'zh-tw').
+        learner_profile: Dict containing learner stats and preferences.
         
     Returns:
         Dict with keys:
@@ -222,8 +289,6 @@ def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
     """
     
     # 1. Sliding Window for History (Keep last 10 turns to save tokens)
-    # Each turn is usually 2 messages (User + Assistant), so last 20 items.
-    # We also need to trust that the history passed in is valid.
     trimmed_history = history[-20:] if len(history) > 20 else history
 
     # 2. Determine Feedback Language
@@ -235,35 +300,77 @@ def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
         feedback_intro = "Reply in Japanese (Natural). Feedback/Explanations MUST be in Traditional Chinese (繁體中文)."
         feedback_lang = "Traditional Chinese"
 
+    # 3. Build Learner Context
+    if learner_profile:
+        context_data = build_learner_context(learner_profile)
+        learner_context = context_data["summary"]
+        max_corrections = context_data["max_corrections"]
+    else:
+        # Default generic context
+        learner_context = "Learner profile: User is a beginner. Treat as N5 level."
+        max_corrections = 2
+
     system_prompt = f"""
     You are a friendly and helpful Japanese language tutor.
-    Your goal is to have a natural conversation with the user in Japanese, while strictly evaluating their language skills.
-    
+
+    Your goal is to have a natural conversation with the user in Japanese,
+    while providing focused, level-appropriate feedback based on their learning profile.
+
+    {learner_context}
+
     Instructions:
-    1. **Role**: Act as a native Japanese speaker. Be polite and encouraging.
-    2. **Language**: 
-       - {feedback_intro}
-    3. **Output Format**:
-       - You MUST return a VALID JSON object.
-       - DO NOT output any text outside the JSON block.
-    
+
+    1. Role
+    - Act as a native Japanese speaker.
+    - Be polite, encouraging, and supportive.
+    - Match your Japanese difficulty to the learner’s estimated level.
+      - N5: short sentences, common words, です／ます form
+      - N4: slightly longer sentences, simple casual allowed if user uses it
+      - N3+: more natural expressions allowed
+
+    2. Language rules
+    - Your reply ("response") MUST be in Japanese only.
+    - All feedback content MUST be written in {feedback_lang}.
+    - {feedback_intro}
+
+    3. Feedback rules
+    - You MUST prioritize corrections related to the learner’s weak points.
+    - Do NOT correct everything.
+    - Focus on errors that affect clarity or sound unnatural.
+    - Limit the number of corrections to AT MOST {max_corrections}.
+    - If the learner’s Japanese is acceptable, keep feedback encouraging and minimal.
+
+    4. Correction format rules
+    - In each correction, quote ONLY the minimal incorrect part.
+    - Use clear and simple explanations suitable for the learner’s level.
+
+    5. Non-Japanese input handling
+    - If the user writes mostly in English or Chinese:
+      - Respond politely in Japanese encouraging them to try Japanese.
+      - Still provide brief feedback in {feedback_lang} if possible.
+
+    6. Output format (STRICT)
+    - You MUST return a VALID JSON object.
+    - DO NOT output any text outside the JSON.
+    - DO NOT include markdown or explanations outside JSON.
+
     JSON Structure:
     {{
-        "response": "Your natural Japanese reply to the user's message.",
-        "feedback": {{
-            "overall": "A brief summary of their Japanese (in {feedback_lang}). E.g., encouragement or pointing out key errors.",
-            "corrections": [
-                {{
-                    "original": "The part of user's message that was wrong",
-                    "corrected": "The corrected Japanese version",
-                    "explanation": "Why it was wrong (in {feedback_lang})"
-                }}
-            ]
-        }}
+      "response": "Your natural Japanese reply.",
+      "feedback": {{
+        "overall": "Brief evaluation or encouragement (in {feedback_lang}).",
+        "corrections": [
+          {{
+            "type": "particle | conjugation | word_choice | politeness | word_order | other",
+            "original": "incorrect part only",
+            "corrected": "corrected Japanese",
+            "explanation": "explanation in {feedback_lang}"
+          }}
+        ]
+      }}
     }}
-    
-    If the user's Japanese is perfect, return an empty list for "corrections".
-    If the user speaks English or Chinese, polite ask them to try speaking Japanese (in Japanese), but still analyze what they said if possible.
+
+    If the user's Japanese is correct or natural enough, return an empty list for "corrections".
     """
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -277,52 +384,13 @@ def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
     # Append current message
     messages.append({"role": "user", "content": message})
 
-    url = f"{BASE_URL}/api/chat"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    # Using json mode if supported by the model, otherwise reliant on prompt
-    payload = {
-        "model": MODEL_NAME,
-        "messages": messages,
-        "stream": False,
-        "options": {
-            "temperature": 0.7
-        }
-        # "format": "json" # REMOVED: causing empty output with some models
-    }
-
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
-        response.raise_for_status()
-        
-        data = response.json()
-        content = data.get("message", {}).get("content", "")
-        if not content:
-            content = data.get("response", "")
-            
-        # Parse JSON
-        import json
-        try:
-            result_json = json.loads(content)
-        except json.JSONDecodeError:
-            print("INFO: JSON Parse failed, attempting regex cleanup...")
-            # Cleanup common markdown code block issues
-            import re
-            content_clean = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE)
-            content_clean = re.sub(r'^```\s*', '', content_clean, flags=re.MULTILINE)
-            content_clean = re.sub(r'\s*```$', '', content_clean, flags=re.MULTILINE)
-            # Try to find the first { and last }
-            match = re.search(r'\{.*\}', content_clean, re.DOTALL)
-            if match:
-                 result_json = json.loads(match.group(0))
-            else:
-                 raise
+        content = query_llm(messages, json_mode=True, temperature=0.7)
+        result_json = _parse_json_safe(content)
 
         # Validate keys
         if "response" not in result_json:
-             result_json["response"] = "申し訳ありません、ちょっと考え込んでしまいました。(AI Error)"
+             result_json["response"] = "申し訳ありません、もう一度お願いします。"
         
         if "feedback" not in result_json:
              result_json["feedback"] = {
@@ -331,14 +399,14 @@ def chat_with_ai(message: str, history: list, locale: str = 'en') -> dict:
              }
              
         return result_json
-
+        
     except Exception as e:
         print(f"Chat error: {e}")
         # Fallback response
         return {
-            "response": f"Error: {str(e)}", # Exposed for debugging
+            "response": "すみません、エラーが発生しました。",
             "feedback": {
-                "overall": "AI 服務暫時無法回應",
+                "overall": f"AI 服務暫時無法回應 ({str(e)})",
                 "corrections": []
             }
         }
