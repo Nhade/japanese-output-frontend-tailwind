@@ -215,7 +215,7 @@ def chat_send():
     if not isinstance(history, list):
         return jsonify({"error": "History must be a list"}), 400
         
-    # P1: Fetch Learner Profile if user_id is provided
+    # Fetch Learner Profile if user_id is provided
     user_id = data.get('user_id')
     learner_profile = None
     if user_id:

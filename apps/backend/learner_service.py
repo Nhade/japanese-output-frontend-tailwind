@@ -61,13 +61,10 @@ def get_learner_profile(conn, user_id):
     
     if row:
         profile = json.loads(row['profile_json'])
-        # P2 Migration: Ensure current_focus exists
+        # Ensure current_focus exists for older profiles
         if "current_focus" not in profile:
             profile["current_focus"] = get_default_profile()["current_focus"]
-            # Save immediately to fix schema
-            # But we can just return it and let next update save it, 
-            # Or simpler: just let refresh_focus handle it during updates/reads if we call it.
-            # For read-consistency, let's just patch it in memory.
+            
         return resolve_focus_display(profile)
     else:
         # Create default
@@ -148,15 +145,11 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
         
         # 3. Check completion
         if focus["progress"] >= focus["target"]:
-            # Rotate logic:
-            # Pick next weak point that is DIFFERENT from current
+            # Rotate logic: Pick next weak point that is DIFFERENT from current
             weak_points = profile.get("weak_points", [])
             next_tag = "General"
             
-            # Simple rotation: find current index, take next, or just take top if current is gone
-            # If current tag is still #1 weak point, maybe keep it? 
-            # OR force rotation to prevent boredom.
-            # Let's force rotation to the next available weak point implementation.
+            # Find next tag
             
             candidates = [wp for wp in weak_points if wp != focus["tag"]]
             if candidates:
