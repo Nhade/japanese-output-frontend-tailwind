@@ -81,9 +81,42 @@ This project places strong emphasis on **explicit system logic and data flow**, 
 * **Database:** SQLite for persistent storage
 * **AI Layer:** Model-agnostic LLM interface supporting multiple providers
 
-> 📌 *Diagram Placeholder:*
-> **Overall System Architecture Diagram**
-> (Frontend ↔ Backend ↔ Database ↔ AI Services)
+```mermaid
+graph TD
+    User["User / Browser"]
+    
+    subgraph Client_Side [Client Side]
+        Vue["Frontend (Vue.js 3)"]
+    end
+    
+    subgraph Server_Side [Server System]
+        Flask["Backend API (Flask)"]
+        NewsFetcher["News Fetcher Script"]
+    end
+    
+    subgraph Data_Layer [Data Persistence]
+        SQLite[("SQLite Database")]
+    end
+    
+    subgraph External_Services [AI & External Services]
+        OpenAI["LLM Provider (OpenAI / Groq / Ollama)"]
+        Google["Google Cloud Translation"]
+        TTS_API["OpenAI TTS API"]
+        NHK["NHK News RSS"]
+    end
+
+    %% Relationships
+    User <-->|Interact| Vue
+    Vue <-->|"REST API (JSON)"| Flask
+    
+    Flask <-->|Read/Write User Data & Exercises| SQLite
+    NewsFetcher -->|Store Processed Articles| SQLite
+    NewsFetcher <-->|Fetch & Scrape| NHK
+    
+    Flask <-->|GenAI Logic & Chat| OpenAI
+    Flask -->|Translate Text| Google
+    Flask -->|Generate Audio| TTS_API
+```
 
 ---
 
@@ -98,12 +131,41 @@ Located in `tools/news_fetcher.py`.
 3. Generates UUIDs from article URLs to prevent duplication
 4. Stores cleaned articles in SQLite
 
-> 📌 *Diagram Placeholder:*
-> **News Ingestion DAG**
+```mermaid
+graph TD
+    Start["Start"] --> FetchRSS["Fetch NHK RSS Feed"]
+    FetchRSS -->|Extract URLs| UrlList["List of Article URLs"]
+
+    subgraph Loop [Processing Loop]
+        UrlList -- Iterate --> FetchHTML["Fetch Article HTML"]
+        FetchHTML --> Parse["Parse HTML (BeautifulSoup)"]
+        Parse --> CheckJSON{"Has JSON-LD?"}
+        
+        CheckJSON -- Yes --> ExtractJSON["Extract Meta from JSON-LD"]
+        CheckJSON -- No --> ExtractTags["Extract Meta from Tags"]
+        
+        ExtractJSON --> ExtractBody["Extract Body Text"]
+        ExtractTags --> ExtractBody
+        
+        ExtractBody --> ArticleObject["Article Data Dict"]
+    end
+
+    ArticleObject -- Collect --> Batch["Batch Data"]
+    
+    Batch -->|Save All| SaveDB["DB Storage Function"]
+
+    subgraph Database [SQLite Storage]
+        SaveDB --> GenUUID["Generate UUIDv5 (Deduplication)"]
+        GenUUID --> Insert["INSERT OR IGNORE"]
+        Insert --> Table[("articles table")]
+    end
+```
 
 ---
 
 ### Exercise Evaluation State Machine
+
+The following diagram represents a **state machine**, where transitions depend on validation outcomes and AI safety checks.
 
 Located in `apps/backend/ai_service.py`.
 
@@ -120,12 +182,49 @@ Located in `apps/backend/ai_service.py`.
    * Classifies error type (typo, particle, conjugation, etc.)
 4. Returns structured JSON feedback
 
-> 📌 *Diagram Placeholder:*
-> **Exercise Evaluation State Machine**
+```mermaid
+graph TD
+    Start["User Submission"] --> Normalize["Normalize Input (pykakasi)"]
+    Normalize --> Compare{"String Match?"}
+
+    Compare -- Yes --> Correct["Mark Correct - Score: 100"]
+    
+    Compare -- No --> AI_Start["Trigger AI Evaluation"]
+
+    subgraph AI_Service [AI Evaluation Service]
+        AI_Start --> Safety{"Safety Check"}
+        
+        Safety -- Violation --> PolicyReject["Block Request"]
+        
+        Safety -- Safe --> BuildPrompt["Construct System Prompt"]
+        BuildPrompt --> QueryLLM["Query LLM (JSON Mode)"]
+        
+        QueryLLM --> Parse{"Parse Response"}
+        
+        Parse -->|Error| Retry["Retry Logic"]
+        Retry --> QueryLLM
+        
+        Parse -->|Success| Extract["Extract Error Type & Reason"]
+        
+        Extract --> Classify{"Classify Error"}
+        
+        Classify --> TypeTypo["Typo"]
+        Classify --> TypeVocab["Vocab"]
+        Classify --> TypeParticle["Particle"]
+        Classify --> TypeConj["Conjugation"]
+        Classify --> TypeUnnatural["Unnatural"]
+        
+        TypeTypo & TypeVocab & TypeParticle & TypeConj & TypeUnnatural --> Calculate["Calculate Score Deduction"]
+    end
+
+    Calculate --> Response["Return Structured Feedback"]
+```
 
 ---
 
 ### Agentic Daily Review Workflow
+
+The agent pipeline is modeled as a **Directed Acyclic Graph (DAG)**, where each agent consumes the output of the previous stage.
 
 Located in `apps/backend/agent_service.py`.
 
@@ -135,8 +234,63 @@ Located in `apps/backend/agent_service.py`.
 2. **Tutor** – Drafts an educational, learner-friendly review
 3. **Editor** – Refines output into structured Markdown
 
-> 📌 *Diagram Placeholder:*
-> **Agent Workflow DAG (Observer → Tutor → Editor)**
+```mermaid
+graph TD
+    Trigger["User Requests Review"] --> DB[("SQLite Database")]
+    
+    subgraph Data [Data Retrieval]
+        DB -->|Query Today's Mistakes| Mistakes["Mistake Log"]
+    end
+
+    subgraph Pipeline [Agent Chain]
+        Mistakes --> Observer["1. Observer Agent - Analyze Patterns"]
+        
+        Observer -- "Output: Weaknesses" --> Tutor["2. Tutor Agent - Draft Feedback"]
+        
+        Tutor -- "Output: Draft Review" --> Editor["3. Editor Agent - Refine & Format"]
+    end
+
+    Editor -->|Final Markdown| Output["Daily Review Card"]
+```
+
+---
+
+### Personalized AI Chat
+
+Located in `apps/backend/ai_service.py` and `apps/backend/learner_service.py`.
+
+**Chat Pipeline:**
+
+1.  **Context Loading** – Fetches user's JLPT level and weak points from `learner_profiles`.
+2.  **Prompt Engineering** – Dynamically constructs a system instruction that:
+    *   Enforces the user's preferred language for explanations (Locale).
+    *   Sets the complexity of Japanese output (N5~N1).
+    *   Focuses corrections on specific weaknesses.
+3.  **JSON-Mode Inference** – Forces the LLM to output separated conversation and feedback.
+
+```mermaid
+graph TD
+    Client["Client / Vue"] -->|Message + Locale| API["API Endpoint"]
+    
+    subgraph Context_Assembly [Context Assembly]
+        API -->|Get User ID| LearnerSvc["Learner Service"]
+        LearnerSvc -->|"Return Profile (Level, Weaknesses)"| API
+    end
+    
+    API -->|Combined Context| AISvc["AI Service"]
+    
+    subgraph Inference_Layer [Inference Layer]
+        AISvc --> Safety{"Safety Check"}
+        Safety -- Safe --> Prompt["Construct System Prompt"]
+        Prompt -->|Inject Profile + History| LLM["LLM (JSON Mode)"]
+        LLM -->|Raw JSON| Parser["Response Parser"]
+    end
+    
+    Parser -->|'response'| ChatReply["Japanese Reply"]
+    Parser -->|'feedback'| Advice["Correction & Advice"]
+    
+    ChatReply & Advice --> Final["Structured Response"]
+```
 
 ---
 
@@ -286,3 +440,14 @@ This project was developed primarily for academic purposes, but contributions ar
 * Additional news sources
 * Enhanced error classification logic
 * Automated testing
+
+---
+
+## 🎓 Academic & Technical Objectives
+
+This project demonstrates:
+- **Practical application of NLP techniques** for Japanese (Morphological Analysis, Kana Conversion)
+- **Hybrid AI system design** combining deterministic logic with probabilistic LLM reasoning
+- **Explicit modeling of system logic** via State Machines and Directed Acyclic Graphs (DAGs)
+- **Separation of concerns** across Frontend, Backend, Data, and AI Services
+- **Agentic Workflow** implementation using multi-stage LLM chains (Observer-Tutor-Editor)
