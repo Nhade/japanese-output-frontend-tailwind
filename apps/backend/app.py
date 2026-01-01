@@ -50,7 +50,7 @@ def get_mistakes(user_id):
 
 from ai_service import evaluate_submission, get_detailed_feedback, chat_with_ai
 from agent_service import generate_daily_review_agent
-from learner_service import create_learner_tables, update_learner_profile, get_learner_profile, backfill_learner_profile
+from learner_service import create_learner_tables, update_learner_profile, get_learner_profile, backfill_learner_profile, update_learner_settings
 
 # Initialize Learner Tables
 try:
@@ -516,6 +516,26 @@ def recalculate_learner_profile_route(user_id):
             
         profile = backfill_learner_profile(conn, user_id)
         return jsonify(profile)
+    finally:
+        conn.close()
+
+
+@app.route('/api/users/profile', methods=['POST'])
+def update_profile():
+    data = request.json
+    user_id = data.get('user_id')
+    settings = data.get('settings')
+    
+    if not user_id or not settings:
+        return jsonify({"error": "Missing user_id or settings"}), 400
+        
+    conn = get_db_connection()
+    try:
+        updated_profile = update_learner_settings(conn, user_id, settings)
+        return jsonify(updated_profile)
+    except Exception as e:
+        print(f"Error updating profile: {e}")
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         conn.close()
 

@@ -118,18 +118,18 @@
         "focus_explainer": "此重點根據你最近的錯誤自動選擇",
         "safety_violation": "由於安全政策，請求已被拒絕。"
     },
+    "settings": {
+        "title": "使用者設定",
+        "jlpt_level": "JLPT 預估等級",
+        "feedback_preference": "回饋風格",
+        "pref_gentle": "溫和 (鼓勵為主)",
+        "pref_normal": "一般 (平衡)",
+        "pref_strict": "嚴格 (詳細糾錯)",
+        "save": "儲存設定",
+        "saved_success": "設定已儲存。"
+    },
     "pos": {
-        "vocabulary": "單字",
-        "grammar": "文法",
         "general": "綜合",
-        "verb": "動詞",
-        "adjective": "形容詞",
-        "noun": "名詞",
-        "adverb": "副詞",
-        "particle": "助詞",
-        "katakana": "片假名",
-        "kanji": "漢字",
-        "sentence": "句子",
         "名詞": "名詞",
         "助詞": "助詞",
         "動詞": "動詞",

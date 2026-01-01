@@ -118,18 +118,18 @@
         "focus_explainer": "This focus is automatically selected based on recent errors.",
         "safety_violation": "Request rejected due to safety policy."
     },
+    "settings": {
+        "title": "User Settings",
+        "jlpt_level": "Est. JLPT Level",
+        "feedback_preference": "Feedback Style",
+        "pref_gentle": "Gentle",
+        "pref_normal": "Normal",
+        "pref_strict": "Strict",
+        "save": "Save Settings",
+        "saved_success": "Settings saved successfully."
+    },
     "pos": {
-        "vocabulary": "Vocabulary",
-        "grammar": "Grammar",
         "general": "General",
-        "verb": "Verb",
-        "adjective": "Adjective",
-        "noun": "Noun",
-        "adverb": "Adverb",
-        "particle": "Particle",
-        "katakana": "Katakana",
-        "kanji": "Kanji",
-        "sentence": "Sentence",
         "名詞": "Noun",
         "助詞": "Particle",
         "動詞": "Verb",

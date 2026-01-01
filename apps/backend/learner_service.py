@@ -278,3 +278,31 @@ def backfill_learner_profile(conn, user_id):
     conn.commit()
     
     return profile
+
+def update_learner_settings(conn, user_id, settings):
+    """
+    Update learner profile settings (level_est, feedback_preference).
+    settings: dict with optional 'level_est', 'feedback_preference'
+    """
+    profile = get_learner_profile(conn, user_id)
+    
+    updated = False
+    if 'level_est' in settings:
+        profile['level_est'] = settings['level_est']
+        updated = True
+        
+    if 'feedback_preference' in settings:
+        profile['feedback_preference'] = settings['feedback_preference']
+        updated = True
+        
+    if updated:
+        profile["updated_at"] = datetime.now().isoformat()
+        conn.execute('''
+            UPDATE learner_profiles 
+            SET profile_json = ?, updated_at = ?
+            WHERE user_id = ?
+        ''', (json.dumps(profile), datetime.now().isoformat(), user_id))
+        conn.commit()
+    
+    return profile
+

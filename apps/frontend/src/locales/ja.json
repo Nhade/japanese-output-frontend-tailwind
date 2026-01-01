@@ -119,17 +119,7 @@
         "safety_violation": "安全ポリシーによりリクエストが拒否されました。"
     },
     "pos": {
-        "vocabulary": "単語",
-        "grammar": "文法",
         "general": "一般",
-        "verb": "動詞",
-        "adjective": "形容詞",
-        "noun": "名詞",
-        "adverb": "副詞",
-        "particle": "助詞",
-        "katakana": "カタカナ",
-        "kanji": "漢字",
-        "sentence": "文",
         "名詞": "名詞",
         "助詞": "助詞",
         "動詞": "動詞",
