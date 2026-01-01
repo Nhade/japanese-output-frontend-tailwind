@@ -83,6 +83,28 @@ async function handleAnswerSubmit() {
     const result = await response.json();
     feedback.value = result;
 
+    // Toast for Focus Progress
+    if (result.focus_diff && result.focus_diff.updated) {
+      const diff = result.focus_diff;
+      const rawTag = diff.tag ? diff.tag.trim() : '';
+      const tag = rawTag ? t(`pos.${rawTag.toLowerCase()}`, rawTag) : '';
+
+      let msg = '';
+      if (diff.rotated) {
+        const rawNewTag = diff.new_tag ? diff.new_tag.trim() : '';
+        const newTag = rawNewTag ? t(`pos.${rawNewTag.toLowerCase()}`, rawNewTag) : '';
+        msg = t('exercise.focus_toast_completed', { tag: newTag });
+        toastStore.trigger(msg, 'success');
+      } else {
+        msg = t('exercise.focus_toast_progress', {
+          tag: tag,
+          progress: diff.progress,
+          target: diff.target
+        });
+        toastStore.trigger(msg, 'info');
+      }
+    }
+
     await nextTick();
     nextQuestionButton.value?.focus();
 

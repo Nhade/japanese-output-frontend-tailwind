@@ -115,7 +115,7 @@ def submit_answer():
             "part_of_speech": row['part_of_speech'],
             "jlpt_level": row['jlpt_level']
         }
-        update_learner_profile(conn, user_id, exercise_info, is_correct)
+        _, focus_diff = update_learner_profile(conn, user_id, exercise_info, is_correct)
         
         conn.commit()
 
@@ -126,7 +126,8 @@ def submit_answer():
     return jsonify({
         "is_correct": is_correct,
         "correct_answer": correct_answer,
-        "log_id": log_id
+        "log_id": log_id,
+        "focus_diff": focus_diff
     })
 
 @app.route('/api/exercise/explain', methods=['POST'])

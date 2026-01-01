@@ -52,7 +52,9 @@
         "footer_helper": "{enter} で確認。 {alt} + {h} でヒント。",
         "error_submit": "回答の送信に失敗しました",
         "network_error": "ネットワークエラーまたはサーバーが利用できません。",
-        "type_here": "ここに入力..."
+        "type_here": "ここに入力...",
+        "focus_toast_completed": "学習重点完了！次は：{tag}",
+        "focus_toast_progress": "学習重点 ({tag}): {progress} / {target}"
     },
     "mistakes": {
         "title": "過去の間違い",
@@ -127,7 +129,14 @@
         "particle": "助詞",
         "katakana": "カタカナ",
         "kanji": "漢字",
-        "sentence": "文"
+        "sentence": "文",
+        "名詞": "名詞",
+        "助詞": "助詞",
+        "動詞": "動詞",
+        "助動詞": "助動詞",
+        "連体詞": "連体詞",
+        "形容詞": "形容詞",
+        "副詞": "副詞"
     },
     "error_type": {
         "none": "正解",
