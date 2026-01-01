@@ -2,35 +2,26 @@ import sqlite3
 import json
 import os
 from datetime import datetime
-from ai_service import BASE_URL, API_KEY, MODEL_NAME, AI_TIMEOUT
-import requests
+from ai_service import query_llm
 
-def call_llm(messages):
-    url = f"{BASE_URL}/api/chat"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": MODEL_NAME,
-        "messages": messages,
-        "stream": False,
-        "temperature": 0.7 
-    }
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
-        response.raise_for_status()
-        
-        data = response.json()
-        content = data.get("message", {}).get("content", "")
-        if not content:
-             content = data.get("response", "")
-        return content
-    except Exception as e:
-        print(f"LLM Call Error: {e}")
-        return None
+
 
 def generate_daily_review_agent(user_id, db_path):
+    """
+    Generates a daily review for the user based on their mistakes from the current day.
+    
+    This function performs a 3-step agentic workflow:
+    1. Analysis: Analyzes the user's mistakes to identify weakness patterns.
+    2. Drafting: Drafts a supportive and educational review based on the analysis.
+    3. Polishing: Polishes the review to ensure a professional and encouraging tone.
+
+    Args:
+        user_id (str): The value of the user's ID.
+        db_path (str): The path to the SQLite database.
+
+    Returns:
+        str: The final polished daily review text in Markdown format.
+    """
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     
@@ -67,7 +58,11 @@ def generate_daily_review_agent(user_id, db_path):
     
     請簡短列出分析結果。
     """
-    analysis_result = call_llm([{"role": "user", "content": prompt_analysis}])
+    try:
+        analysis_result = query_llm([{"role": "user", "content": prompt_analysis}])
+    except Exception as e:
+        print(f"Agent Step 1 Failed: {e}")
+        return "無法進行分析。"
 
     # --- Agent Step 2: Draft review (Drafting) ---
     print("Agent Step 2: Drafting review...")
@@ -89,7 +84,11 @@ def generate_daily_review_agent(user_id, db_path):
         {"role": "assistant", "content": analysis_result},
         {"role": "user", "content": prompt_draft}
     ]
-    draft_result = call_llm(messages_draft)
+    try:
+        draft_result = query_llm(messages_draft)
+    except Exception as e:
+        print(f"Agent Step 2 Failed: {e}")
+        return analysis_result or "無法產生回顧。"
 
     # --- Agent Step 3: Final polishing (Polishing) ---
     print("Agent Step 3: Polishing...")
@@ -103,6 +102,10 @@ def generate_daily_review_agent(user_id, db_path):
         {"role": "assistant", "content": draft_result},
         {"role": "user", "content": prompt_polish}
     ]
-    final_result = call_llm(messages_polish)
+    try:
+        final_result = query_llm(messages_polish)
+    except Exception as e:
+        print(f"Agent Step 3 Failed: {e}")
+        return draft_result or "無法優化草稿。"
 
     return final_result
