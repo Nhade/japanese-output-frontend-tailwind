@@ -414,9 +414,7 @@ def get_news_list():
         params.append(category)
     
     if date_str:
-        # Assuming publish_timestamp is ISO string, we try to match the date part.
-        # SQLite's date function might be useful, or simple string matching if format is consistent.
-        # Timestamps are like '2024-12-14T...' so 'LIKE date_str%' works.
+        # Match date part of ISO timestamp
         query += " AND publish_timestamp LIKE ?"
         params.append(f"{date_str}%")
 

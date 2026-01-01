@@ -29,7 +29,7 @@ const prefOptions = [
     { value: 'strict', label: 'settings.pref_strict' },
 ];
 
-// Fetch current settings when modal opens
+
 watch(() => props.show, async (newVal) => {
     if (newVal && auth.user_id) {
         try {

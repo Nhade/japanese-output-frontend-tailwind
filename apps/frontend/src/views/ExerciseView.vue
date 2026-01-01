@@ -15,14 +15,13 @@ const md = new MarkdownIt({
   typographer: true
 });
 
-// Reactive state for the view
-const exercise = ref(null); // Holds the current exercise data
-const feedback = ref(null); // Holds the feedback from the server after submission
-const detailedFeedback = ref(null); // Holds the detailed explanation
+const exercise = ref(null);
+const feedback = ref(null);
+const detailedFeedback = ref(null);
 const showDetailModal = ref(false);
 const detailedError = ref(null);
-const isLoading = ref(true); // Controls the loading spinner visibility
-const isLoadingDetailed = ref(false); // Controls the detailed feedback spinner
+const isLoading = ref(true);
+const isLoadingDetailed = ref(false);
 const auth = useAuthStore();
 const toastStore = useToastStore();
 const userAnswer = ref('');
@@ -30,9 +29,7 @@ const showHint = ref(false);
 const nextQuestionButton = ref(null);
 const answerInput = ref(null);
 
-// --- API Interaction ---
 
-// Fetches a new random exercise from the backend
 async function fetchNewExercise() {
   isLoading.value = true;
   feedback.value = null; // Reset feedback for the new question
@@ -60,8 +57,7 @@ async function fetchNewExercise() {
   }
 }
 
-// Submits the user's answer to the backend
-const isExplaining = ref(false); // New state for AI loading
+const isExplaining = ref(false);
 
 async function handleAnswerSubmit() {
   if (!exercise.value || !userAnswer.value.trim()) return;

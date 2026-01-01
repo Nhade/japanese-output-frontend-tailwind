@@ -94,8 +94,6 @@ def resolve_focus_display(profile):
     }
     if tag in LEGACY_MAPPING:
         focus["tag"] = LEGACY_MAPPING[tag]
-        # Optional: Reset progress if migrating? Or keep it?
-        # Keeping it is friendlier, though context changed.
         
     return profile
 
@@ -162,8 +160,6 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
     # So direct match should work.
     if focus["tag"] == pos:
         # Increment progress
-        # We can count ANY attempt, or only correct/wrong?
-        # Plan says "user answers a question tagged with focus" -> Any attempt is fine to show effort.
         focus["progress"] += 1
         focus_diff["updated"] = True
         focus_diff["progress"] = focus["progress"]
@@ -187,7 +183,6 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
                 next_tag = "名詞" if focus["tag"] != "名詞" else "助詞"
             
             old_tag = focus["tag"]
-            print(f"FOCUS ROTATION: {old_tag} -> {next_tag}")
 
             profile["current_focus"] = {
                 "tag": next_tag,
