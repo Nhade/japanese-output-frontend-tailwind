@@ -11,6 +11,7 @@ interface FeedbackCorrection {
 interface Feedback {
     overall: string;
     corrections: FeedbackCorrection[];
+    retry_count?: number;
 }
 
 interface Message {
@@ -183,6 +184,10 @@ const toggleFeedback = (index: number) => {
                                 <div
                                     class="mb-3 font-medium text-amber-700 dark:text-amber-500 flex items-center gap-2">
                                     <span>📝 {{ t('chat.analysis') }}</span>
+                                    <span v-if="msg.feedback.retry_count && msg.feedback.retry_count > 0"
+                                        class="text-xs bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/15 px-2 py-0.5 rounded border uppercase tracking-wider ml-auto">
+                                        Retried: {{ msg.feedback.retry_count }}
+                                    </span>
                                 </div>
 
                                 <p class="mb-3 italic">{{ msg.feedback.overall }}</p>
@@ -194,7 +199,7 @@ const toggleFeedback = (index: number) => {
                                         <div class="flex items-start gap-2 mb-1">
                                             <span class="text-red-500 font-mono text-xs mt-0.5">✖</span>
                                             <span class="line-through opacity-60" lang="ja">{{ correction.original
-                                            }}</span>
+                                                }}</span>
                                         </div>
                                         <div class="flex items-start gap-2 mb-2">
                                             <span class="text-green-500 font-mono text-xs mt-0.5">✔</span>

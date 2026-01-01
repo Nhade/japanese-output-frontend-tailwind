@@ -137,6 +137,27 @@ def _parse_json_safe(content: str) -> dict:
             
     raise ValueError(f"Could not parse JSON from content: {content[:100]}...")
 
+def query_llm_json(messages: List[Dict[str, str]], retries: int = 3, temperature: float = 0.7) -> dict:
+    """
+    Wrapper around query_llm to handle JSON parsing with retries.
+    Returns a dictionary: {"data": dict|None, "retry_count": int, "error": str|None}
+    """
+    retry_count = 0
+    last_error = None
+    
+    while retry_count <= retries:
+        try:
+            # Disable json_mode at API level as it causes empty responses on this provider
+            content = query_llm(messages, json_mode=False, temperature=temperature)
+            data = _parse_json_safe(content)
+            return {"data": data, "retry_count": retry_count, "error": None}
+        except (ValueError, json.JSONDecodeError) as e:
+            last_error = str(e)
+            print(f"JSON parsing failed (attempt {retry_count + 1}/{retries + 1}): {e}")
+            retry_count += 1
+            
+    return {"data": None, "retry_count": retries, "error": last_error}
+
 def evaluate_submission(question: str, user_answer: str, correct_answer: str) -> dict:
     """
     Call Server LLM to evaluate the submission.
@@ -176,8 +197,21 @@ def evaluate_submission(question: str, user_answer: str, correct_answer: str) ->
     ]
 
     try:
-        content = query_llm(messages, json_mode=True, temperature=0.1)
-        result_json = _parse_json_safe(content)
+        result = query_llm_json(messages, temperature=0.1)
+        retry_count = result["retry_count"]
+        
+        if result["error"]:
+             print(f"Failed to evaluate submission after retries. Error: {result['error']}")
+             return {
+                "is_correct": False,
+                "score": 0,
+                "error_type": "unknown",
+                "feedback": f"AI 回應格式錯誤 (Retried {retry_count} times)",
+                "deduction": 0,
+                "retry_count": retry_count
+             }
+
+        result_json = result["data"]
 
         error_type_str = result_json.get("error_type", "other").lower()
         reasoning = result_json.get("reasoning", "No feedback provided")
@@ -189,13 +223,14 @@ def evaluate_submission(question: str, user_answer: str, correct_answer: str) ->
             error_type_enum = ErrorType.OTHER
                 
     except Exception as e:
-        print(f"Failed to evaluate submission. Error: {e}")
+        print(f"Unexpected error in evaluate_submission: {e}")
         return {
             "is_correct": False,
             "score": 0,
             "error_type": "unknown",
-            "feedback": "AI 回應格式錯誤",
-            "deduction": 0
+            "feedback": "AI 服務發生未預期錯誤",
+            "deduction": 0,
+            "retry_count": 0
         }
 
     # Calculate score (Max 100)
@@ -207,7 +242,8 @@ def evaluate_submission(question: str, user_answer: str, correct_answer: str) ->
         "score": final_score,
         "error_type": error_type_enum.value,
         "feedback": reasoning,
-        "deduction": deduction
+        "deduction": deduction,
+        "retry_count": retry_count
     }
 
 def get_detailed_feedback(question: str, user_answer: str, correct_answer: str) -> str:
@@ -385,8 +421,20 @@ def chat_with_ai(message: str, history: list, locale: str = 'en', learner_profil
     messages.append({"role": "user", "content": message})
 
     try:
-        content = query_llm(messages, json_mode=True, temperature=0.7)
-        result_json = _parse_json_safe(content)
+        result = query_llm_json(messages, temperature=0.7)
+        retry_count = result["retry_count"]
+        
+        if result["error"]:
+             return {
+                "response": "すみません、エラーが発生しました。",
+                "feedback": {
+                    "overall": f"AI 服務暫時無法回應 (格式錯誤, retried {retry_count} times)",
+                    "corrections": []
+                },
+                "retry_count": retry_count
+            }
+            
+        result_json = result["data"]
 
         # Validate keys
         if "response" not in result_json:
@@ -397,7 +445,8 @@ def chat_with_ai(message: str, history: list, locale: str = 'en', learner_profil
                  "overall": "無法取得回饋",
                  "corrections": []
              }
-             
+         
+        result_json["retry_count"] = retry_count
         return result_json
         
     except Exception as e:
@@ -408,5 +457,6 @@ def chat_with_ai(message: str, history: list, locale: str = 'en', learner_profil
             "feedback": {
                 "overall": f"AI 服務暫時無法回應 ({str(e)})",
                 "corrections": []
-            }
+            },
+            "retry_count": 0
         }
