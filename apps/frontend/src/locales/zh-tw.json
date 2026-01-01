@@ -52,7 +52,9 @@
         "footer_helper": "按 {enter} 檢查。按 {alt} + {h} 顯示提示。",
         "error_submit": "提交答案失敗",
         "network_error": "網路錯誤或伺服器無法連線。",
-        "type_here": "在此輸入..."
+        "type_here": "在此輸入...",
+        "focus_toast_completed": "重點學習已完成！接下來：{tag}",
+        "focus_toast_progress": "學習重點 ({tag})：{progress} / {target}"
     },
     "mistakes": {
         "title": "過去的錯誤",
@@ -116,18 +118,25 @@
         "focus_explainer": "此重點根據你最近的錯誤自動選擇",
         "safety_violation": "由於安全政策，請求已被拒絕。"
     },
+    "settings": {
+        "title": "使用者設定",
+        "jlpt_level": "JLPT 預估等級",
+        "feedback_preference": "回饋風格",
+        "pref_gentle": "溫和 (鼓勵為主)",
+        "pref_normal": "一般 (平衡)",
+        "pref_strict": "嚴格 (詳細糾錯)",
+        "save": "儲存設定",
+        "saved_success": "設定已儲存。"
+    },
     "pos": {
-        "vocabulary": "單字",
-        "grammar": "文法",
         "general": "綜合",
-        "verb": "動詞",
-        "adjective": "形容詞",
-        "noun": "名詞",
-        "adverb": "副詞",
-        "particle": "助詞",
-        "katakana": "片假名",
-        "kanji": "漢字",
-        "sentence": "句子"
+        "名詞": "名詞",
+        "助詞": "助詞",
+        "動詞": "動詞",
+        "助動詞": "助動詞",
+        "連体詞": "連體詞",
+        "形容詞": "形容詞",
+        "副詞": "副詞"
     },
     "error_type": {
         "none": "完美",

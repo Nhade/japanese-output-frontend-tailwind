@@ -43,7 +43,7 @@ def refresh_focus(profile):
     # If tag is missing or we force rotation (logic to be added if needed)
     if not focus.get("tag"):
         weak_points = profile.get("weak_points", [])
-        new_tag = weak_points[0] if weak_points else "Vocabulary" # Default fallback
+        new_tag = weak_points[0] if weak_points else "名詞" # Default fallback
         
         focus = {
             "tag": new_tag,
@@ -81,8 +81,20 @@ def get_learner_profile(conn, user_id):
 
 def resolve_focus_display(profile):
     """Ensure focus is set for display purposes even if DB has old data."""
-    if not profile.get("current_focus", {}).get("tag"):
+    focus = profile.get("current_focus", {})
+    if not focus.get("tag"):
         refresh_focus(profile)
+    
+    # Migration for legacy tags
+    tag = focus.get("tag")
+    LEGACY_MAPPING = {
+        "Vocabulary": "名詞",
+        "Grammar": "助詞",
+        "General": "名詞"
+    }
+    if tag in LEGACY_MAPPING:
+        focus["tag"] = LEGACY_MAPPING[tag]
+        
     return profile
 
 def update_learner_profile(conn, user_id, exercise_info, is_correct):
@@ -133,18 +145,29 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
     refresh_focus(profile)
     focus = profile["current_focus"]
     
+    focus_diff = {
+        "updated": False,
+        "completed": False,
+        "rotated": False,
+        "progress": focus["progress"],
+        "target": focus["target"],
+        "tag": focus["tag"]
+    }
+
     # 2. Check overlap (Case insensitive match or exact?)
     # POS in DB are usually capitalized e.g. "Particle", "Verb".
     # Focus tag comes from weak_points which comes from POS.
     # So direct match should work.
     if focus["tag"] == pos:
         # Increment progress
-        # We can count ANY attempt, or only correct/wrong?
-        # Plan says "user answers a question tagged with focus" -> Any attempt is fine to show effort.
         focus["progress"] += 1
+        focus_diff["updated"] = True
+        focus_diff["progress"] = focus["progress"]
         
         # 3. Check completion
         if focus["progress"] >= focus["target"]:
+            focus_diff["completed"] = True
+            
             # Rotate logic: Pick next weak point that is DIFFERENT from current
             weak_points = profile.get("weak_points", [])
             next_tag = "General"
@@ -157,10 +180,9 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
             else:
                 # If no other weak points, loop back or generic
                 # If no weak points exist yet, default to general practice focus
-                next_tag = "Vocabulary" if focus["tag"] != "Vocabulary" else "Grammar"
+                next_tag = "名詞" if focus["tag"] != "名詞" else "助詞"
             
             old_tag = focus["tag"]
-            print(f"FOCUS ROTATION: {old_tag} -> {next_tag}")
 
             profile["current_focus"] = {
                 "tag": next_tag,
@@ -168,6 +190,8 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
                 "target": 5,
                 "started_at": datetime.now().isoformat()
             }
+            focus_diff["rotated"] = True
+            focus_diff["new_tag"] = next_tag
         else:
             # Safeguard: Clamp at target (shouldn't be needed with >= check, but good for data integrity)
             profile["current_focus"]["progress"] = min(focus["progress"], focus["target"])
@@ -183,7 +207,7 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
     ''', (json.dumps(profile), datetime.now().isoformat(), user_id))
     conn.commit()
     
-    return profile
+    return profile, focus_diff
 
 def backfill_learner_profile(conn, user_id):
     """
@@ -249,3 +273,31 @@ def backfill_learner_profile(conn, user_id):
     conn.commit()
     
     return profile
+
+def update_learner_settings(conn, user_id, settings):
+    """
+    Update learner profile settings (level_est, feedback_preference).
+    settings: dict with optional 'level_est', 'feedback_preference'
+    """
+    profile = get_learner_profile(conn, user_id)
+    
+    updated = False
+    if 'level_est' in settings:
+        profile['level_est'] = settings['level_est']
+        updated = True
+        
+    if 'feedback_preference' in settings:
+        profile['feedback_preference'] = settings['feedback_preference']
+        updated = True
+        
+    if updated:
+        profile["updated_at"] = datetime.now().isoformat()
+        conn.execute('''
+            UPDATE learner_profiles 
+            SET profile_json = ?, updated_at = ?
+            WHERE user_id = ?
+        ''', (json.dumps(profile), datetime.now().isoformat(), user_id))
+        conn.commit()
+    
+    return profile
+

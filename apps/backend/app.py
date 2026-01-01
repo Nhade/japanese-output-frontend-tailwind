@@ -50,7 +50,7 @@ def get_mistakes(user_id):
 
 from ai_service import evaluate_submission, get_detailed_feedback, chat_with_ai
 from agent_service import generate_daily_review_agent
-from learner_service import create_learner_tables, update_learner_profile, get_learner_profile, backfill_learner_profile
+from learner_service import create_learner_tables, update_learner_profile, get_learner_profile, backfill_learner_profile, update_learner_settings
 
 # Initialize Learner Tables
 try:
@@ -115,7 +115,7 @@ def submit_answer():
             "part_of_speech": row['part_of_speech'],
             "jlpt_level": row['jlpt_level']
         }
-        update_learner_profile(conn, user_id, exercise_info, is_correct)
+        _, focus_diff = update_learner_profile(conn, user_id, exercise_info, is_correct)
         
         conn.commit()
 
@@ -126,7 +126,8 @@ def submit_answer():
     return jsonify({
         "is_correct": is_correct,
         "correct_answer": correct_answer,
-        "log_id": log_id
+        "log_id": log_id,
+        "focus_diff": focus_diff
     })
 
 @app.route('/api/exercise/explain', methods=['POST'])
@@ -413,9 +414,7 @@ def get_news_list():
         params.append(category)
     
     if date_str:
-        # Assuming publish_timestamp is ISO string, we try to match the date part.
-        # SQLite's date function might be useful, or simple string matching if format is consistent.
-        # Timestamps are like '2024-12-14T...' so 'LIKE date_str%' works.
+        # Match date part of ISO timestamp
         query += " AND publish_timestamp LIKE ?"
         params.append(f"{date_str}%")
 
@@ -515,6 +514,26 @@ def recalculate_learner_profile_route(user_id):
             
         profile = backfill_learner_profile(conn, user_id)
         return jsonify(profile)
+    finally:
+        conn.close()
+
+
+@app.route('/api/users/profile', methods=['POST'])
+def update_profile():
+    data = request.json
+    user_id = data.get('user_id')
+    settings = data.get('settings')
+    
+    if not user_id or not settings:
+        return jsonify({"error": "Missing user_id or settings"}), 400
+        
+    conn = get_db_connection()
+    try:
+        updated_profile = update_learner_settings(conn, user_id, settings)
+        return jsonify(updated_profile)
+    except Exception as e:
+        print(f"Error updating profile: {e}")
+        return jsonify({"error": "Internal server error"}), 500
     finally:
         conn.close()
 

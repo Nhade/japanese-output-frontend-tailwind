@@ -15,14 +15,13 @@ const md = new MarkdownIt({
   typographer: true
 });
 
-// Reactive state for the view
-const exercise = ref(null); // Holds the current exercise data
-const feedback = ref(null); // Holds the feedback from the server after submission
-const detailedFeedback = ref(null); // Holds the detailed explanation
+const exercise = ref(null);
+const feedback = ref(null);
+const detailedFeedback = ref(null);
 const showDetailModal = ref(false);
 const detailedError = ref(null);
-const isLoading = ref(true); // Controls the loading spinner visibility
-const isLoadingDetailed = ref(false); // Controls the detailed feedback spinner
+const isLoading = ref(true);
+const isLoadingDetailed = ref(false);
 const auth = useAuthStore();
 const toastStore = useToastStore();
 const userAnswer = ref('');
@@ -30,9 +29,7 @@ const showHint = ref(false);
 const nextQuestionButton = ref(null);
 const answerInput = ref(null);
 
-// --- API Interaction ---
 
-// Fetches a new random exercise from the backend
 async function fetchNewExercise() {
   isLoading.value = true;
   feedback.value = null; // Reset feedback for the new question
@@ -60,8 +57,7 @@ async function fetchNewExercise() {
   }
 }
 
-// Submits the user's answer to the backend
-const isExplaining = ref(false); // New state for AI loading
+const isExplaining = ref(false);
 
 async function handleAnswerSubmit() {
   if (!exercise.value || !userAnswer.value.trim()) return;
@@ -82,6 +78,28 @@ async function handleAnswerSubmit() {
     // Immediate feedback
     const result = await response.json();
     feedback.value = result;
+
+    // Toast for Focus Progress
+    if (result.focus_diff && result.focus_diff.updated) {
+      const diff = result.focus_diff;
+      const rawTag = diff.tag ? diff.tag.trim() : '';
+      const tag = rawTag ? t(`pos.${rawTag.toLowerCase()}`, rawTag) : '';
+
+      let msg = '';
+      if (diff.rotated) {
+        const rawNewTag = diff.new_tag ? diff.new_tag.trim() : '';
+        const newTag = rawNewTag ? t(`pos.${rawNewTag.toLowerCase()}`, rawNewTag) : '';
+        msg = t('exercise.focus_toast_completed', { tag: newTag });
+        toastStore.trigger(msg, 'success');
+      } else {
+        msg = t('exercise.focus_toast_progress', {
+          tag: tag,
+          progress: diff.progress,
+          target: diff.target
+        });
+        toastStore.trigger(msg, 'info');
+      }
+    }
 
     await nextTick();
     nextQuestionButton.value?.focus();
