@@ -111,7 +111,8 @@
         "focus_title": "今日重點",
         "focus_default": "先多聊幾句，我會找出你的弱點 🙂",
         "focus_complete_msg": "太棒了！繼續練習，或稍後回來查看新重點。",
-        "focus_explainer": "此重點根據你最近的錯誤自動選擇"
+        "focus_explainer": "此重點根據你最近的錯誤自動選擇",
+        "safety_violation": "由於安全政策，請求已被拒絕。"
     },
     "pos": {
         "vocabulary": "單字",

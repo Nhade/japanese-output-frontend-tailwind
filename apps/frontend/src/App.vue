@@ -3,8 +3,11 @@ import { watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import TheHeader from './components/TheHeader.vue';
 import TheFooter from './components/TheFooter.vue';
+import ToastNotification from './components/ToastNotification.vue';
+import { useToastStore } from './stores/toast';
 
 const { locale } = useI18n();
+const toastStore = useToastStore();
 
 // Map internal locales to BCP 47 standard codes for fonts
 const localeMap = {
@@ -23,8 +26,10 @@ watch(locale, (newLocale) => {
 <template>
   <div id="app-container" class="overscroll-contain">
     <TheHeader />
+    <ToastNotification :show="toastStore.show" :message="toastStore.message" :type="toastStore.type"
+      @close="toastStore.close" />
     <main
-      class="main-content pt-16 min-h-screen bg-zinc-50 dark:bg-zinc-900 dark:bg-gradient-to-b dark:from-zinc-900 dark:to-zinc-950 transition-colors duration-300">
+      class="main-content pt-16 min-h-screen bg-zinc-50 dark:bg-zinc-900 dark:bg-linear-to-b dark:from-zinc-900 dark:to-zinc-950 transition-colors duration-300">
       <router-view v-slot="{ Component }">
         <transition name="page" mode="out-in">
           <component :is="Component" />

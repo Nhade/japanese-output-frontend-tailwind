@@ -111,7 +111,8 @@
         "focus_title": "Daily Focus",
         "focus_default": "Chat freely, I'll find your weak points 🙂",
         "focus_complete_msg": "Great job! Keep practicing or check back later for a new focus.",
-        "focus_explainer": "This focus is automatically selected based on recent errors."
+        "focus_explainer": "This focus is automatically selected based on recent errors.",
+        "safety_violation": "Request rejected due to safety policy."
     },
     "pos": {
         "vocabulary": "Vocabulary",

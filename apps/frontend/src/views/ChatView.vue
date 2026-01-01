@@ -23,9 +23,12 @@ interface Message {
 
 import LearningFocusCard from '../components/LearningFocusCard.vue';
 import { useAuthStore } from '../stores/auth';
+import { useToastStore } from '../stores/toast';
 
 const { t, locale } = useI18n();
 const authStore = useAuthStore();
+const toastStore = useToastStore();
+
 const messages = ref<Message[]>([]);
 const inputMessage = ref('');
 const isLoading = ref(false);
@@ -110,6 +113,12 @@ const sendMessage = async () => {
         }
 
         const data = await response.json();
+
+        // Check for safety violation (heuristic: check overall feedback text)
+        // Ideally backend should return specific flag, but checking text works for now as configured
+        if (data.feedback && data.feedback.overall && data.feedback.overall.includes("Safety violation")) {
+            toastStore.trigger(t('chat.safety_violation'), 'error');
+        }
 
         // Add assistant message
         messages.value.push({
@@ -233,7 +242,7 @@ const toggleFeedback = (index: number) => {
                                         <div class="flex items-start gap-2 mb-1">
                                             <span class="text-red-500 font-mono text-xs mt-0.5">✖</span>
                                             <span class="line-through opacity-60" lang="ja">{{ correction.original
-                                                }}</span>
+                                            }}</span>
                                         </div>
                                         <div class="flex items-start gap-2 mb-2">
                                             <span class="text-green-500 font-mono text-xs mt-0.5">✔</span>
