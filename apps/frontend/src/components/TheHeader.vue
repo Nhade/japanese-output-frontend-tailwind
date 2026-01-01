@@ -31,9 +31,7 @@ const isActive = (path: string) => route.path === path
     class="fixed top-0 z-50 w-full border-b backdrop-blur transition-colors duration-300 border-zinc-200 bg-white/70 dark:border-white/10 dark:bg-zinc-900/50">
     <nav class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
       <router-link to="/" class="flex items-center gap-2">
-        <span
-          class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-200 font-bold transition-colors">O</span>
-        <span class="text-lg font-semibold tracking-wide text-zinc-900 dark:text-zinc-100 transition-colors">OWO</span>
+        <img src="/shiori_no_romaji.png" class="h-8 w-auto object-contain" alt="栞" />
       </router-link>
       <div class="flex items-center gap-2">
         <ul class="flex items-center gap-1 text-sm">

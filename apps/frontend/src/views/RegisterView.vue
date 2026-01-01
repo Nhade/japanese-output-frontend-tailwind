@@ -2,11 +2,13 @@
   <main class="grid min-h-[calc(100vh-4rem)] place-items-center px-4 text-zinc-900 dark:text-zinc-100">
     <section
       class="w-full max-w-md rounded-2xl border p-6 shadow-xl bg-white border-zinc-200 shadow-zinc-200/50 dark:bg-zinc-900/60 dark:border-white/5 dark:shadow-black/30">
-      <div class="mb-6 flex items-center gap-2">
-        <div
-          class="inline-flex h-9 w-9 items-center justify-center rounded-lg font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
-          O</div>
-        <h1 class="text-lg font-semibold">{{ $t('auth.register_title') }}</h1>
+      <div class="mb-8 text-center">
+        <img src="/shiori.png" class="mx-auto mb-4 h-24 w-24 object-contain" alt="Logo" />
+        <p class="mb-6 text-xs font-medium uppercase tracking-widest text-zinc-500 dark:text-zinc-400">{{
+          $t('auth.brand_descriptor') }}</p>
+      </div>
+      <div class="mb-6">
+        <h2 class="text-lg font-semibold text-center">{{ $t('auth.register_title') }}</h2>
       </div>
       <form @submit.prevent="register" class="space-y-4">
         <div>
@@ -22,14 +24,14 @@
             :placeholder="$t('auth.create_password_placeholder')" />
         </div>
         <button type="submit"
-          class="w-full rounded-xl px-4 py-2.5 font-medium shadow-lg transition-all active:scale-95 bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500">{{
+          class="w-full rounded-xl px-4 py-2.5 font-medium shadow-lg transition-all active:scale-95 bg-linear-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500">{{
             $t('auth.register_button') }}</button>
       </form>
       <p v-if="error" class="mt-4 text-center text-sm text-red-400">{{ error }}</p>
       <p v-if="message" class="mt-4 text-center text-sm text-emerald-700 dark:text-emerald-400">{{ message }}</p>
       <p class="mt-4 text-center text-sm text-zinc-600 dark:text-zinc-400">{{ $t('auth.has_account') }}
         <router-link to="/login" class="text-emerald-700 hover:underline dark:text-emerald-300">{{ $t('auth.login_link')
-          }}</router-link>
+        }}</router-link>
       </p>
     </section>
   </main>

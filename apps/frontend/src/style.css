@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+.font-serif-jp {
+  font-family: "Noto Serif JP", serif;
+}
+
 /* Font Families */
 /* Font Families */
 :root:lang(ja),
