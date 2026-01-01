@@ -1,9 +1,13 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
 import Modal from '../components/Modal.vue';
 import { useAuthStore } from '../stores/auth';
+import { useToastStore } from '../stores/toast';
 import MarkdownIt from 'markdown-it';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const md = new MarkdownIt({
   html: true,
@@ -20,6 +24,7 @@ const detailedError = ref(null);
 const isLoading = ref(true); // Controls the loading spinner visibility
 const isLoadingDetailed = ref(false); // Controls the detailed feedback spinner
 const auth = useAuthStore();
+const toastStore = useToastStore();
 const userAnswer = ref('');
 const showHint = ref(false);
 const nextQuestionButton = ref(null);
@@ -102,6 +107,11 @@ async function handleAnswerSubmit() {
           if (exercise.value && exercise.value.exercise_id === currentExerciseId) {
             // Merge explanation into feedback object
             feedback.value = { ...feedback.value, ...explanation };
+
+            // Check for safety violation
+            if (explanation.feedback && explanation.feedback.includes("Safety violation")) {
+              toastStore.trigger(t('chat.safety_violation'), 'error');
+            }
           }
         }
       } catch (err) {
@@ -140,6 +150,14 @@ async function fetchDetailedFeedback() {
 
     if (response.ok) {
       const data = await response.json();
+
+      // Check for safety violation
+      if (data.detailed_feedback && data.detailed_feedback.includes("Safety violation")) {
+        toastStore.trigger(t('chat.safety_violation'), 'error');
+        // Don't show modal if safety violation
+        return;
+      }
+
       detailedFeedback.value = data.detailed_feedback;
       showDetailModal.value = true;
     } else {
