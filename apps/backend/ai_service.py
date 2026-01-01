@@ -57,7 +57,15 @@ class ErrorType(str, Enum):
     OTHER = "other"             # Other -3
 
 def calculate_score(error_type: ErrorType) -> int:
-    """Calculate score deduction based on error type"""
+    """
+    Calculate score deduction based on error type.
+
+    Args:
+        error_type (ErrorType): The type of error detected in the user's submission.
+
+    Returns:
+        int: The score deduction associated with the error type.
+    """
     mapping = {
         ErrorType.NONE: 0,
         ErrorType.TYPO: -1,
@@ -71,8 +79,15 @@ def calculate_score(error_type: ErrorType) -> int:
 
 def query_llm(messages: List[Dict[str, str]], json_mode: bool = False, temperature: float = 0.7) -> str:
     """
-    Unified function to query the configured LLM provider.
-    Returns the text content of the response.
+    Unified function to query the configured LLM provider (Ollama or OpenAI).
+
+    Args:
+        messages (List[Dict[str, str]]): A list of message dictionaries (role, content).
+        json_mode (bool, optional): Whether to request JSON output from the model. Defaults to False.
+        temperature (float, optional): The temperature for sampling. Defaults to 0.7.
+
+    Returns:
+        str: The content of the response from the LLM.
     """
     if LLM_PROVIDER == "openai" and openai_client:
         try:
@@ -155,7 +170,18 @@ def _parse_json_safe(content: str) -> dict:
 def query_llm_json(messages: List[Dict[str, str]], retries: int = 3, temperature: float = 0.7) -> dict:
     """
     Wrapper around query_llm to handle JSON parsing with retries.
-    Returns a dictionary: {"data": dict|None, "retry_count": int, "error": str|None}
+    Attempts to parse the JSON output from the LLM, applying cleanup strategies if needed.
+
+    Args:
+        messages (List[Dict[str, str]]): A list of message dictionaries.
+        retries (int, optional): Number of times to retry if JSON parsing fails. Defaults to 3.
+        temperature (float, optional): The temperature for sampling. Defaults to 0.7.
+
+    Returns:
+        dict: A dictionary containing:
+            - "data": The parsed JSON data (dict) or None if failed.
+            - "retry_count": The number of retries attempted.
+            - "error": The error message if failed, or None.
     """
     retry_count = 0
     last_error = None
@@ -175,7 +201,21 @@ def query_llm_json(messages: List[Dict[str, str]], retries: int = 3, temperature
 
 def evaluate_submission(question: str, user_answer: str, correct_answer: str) -> dict:
     """
-    Call Server LLM to evaluate the submission.
+    Call Server LLM to evaluate the learner's submission against the correct answer.
+
+    Args:
+        question (str): The question being asked.
+        user_answer (str): The answer provided by the user.
+        correct_answer (str): The correct answer for the question.
+
+    Returns:
+        dict: Evaluation results containing:
+            - "is_correct": bool
+            - "score": int (0-100)
+            - "error_type": str (from ErrorType)
+            - "feedback": str (reasoning)
+            - "deduction": int
+            - "retry_count": int
     """
     # 0. Safety Check
     safety_result = check_safety(user_answer)
@@ -276,7 +316,15 @@ def evaluate_submission(question: str, user_answer: str, correct_answer: str) ->
 
 def get_detailed_feedback(question: str, user_answer: str, correct_answer: str) -> str:
     """
-    Ask AI for a detailed grammatical explanation.
+    Ask AI for a detailed grammatical explanation of the user's error.
+
+    Args:
+        question (str): The question context.
+        user_answer (str): The user's incorrect answer.
+        correct_answer (str): The correct answer.
+
+    Returns:
+        str: A detailed explanation in the target feedback language (Traditional Chinese).
     """
     # Safety Check
     safety_result = check_safety(user_answer)
@@ -316,7 +364,16 @@ def get_detailed_feedback(question: str, user_answer: str, correct_answer: str) 
 
 def build_learner_context(profile: dict) -> dict:
     """
-    Generate a short, human-readable block from the profile.
+    Generate a short, human-readable context block from the learner's profile.
+    This context is used to prompt the AI to adapt to the learner's level and weak points.
+
+    Args:
+        profile (dict): The learner's profile data.
+
+    Returns:
+        dict: Contains:
+            - "summary": A string summary of the profile.
+            - "max_corrections": Recommended max corrections based on preference.
     """
     level = profile.get("level_est", "N5")
     # Retrieve weak_points, defaulting to empty list if missing/None
