@@ -11,10 +11,12 @@
     },
     "common": {
         "language": "語言",
+        "title": "栞",
         "loading": "載入中..."
     },
     "auth": {
-        "login_title": "登入 OWO",
+        "login_title": "歡迎回來",
+        "brand_descriptor": "個性化實用日語學習",
         "register_title": "建立帳戶",
         "username": "使用者名稱",
         "password": "密碼",

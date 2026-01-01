@@ -11,10 +11,12 @@
     },
     "common": {
         "language": "Language",
+        "title": "栞",
         "loading": "Loading..."
     },
     "auth": {
-        "login_title": "Login to OWO",
+        "login_title": "Welcome back",
+        "brand_descriptor": "Personalized Real-World Japanese Learning",
         "register_title": "Create an account",
         "username": "Username",
         "password": "Password",
