@@ -19,12 +19,24 @@ password_hash = PasswordHash.recommended()
 DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'news_corpus.db')
 
 def get_db_connection():
+    """
+    Establish a connection to the SQLite database.
+    
+    Returns:
+        sqlite3.Connection: Connection object with row_factory set to sqlite3.Row.
+    """
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 @app.route('/api/exercise/random', methods=['GET'])
 def get_random_exercise():
+    """
+    Fetch a random exercise from the database.
+
+    Returns:
+        JSON: A dictionary containing the exercise details (id, question, hint).
+    """
     conn = get_db_connection()
     exercise = conn.execute('SELECT exercise_id, question_sentence, hint_chinese FROM exercise ORDER BY RANDOM() LIMIT 1').fetchone()
     conn.close()
@@ -35,6 +47,15 @@ def get_random_exercise():
 
 @app.route('/api/mistakes/<user_id>', methods=['GET'])
 def get_mistakes(user_id):
+    """
+    Retrieve the list of mistakes (incorrect answers) for a specific user.
+
+    Args:
+        user_id (str): The ID of the user.
+
+    Returns:
+        JSON: A list of mistake objects (question, user_answer, correct_answer, feedback, etc.).
+    """
     conn = get_db_connection()
     mistakes = conn.execute('''
         SELECT al.log_id, e.question_sentence, al.user_answer, e.correct_answer,
@@ -62,6 +83,14 @@ except Exception as e:
 
 @app.route('/api/exercise/submit', methods=['POST'])
 def submit_answer():
+    """
+    Submit an answer for an exercise.
+    Evaluates the answer locally first (using Kakasi for simple matching).
+    Updates the answer log and learner profile.
+
+    Returns:
+        JSON: result containing is_correct, correct_answer, log_id, key focus updates.
+    """
     data = request.get_json()
     exercise_id = data.get('exercise_id')
     user_answer = data.get('user_answer', '').strip()
@@ -132,6 +161,13 @@ def submit_answer():
 
 @app.route('/api/exercise/explain', methods=['POST'])
 def explain_answer():
+    """
+    Request AI evaluation for a specific submission log.
+    Updates the log with AI-generated feedback, score, and error type.
+
+    Returns:
+        JSON: The AI evaluation result (feedback, score, error_type).
+    """
     data = request.get_json()
     log_id = data.get('log_id')
     
@@ -173,6 +209,13 @@ def explain_answer():
 
 @app.route('/api/exercise/explain-detailed', methods=['POST'])
 def explain_answer_detailed():
+    """
+    Request detailed grammatical explanation for a submission.
+    Does not update the database, just returns the explanation.
+
+    Returns:
+        JSON: {"detailed_feedback": str}
+    """
     data = request.get_json()
     log_id = data.get('log_id')
     
@@ -204,6 +247,13 @@ def explain_answer_detailed():
 
 @app.route('/api/chat/send', methods=['POST'])
 def chat_send():
+    """
+    Send a message to the AI chat interface.
+    The AI considers the user's learner profile (level, weak points) when responding.
+
+    Returns:
+        JSON: The AI's response and feedback on the user's input.
+    """
     data = request.get_json()
     message = data.get('message')
     history = data.get('history', [])
@@ -232,6 +282,12 @@ def chat_send():
 
 @app.route('/api/users/register', methods=['POST'])
 def register_user():
+    """
+    Register a new user.
+
+    Returns:
+        JSON: Success message and new user_id, or error if username exists.
+    """
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
@@ -258,6 +314,12 @@ def register_user():
     
 @app.route('/api/users/login', methods=['POST'])
 def login_user():
+    """
+    Authenticate a user.
+
+    Returns:
+        JSON: Success message and user_id if credentials match, else 401 error.
+    """
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
@@ -289,6 +351,16 @@ def login_user():
 
 @app.route('/api/statistics/<user_id>', methods=['GET'])
 def get_user_statistics(user_id):
+    """
+    Calculate and return comprehensive statistics for a user.
+    Includes accuracy by Part of Speech, JLPT level, overall summary, and daily history.
+
+    Args:
+        user_id (str): The ID of the user.
+
+    Returns:
+        JSON: Structured statistics object.
+    """
     conn = get_db_connection()
     # query to get statistics for a user
     query = """
@@ -401,6 +473,13 @@ def get_user_statistics(user_id):
 
 @app.route('/api/news', methods=['GET'])
 def get_news_list():
+    """
+    Get a list of processed news articles.
+    Supports filtering by category and date.
+
+    Returns:
+        JSON: List of article summaries.
+    """
     category = request.args.get('category')
     date_str = request.args.get('date')  # Expected format YYYY-MM-DD
 
@@ -426,6 +505,16 @@ def get_news_list():
 
 @app.route('/api/news/<article_id>', methods=['GET'])
 def get_news_detail(article_id):
+    """
+    Get details of a specific news article.
+    The body text is split into paragraphs for the frontend.
+
+    Args:
+        article_id (str): The ID of the article.
+
+    Returns:
+        JSON: Article details and list of paragraphs.
+    """
     conn = get_db_connection()
     article = conn.execute('SELECT * FROM articles WHERE article_id = ?', (article_id,)).fetchone()
     conn.close()
@@ -460,6 +549,12 @@ def get_news_detail(article_id):
 
 @app.route('/api/translate', methods=['POST'])
 def translate_paragraph():
+    """
+    Translate a specific text segment.
+
+    Returns:
+        JSON: {"translated_text": str}
+    """
     data = request.get_json()
     text = data.get('text')
     target = data.get('target', 'zh-TW')  # Default to zh-TW if not provided
@@ -472,6 +567,12 @@ def translate_paragraph():
 
 @app.route('/api/tts', methods=['POST'])
 def get_tts():
+    """
+    Generate Text-to-Speech audio for a given text.
+    
+    Returns:
+        Response: Audio file (WAV).
+    """
     data = request.get_json()
     text = data.get('text')
     
@@ -487,6 +588,15 @@ def get_tts():
 
 @app.route('/api/agent/daily_review/<user_id>', methods=['GET'])
 def get_daily_review(user_id):
+    """
+    Trigger the Daily Review Agent to generate a personalized review using the Agent Service.
+
+    Args:
+        user_id (str): The ID of the user.
+
+    Returns:
+        JSON: {"review": markdown_string}
+    """
     try:
         review_content = generate_daily_review_agent(user_id, DATABASE_PATH)
         return jsonify({"review": review_content})
@@ -496,6 +606,15 @@ def get_daily_review(user_id):
 
 @app.route('/api/learner/profile/<user_id>', methods=['GET'])
 def get_learner_profile_route(user_id):
+    """
+    Get the learner profile for a specific user.
+
+    Args:
+        user_id (str): The ID of the user.
+
+    Returns:
+        JSON: Learner profile object.
+    """
     conn = get_db_connection()
     try:
         profile = get_learner_profile(conn, user_id)
@@ -505,6 +624,15 @@ def get_learner_profile_route(user_id):
 
 @app.route('/api/learner/recalculate/<user_id>', methods=['POST'])
 def recalculate_learner_profile_route(user_id):
+    """
+    Force a recalculation (backfill) of the learner profile based on all logs.
+
+    Args:
+        user_id (str): The ID of the user.
+
+    Returns:
+        JSON: Updated learner profile object.
+    """
     conn = get_db_connection()
     try:
         # Check if user exists first (optional but good)
@@ -520,6 +648,12 @@ def recalculate_learner_profile_route(user_id):
 
 @app.route('/api/users/profile', methods=['POST'])
 def update_profile():
+    """
+    Update specific settings in the learner profile (like level estimate or feedback preference).
+
+    Returns:
+        JSON: Updated learner profile object.
+    """
     data = request.json
     user_id = data.get('user_id')
     settings = data.get('settings')

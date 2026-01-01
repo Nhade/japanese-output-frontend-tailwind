@@ -3,7 +3,12 @@ import json
 from datetime import datetime
 
 def create_learner_tables(conn):
-    """Create learner_profiles table if it doesn't exist."""
+    """
+    Create learner_profiles table if it doesn't exist.
+
+    Args:
+        conn: The SQLite database connection.
+    """
     conn.execute('''
         CREATE TABLE IF NOT EXISTS learner_profiles (
             user_id TEXT PRIMARY KEY,
@@ -14,6 +19,18 @@ def create_learner_tables(conn):
     conn.commit()
 
 def get_default_profile():
+    """
+    Return the default structure for a new learner profile.
+
+    Returns:
+        dict: A dictionary representing a default learner profile with:
+            - level_est: "N5"
+            - weak_points: []
+            - strong_points: []
+            - feedback_preference: "gentle"
+            - current_focus: default focus object
+            - stats: empty statistics buckets
+    """
     return {
         "level_est": "N5",
         "weak_points": [],
@@ -35,8 +52,14 @@ def get_default_profile():
 
 def refresh_focus(profile):
     """
-    Ensure a valid current_focus exists.
-    If missing or None, pick from weak_points or default.
+    Ensure a valid current_focus exists in the profile.
+    If missing or None, picks a focus from weak_points or defaults to '名詞'.
+
+    Args:
+        profile (dict): The learner profile to check and update.
+
+    Returns:
+        dict: The updated profile with a valid current_focus.
     """
     focus = profile.get("current_focus") or {}
     
@@ -56,7 +79,16 @@ def refresh_focus(profile):
     return profile
 
 def get_learner_profile(conn, user_id):
-    """Fetch learner profile or create default if missing."""
+    """
+    Fetch learner profile for a user or create a default one if missing.
+
+    Args:
+        conn: The SQLite database connection.
+        user_id (str): The user's ID.
+
+    Returns:
+        dict: The learner's profile dictionary.
+    """
     row = conn.execute('SELECT profile_json FROM learner_profiles WHERE user_id = ?', (user_id,)).fetchone()
     
     if row:
@@ -80,7 +112,16 @@ def get_learner_profile(conn, user_id):
         return profile
 
 def resolve_focus_display(profile):
-    """Ensure focus is set for display purposes even if DB has old data."""
+    """
+    Ensure focus is set for display purposes even if DB has old data.
+    Also handles migration of legacy tags to new Japanese tags.
+
+    Args:
+        profile (dict): The learner profile to process.
+
+    Returns:
+        dict: The profile with resolved focus tags.
+    """
     focus = profile.get("current_focus", {})
     if not focus.get("tag"):
         refresh_focus(profile)
@@ -99,8 +140,17 @@ def resolve_focus_display(profile):
 
 def update_learner_profile(conn, user_id, exercise_info, is_correct):
     """
-    Update learner stats and recompute weak/strong points.
-    exercise_info: dict with 'part_of_speech', 'jlpt_level'
+    Update learner stats and recompute weak/strong points after an exercise.
+
+    Args:
+        conn: The SQLite database connection.
+        user_id (str): The user's ID.
+        exercise_info (dict): Contains metadata like 'part_of_speech' and 'jlpt_level'.
+        is_correct (bool): Whether the user answered correctly.
+
+    Returns:
+        tuple: (updated_profile (dict), focus_diff (dict))
+            focus_diff contains details on whether the focus area was updated, completed, or rotated.
     """
     profile = get_learner_profile(conn, user_id)
     stats = profile.get("stats", {})
@@ -212,6 +262,14 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
 def backfill_learner_profile(conn, user_id):
     """
     Rebuild learner profile stats from all existing answer logs.
+    Useful for fixing inconsistent stats or applying new logic to old data.
+
+    Args:
+        conn: The SQLite database connection.
+        user_id (str): The user's ID.
+
+    Returns:
+        dict: The updated (recalculated) learner profile.
     """
     # 1. Reset profile stats
     profile = get_learner_profile(conn, user_id)
@@ -277,7 +335,14 @@ def backfill_learner_profile(conn, user_id):
 def update_learner_settings(conn, user_id, settings):
     """
     Update learner profile settings (level_est, feedback_preference).
-    settings: dict with optional 'level_est', 'feedback_preference'
+
+    Args:
+        conn: The SQLite database connection.
+        user_id (str): The user's ID.
+        settings (dict): Dictionary capable of containing 'level_est' and 'feedback_preference'.
+
+    Returns:
+        dict: The updated learner profile.
     """
     profile = get_learner_profile(conn, user_id)
     
