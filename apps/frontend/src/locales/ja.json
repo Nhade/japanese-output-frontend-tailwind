@@ -107,6 +107,32 @@
         "analysis": "分析結果",
         "no_errors": "大きな間違いは見つかりませんでした。素晴らしい！",
         "error_response": "すみません、エラーが発生しました。",
-        "disclaimer": "AIは間違いを犯す可能性があります。重要な情報は確認してください。"
+        "disclaimer": "AIは間違いを犯す可能性があります。重要な情報は確認してください。",
+        "focus_title": "今日の重要ポイント",
+        "focus_default": "自由に話しかけてください。弱点を見つけます 🙂",
+        "focus_complete_msg": "素晴らしい！練習を続けるか、後で新しいポイントを確認してください。",
+        "focus_explainer": "このポイントは最近の間違いに基づいて自動的に選択されました"
+    },
+    "pos": {
+        "vocabulary": "単語",
+        "grammar": "文法",
+        "general": "一般",
+        "verb": "動詞",
+        "adjective": "形容詞",
+        "noun": "名詞",
+        "adverb": "副詞",
+        "particle": "助詞",
+        "katakana": "カタカナ",
+        "kanji": "漢字",
+        "sentence": "文"
+    },
+    "error_type": {
+        "none": "正解",
+        "typo": "タイプミス",
+        "vocab": "単語選定",
+        "particle": "助詞",
+        "conjugation": "活用",
+        "unnatural": "不自然",
+        "other": "その他"
     }
 }

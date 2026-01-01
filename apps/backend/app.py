@@ -50,6 +50,15 @@ def get_mistakes(user_id):
 
 from ai_service import evaluate_submission, get_detailed_feedback, chat_with_ai
 from agent_service import generate_daily_review_agent
+from learner_service import create_learner_tables, update_learner_profile, get_learner_profile, backfill_learner_profile
+
+# Initialize Learner Tables
+try:
+    with sqlite3.connect(DATABASE_PATH) as conn:
+        create_learner_tables(conn)
+except Exception as e:
+    print(f"Database init error: {e}")
+
 
 @app.route('/api/exercise/submit', methods=['POST'])
 def submit_answer():
@@ -64,7 +73,8 @@ def submit_answer():
     conn = get_db_connection()
     try:
         # Fetch question_sentence as well
-        row = conn.execute('SELECT question_sentence, correct_answer FROM exercise WHERE exercise_id = ?', (exercise_id,)).fetchone()
+        row = conn.execute('SELECT question_sentence, correct_answer, part_of_speech, jlpt_level FROM exercise WHERE exercise_id = ?', (exercise_id,)).fetchone()
+
 
         if row is None:
             return jsonify({"error": "Exercise not found"}), 404
@@ -99,7 +109,16 @@ def submit_answer():
             (log_id, user_id, exercise_id, user_answer, is_correct, answered_timestamp, feedback, score, error_type) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (log_id, user_id, exercise_id, user_answer, is_correct, answered_timestamp, feedback, score, error_type))
+        
+        # Update Learner Profile
+        exercise_info = {
+            "part_of_speech": row['part_of_speech'],
+            "jlpt_level": row['jlpt_level']
+        }
+        update_learner_profile(conn, user_id, exercise_info, is_correct)
+        
         conn.commit()
+
         
     finally:
         conn.close()
@@ -196,7 +215,18 @@ def chat_send():
     if not isinstance(history, list):
         return jsonify({"error": "History must be a list"}), 400
         
-    result = chat_with_ai(message, history, locale)
+    # Fetch Learner Profile if user_id is provided
+    user_id = data.get('user_id')
+    learner_profile = None
+    if user_id:
+        try:
+            conn = get_db_connection()
+            learner_profile = get_learner_profile(conn, user_id)
+            conn.close()
+        except Exception as e:
+            print(f"Error fetching profile for chat: {e}")
+            
+    result = chat_with_ai(message, history, locale, learner_profile)
     return jsonify(result)
 
 @app.route('/api/users/register', methods=['POST'])
@@ -464,6 +494,30 @@ def get_daily_review(user_id):
     except Exception as e:
         print(f"Agent Error: {e}")
         return jsonify({"error": "Agent 正在忙碌中，請稍後再試"}), 500
+
+@app.route('/api/learner/profile/<user_id>', methods=['GET'])
+def get_learner_profile_route(user_id):
+    conn = get_db_connection()
+    try:
+        profile = get_learner_profile(conn, user_id)
+        return jsonify(profile)
+    finally:
+        conn.close()
+
+@app.route('/api/learner/recalculate/<user_id>', methods=['POST'])
+def recalculate_learner_profile_route(user_id):
+    conn = get_db_connection()
+    try:
+        # Check if user exists first (optional but good)
+        user = conn.execute('SELECT 1 FROM users WHERE user_id = ?', (user_id,)).fetchone()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+            
+        profile = backfill_learner_profile(conn, user_id)
+        return jsonify(profile)
+    finally:
+        conn.close()
+
 
 if __name__ == '__main__':
     app.run(debug=True)

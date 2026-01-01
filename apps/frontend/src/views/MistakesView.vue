@@ -93,7 +93,7 @@
                   {{ mistake.score }}</span>
                 <span v-if="mistake.error_type"
                   class="text-xs px-2 py-0.5 rounded uppercase bg-indigo-50 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200">{{
-                    mistake.error_type }}</span>
+                    $t('error_type.' + mistake.error_type, mistake.error_type) }}</span>
               </div>
             </div>
             <p class="text-sm text-zinc-700 dark:text-zinc-300">{{ mistake.feedback }}</p>

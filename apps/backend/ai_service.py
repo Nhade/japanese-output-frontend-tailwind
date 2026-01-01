@@ -15,8 +15,7 @@ MODEL_NAME = os.getenv("MODEL_NAME", "gpt-oss:120b")
 AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "120"))
 
 # Base URL handling
-# If OpenAI provider, allow API_BASE_URL to override default (e.g. for Groq), otherwise None uses default.
-# If Ollama, default to localhost.
+# Allows overriding default API base for OpenAI or Ollama
 raw_base_url = os.getenv("API_BASE_URL")
 if LLM_PROVIDER == "openai":
     BASE_URL = raw_base_url if raw_base_url else None 
@@ -26,7 +25,7 @@ else:
     if BASE_URL.endswith("/v1"):
         BASE_URL = BASE_URL[:-3]
 
-# Initialize OpenAI Client if needed (lazy init is also fine, but global is easier for now)
+# Initialize OpenAI Client if needed
 openai_client = None
 if LLM_PROVIDER == "openai":
     openai_client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
