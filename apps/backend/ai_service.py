@@ -2,20 +2,34 @@ import os
 import json
 import requests
 from enum import Enum
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
-# Users should set API_BASE_URL to the root of their Ollama instance (e.g. http://localhost:11434)
-BASE_URL = os.getenv("API_BASE_URL", "http://localhost:11434").rstrip("/")
-if BASE_URL.endswith("/v1"):
-    BASE_URL = BASE_URL[:-3]
-
+# Configuration
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
 API_KEY = os.getenv("API_KEY", "ollama")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-oss:120b")
-# Allow longer timeout for cold start
 AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "120"))
+
+# Base URL handling
+# If OpenAI provider, allow API_BASE_URL to override default (e.g. for Groq), otherwise None uses default.
+# If Ollama, default to localhost.
+raw_base_url = os.getenv("API_BASE_URL")
+if LLM_PROVIDER == "openai":
+    BASE_URL = raw_base_url if raw_base_url else None 
+else:
+    # Ollama default
+    BASE_URL = raw_base_url if raw_base_url else "http://localhost:11434"
+    if BASE_URL.endswith("/v1"):
+        BASE_URL = BASE_URL[:-3]
+
+# Initialize OpenAI Client if needed (lazy init is also fine, but global is easier for now)
+openai_client = None
+if LLM_PROVIDER == "openai":
+    openai_client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
 # Define Error Types
 class ErrorType(str, Enum):
@@ -40,10 +54,113 @@ def calculate_score(error_type: ErrorType) -> int:
     }
     return mapping.get(error_type, -3)
 
+def query_llm(messages: List[Dict[str, str]], json_mode: bool = False, temperature: float = 0.7) -> str:
+    """
+    Unified function to query the configured LLM provider.
+    Returns the text content of the response.
+    """
+    if LLM_PROVIDER == "openai" and openai_client:
+        try:
+            response_format = {"type": "json_object"} if json_mode else {"type": "text"}
+            
+            completion = openai_client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=messages,
+                response_format=response_format,
+                temperature=temperature,
+                timeout=AI_TIMEOUT
+            )
+            return completion.choices[0].message.content
+        except Exception as e:
+            print(f"OpenAI API Error: {e}")
+            raise e
+    else:
+        # Fallback to Ollama (requests)
+        url = f"{BASE_URL.rstrip('/')}/api/chat"
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": MODEL_NAME,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature
+            }
+        }
+        
+        # Ollama 'format' param for JSON mode
+        if json_mode:
+            payload["format"] = "json"
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
+            response.raise_for_status()
+            
+            data = response.json()
+            content = data.get("message", {}).get("content", "")
+            if not content:
+                content = data.get("response", "")
+            return content
+            
+        except requests.RequestException as e:
+            print(f"Ollama API Error: {e}")
+            raise e
+
+def _parse_json_safe(content: str) -> dict:
+    """Helper to parse JSON from LLM response with cleanup strategies."""
+    # 1. Direct try
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+        
+    # 2. Cleanup markdown code blocks
+    import re
+    cleaned = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE)
+    cleaned = re.sub(r'^```\s*', '', cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r'\s*```$', '', cleaned, flags=re.MULTILINE)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # 3. Find first { and last }
+    match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
+            
+    raise ValueError(f"Could not parse JSON from content: {content[:100]}...")
+
+def query_llm_json(messages: List[Dict[str, str]], retries: int = 3, temperature: float = 0.7) -> dict:
+    """
+    Wrapper around query_llm to handle JSON parsing with retries.
+    Returns a dictionary: {"data": dict|None, "retry_count": int, "error": str|None}
+    """
+    retry_count = 0
+    last_error = None
+    
+    while retry_count <= retries:
+        try:
+            # Disable json_mode at API level as it causes empty responses on this provider
+            content = query_llm(messages, json_mode=False, temperature=temperature)
+            data = _parse_json_safe(content)
+            return {"data": data, "retry_count": retry_count, "error": None}
+        except (ValueError, json.JSONDecodeError) as e:
+            last_error = str(e)
+            print(f"JSON parsing failed (attempt {retry_count + 1}/{retries + 1}): {e}")
+            retry_count += 1
+            
+    return {"data": None, "retry_count": retries, "error": last_error}
+
 def evaluate_submission(question: str, user_answer: str, correct_answer: str) -> dict:
     """
-    Call Server LLM (Ollama API) to evaluate the submission.
-    Uses native /api/chat endpoint via requests to avoid issues with /v1/chat/completions.
+    Call Server LLM to evaluate the submission.
     """
     system_prompt = f"""
     You are a strict Japanese language teacher. 
@@ -74,54 +191,27 @@ def evaluate_submission(question: str, user_answer: str, correct_answer: str) ->
     User Answer: {user_answer}
     """
 
-    url = f"{BASE_URL}/api/chat"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": MODEL_NAME,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "stream": False
-    }
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
 
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
-        response.raise_for_status()
+        result = query_llm_json(messages, temperature=0.1)
+        retry_count = result["retry_count"]
         
-        # Parse Ollama response
-        data = response.json()
-        
-        content = data.get("message", {}).get("content", "")
-        if not content:
-             # Fallback for other structures (e.g. if 'response' is used instead of 'message')
-             content = data.get("response", "")
-        
-        # Helper to strip markdown code blocks
-        if "```" in content:
-            # removing ```json ... ``` or just ``` ... ```
-            import re
-            content = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE)
-            content = re.sub(r'^```\s*', '', content, flags=re.MULTILINE)
-            content = re.sub(r'\s*```$', '', content, flags=re.MULTILINE)
-        
-        # Parse nested JSON in content
-        try:
-            result_json = json.loads(content)
-        except json.JSONDecodeError:
-            # Fallback: Try to find JSON structure in the text
-            import re
-            match = re.search(r'\{.*\}', content, re.DOTALL)
-            if match:
-                try:
-                    result_json = json.loads(match.group(0))
-                except json.JSONDecodeError:
-                    raise # Still failed
-            else:
-                raise # No JSON found
+        if result["error"]:
+             print(f"Failed to evaluate submission after retries. Error: {result['error']}")
+             return {
+                "is_correct": False,
+                "score": 0,
+                "error_type": "unknown",
+                "feedback": f"AI 回應格式錯誤 (Retried {retry_count} times)",
+                "deduction": 0,
+                "retry_count": retry_count
+             }
+
+        result_json = result["data"]
 
         error_type_str = result_json.get("error_type", "other").lower()
         reasoning = result_json.get("reasoning", "No feedback provided")
@@ -132,14 +222,15 @@ def evaluate_submission(question: str, user_answer: str, correct_answer: str) ->
         except ValueError:
             error_type_enum = ErrorType.OTHER
                 
-    except (json.JSONDecodeError, Exception) as e:
-        print(f"Failed to parse AI response JSON. Error: {e}")
+    except Exception as e:
+        print(f"Unexpected error in evaluate_submission: {e}")
         return {
             "is_correct": False,
             "score": 0,
             "error_type": "unknown",
-            "feedback": "AI 回應格式錯誤",
-            "deduction": 0
+            "feedback": "AI 服務發生未預期錯誤",
+            "deduction": 0,
+            "retry_count": 0
         }
 
     # Calculate score (Max 100)
@@ -151,7 +242,8 @@ def evaluate_submission(question: str, user_answer: str, correct_answer: str) ->
         "score": final_score,
         "error_type": error_type_enum.value,
         "feedback": reasoning,
-        "deduction": deduction
+        "deduction": deduction,
+        "retry_count": retry_count
     }
 
 def get_detailed_feedback(question: str, user_answer: str, correct_answer: str) -> str:
@@ -176,30 +268,13 @@ def get_detailed_feedback(question: str, user_answer: str, correct_answer: str) 
     User Answer: {user_answer}
     """
 
-    url = f"{BASE_URL}/api/chat"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": MODEL_NAME,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "stream": False
-    }
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
 
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
-        response.raise_for_status()
-        
-        # Parse Ollama response
-        data = response.json()
-        content = data.get("message", {}).get("content", "")
-        if not content:
-             content = data.get("response", "")
-        
+        content = query_llm(messages, json_mode=False, temperature=0.7)
         return content
 
     except Exception as e:
@@ -345,55 +420,21 @@ def chat_with_ai(message: str, history: list, locale: str = 'en', learner_profil
     # Append current message
     messages.append({"role": "user", "content": message})
 
-    url = f"{BASE_URL}/api/chat"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    # Using json mode if supported by the model, otherwise reliant on prompt
-    payload = {
-        "model": MODEL_NAME,
-        "messages": messages,
-        "stream": False,
-        "options": {
-            "temperature": 0.7
-        }
-    }
-
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
-        response.raise_for_status()
+        result = query_llm_json(messages, temperature=0.7)
+        retry_count = result["retry_count"]
         
-        data = response.json()
-        content = data.get("message", {}).get("content", "")
-        if not content:
-            content = data.get("response", "")
+        if result["error"]:
+             return {
+                "response": "すみません、エラーが発生しました。",
+                "feedback": {
+                    "overall": f"AI 服務暫時無法回應 (格式錯誤, retried {retry_count} times)",
+                    "corrections": []
+                },
+                "retry_count": retry_count
+            }
             
-        # Parse JSON
-        import json
-        try:
-            result_json = json.loads(content)
-        except json.JSONDecodeError:
-            print("INFO: JSON Parse failed, attempting regex cleanup...")
-            # Cleanup common markdown code block issues
-            import re
-            content_clean = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE)
-            content_clean = re.sub(r'^```\s*', '', content_clean, flags=re.MULTILINE)
-            content_clean = re.sub(r'\s*```$', '', content_clean, flags=re.MULTILINE)
-            # Try to find the first { and last }
-            match = re.search(r'\{.*\}', content_clean, re.DOTALL)
-            if match:
-                 result_json = json.loads(match.group(0))
-            else:
-                 print(f"FAILED CONTENT: {content}") 
-                 # Final fallback if really broken
-                 return {
-                    "response": "申し訳ありません、ちょっと調子が悪いようです。(AI formatting error)",
-                    "feedback": {
-                        "overall": "系統暫時無法處理您的請求。",
-                        "corrections": []
-                    }
-                 }
+        result_json = result["data"]
 
         # Validate keys
         if "response" not in result_json:
@@ -404,9 +445,10 @@ def chat_with_ai(message: str, history: list, locale: str = 'en', learner_profil
                  "overall": "無法取得回饋",
                  "corrections": []
              }
-             
+         
+        result_json["retry_count"] = retry_count
         return result_json
-
+        
     except Exception as e:
         print(f"Chat error: {e}")
         # Fallback response
@@ -415,5 +457,6 @@ def chat_with_ai(message: str, history: list, locale: str = 'en', learner_profil
             "feedback": {
                 "overall": f"AI 服務暫時無法回應 ({str(e)})",
                 "corrections": []
-            }
+            },
+            "retry_count": 0
         }
