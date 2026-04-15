@@ -1,6 +1,6 @@
-import sqlite3
 import json
 from datetime import datetime
+
 
 def create_learner_tables(conn):
     """
@@ -62,12 +62,12 @@ def refresh_focus(profile):
         dict: The updated profile with a valid current_focus.
     """
     focus = profile.get("current_focus") or {}
-    
+
     # If tag is missing or we force rotation (logic to be added if needed)
     if not focus.get("tag"):
         weak_points = profile.get("weak_points", [])
         new_tag = weak_points[0] if weak_points else "名詞" # Default fallback
-        
+
         focus = {
             "tag": new_tag,
             "progress": 0,
@@ -75,7 +75,7 @@ def refresh_focus(profile):
             "started_at": datetime.now().isoformat()
         }
         profile["current_focus"] = focus
-    
+
     return profile
 
 def get_learner_profile(conn, user_id):
@@ -90,20 +90,20 @@ def get_learner_profile(conn, user_id):
         dict: The learner's profile dictionary.
     """
     row = conn.execute('SELECT profile_json FROM learner_profiles WHERE user_id = ?', (user_id,)).fetchone()
-    
+
     if row:
         profile = json.loads(row['profile_json'])
         # Ensure current_focus exists for older profiles
         if "current_focus" not in profile:
             profile["current_focus"] = get_default_profile()["current_focus"]
-            
+
         return resolve_focus_display(profile)
     else:
         # Create default
         profile = get_default_profile()
         # Initial focus
         refresh_focus(profile)
-        
+
         conn.execute('''
             INSERT INTO learner_profiles (user_id, profile_json, updated_at)
             VALUES (?, ?, ?)
@@ -125,7 +125,7 @@ def resolve_focus_display(profile):
     focus = profile.get("current_focus", {})
     if not focus.get("tag"):
         refresh_focus(profile)
-    
+
     # Migration for legacy tags
     tag = focus.get("tag")
     LEGACY_MAPPING = {
@@ -135,7 +135,7 @@ def resolve_focus_display(profile):
     }
     if tag in LEGACY_MAPPING:
         focus["tag"] = LEGACY_MAPPING[tag]
-        
+
     return profile
 
 def update_learner_profile(conn, user_id, exercise_info, is_correct):
@@ -154,10 +154,10 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
     """
     profile = get_learner_profile(conn, user_id)
     stats = profile.get("stats", {})
-    
+
     pos = exercise_info.get('part_of_speech', 'unknown')
     jlpt = exercise_info.get('jlpt_level', 'unknown')
-    
+
     # Initialize dicts if missing (migration safety)
     for key in ["by_pos_attempt", "by_pos_wrong", "by_jlpt_attempt", "by_jlpt_wrong"]:
         if key not in stats:
@@ -166,7 +166,7 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
     # Update counts
     stats["by_pos_attempt"][pos] = stats["by_pos_attempt"].get(pos, 0) + 1
     stats["by_jlpt_attempt"][jlpt] = stats["by_jlpt_attempt"].get(jlpt, 0) + 1
-    
+
     if not is_correct:
         stats["by_pos_wrong"][pos] = stats["by_pos_wrong"].get(pos, 0) + 1
         stats["by_jlpt_wrong"][jlpt] = stats["by_jlpt_wrong"].get(jlpt, 0) + 1
@@ -179,13 +179,13 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
             wrong = stats["by_pos_wrong"].get(p, 0)
             rate = wrong / attempts
             pos_error_rates.append((p, rate))
-    
+
     # Sort by error rate desc
     pos_error_rates.sort(key=lambda x: x[1], reverse=True)
-    
+
     # Top 3 weak
     profile["weak_points"] = [p[0] for p in pos_error_rates[:3]]
-    
+
     # Strong points (Bottom 2 error rates, need minimal attempts too)
     strong_candidates = [p[0] for p in pos_error_rates if p[1] < 0.2] # < 20% error
     profile["strong_points"] = strong_candidates[:3]
@@ -194,7 +194,7 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
     # 1. Ensure we have a focus
     refresh_focus(profile)
     focus = profile["current_focus"]
-    
+
     focus_diff = {
         "updated": False,
         "completed": False,
@@ -213,17 +213,17 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
         focus["progress"] += 1
         focus_diff["updated"] = True
         focus_diff["progress"] = focus["progress"]
-        
+
         # 3. Check completion
         if focus["progress"] >= focus["target"]:
             focus_diff["completed"] = True
-            
+
             # Rotate logic: Pick next weak point that is DIFFERENT from current
             weak_points = profile.get("weak_points", [])
             next_tag = "General"
-            
+
             # Find next tag
-            
+
             candidates = [wp for wp in weak_points if wp != focus["tag"]]
             if candidates:
                 next_tag = candidates[0]
@@ -231,8 +231,8 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
                 # If no other weak points, loop back or generic
                 # If no weak points exist yet, default to general practice focus
                 next_tag = "名詞" if focus["tag"] != "名詞" else "助詞"
-            
-            old_tag = focus["tag"]
+
+            focus["tag"]
 
             profile["current_focus"] = {
                 "tag": next_tag,
@@ -249,14 +249,14 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
     # Save
     profile["stats"] = stats
     profile["updated_at"] = datetime.now().isoformat()
-    
+
     conn.execute('''
-        UPDATE learner_profiles 
+        UPDATE learner_profiles
         SET profile_json = ?, updated_at = ?
         WHERE user_id = ?
     ''', (json.dumps(profile), datetime.now().isoformat(), user_id))
     conn.commit()
-    
+
     return profile, focus_diff
 
 def backfill_learner_profile(conn, user_id):
@@ -279,7 +279,7 @@ def backfill_learner_profile(conn, user_id):
         "by_jlpt_attempt": {},
         "by_jlpt_wrong": {}
     }
-    
+
     # 2. Query all logs for this user
     # Join with exercise to get POS and JLPT
     rows = conn.execute('''
@@ -288,22 +288,22 @@ def backfill_learner_profile(conn, user_id):
         JOIN exercise e ON al.exercise_id = e.exercise_id
         WHERE al.user_id = ?
     ''', (user_id,)).fetchall()
-    
+
     # 3. Aggregate
     for row in rows:
         pos = row['part_of_speech'] if row['part_of_speech'] else 'unknown'
         jlpt = row['jlpt_level'] if row['jlpt_level'] else 'unknown'
         is_correct = bool(row['is_correct'])
-        
+
         # Attempts
         stats["by_pos_attempt"][pos] = stats["by_pos_attempt"].get(pos, 0) + 1
         stats["by_jlpt_attempt"][jlpt] = stats["by_jlpt_attempt"].get(jlpt, 0) + 1
-        
+
         # Wrongs
         if not is_correct:
             stats["by_pos_wrong"][pos] = stats["by_pos_wrong"].get(pos, 0) + 1
             stats["by_jlpt_wrong"][jlpt] = stats["by_jlpt_wrong"].get(jlpt, 0) + 1
-            
+
     # 4. Recompute Weak Points (Reuse logic or copy it)
     # Copied logic for simplicity & independence
     pos_error_rates = []
@@ -312,24 +312,24 @@ def backfill_learner_profile(conn, user_id):
             wrong = stats["by_pos_wrong"].get(p, 0)
             rate = wrong / attempts
             pos_error_rates.append((p, rate))
-            
+
     pos_error_rates.sort(key=lambda x: x[1], reverse=True)
-    
+
     profile["weak_points"] = [p[0] for p in pos_error_rates[:3]]
     strong_candidates = [p[0] for p in pos_error_rates if p[1] < 0.2]
     profile["strong_points"] = strong_candidates[:3]
-    
+
     profile["stats"] = stats
     profile["updated_at"] = datetime.now().isoformat()
-    
+
     # Save
     conn.execute('''
-        UPDATE learner_profiles 
+        UPDATE learner_profiles
         SET profile_json = ?, updated_at = ?
         WHERE user_id = ?
     ''', (json.dumps(profile), datetime.now().isoformat(), user_id))
     conn.commit()
-    
+
     return profile
 
 def update_learner_settings(conn, user_id, settings):
@@ -345,24 +345,24 @@ def update_learner_settings(conn, user_id, settings):
         dict: The updated learner profile.
     """
     profile = get_learner_profile(conn, user_id)
-    
+
     updated = False
     if 'level_est' in settings:
         profile['level_est'] = settings['level_est']
         updated = True
-        
+
     if 'feedback_preference' in settings:
         profile['feedback_preference'] = settings['feedback_preference']
         updated = True
-        
+
     if updated:
         profile["updated_at"] = datetime.now().isoformat()
         conn.execute('''
-            UPDATE learner_profiles 
+            UPDATE learner_profiles
             SET profile_json = ?, updated_at = ?
             WHERE user_id = ?
         ''', (json.dumps(profile), datetime.now().isoformat(), user_id))
         conn.commit()
-    
+
     return profile
 

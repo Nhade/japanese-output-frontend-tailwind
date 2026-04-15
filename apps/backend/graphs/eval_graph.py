@@ -5,17 +5,17 @@ Two graphs:
   - eval_graph: evaluate_submission() — classify errors and score
   - detailed_feedback_graph: get_detailed_feedback() — grammatical explanation
 """
-import json
 from typing import TypedDict
-from langgraph.graph import StateGraph, END
+
+from langgraph.graph import END, StateGraph
+
 from ai_core import (
+    ErrorType,
+    calculate_score,
     check_safety,
     query_llm,
     query_llm_json,
-    ErrorType,
-    calculate_score,
 )
-
 
 # ---------------------------------------------------------------------------
 # State definitions

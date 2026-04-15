@@ -2,13 +2,14 @@ import os
 import sqlite3
 import uuid
 from datetime import datetime
-from flask import Flask, jsonify, request
+
+from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 from pwdlib import PasswordHash, exceptions
 from pykakasi import kakasi
+
 from translation_service import translate_text
 from tts_service import generate_audio
-from flask import Response
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -21,7 +22,7 @@ DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '
 def get_db_connection():
     """
     Establish a connection to the SQLite database.
-    
+
     Returns:
         sqlite3.Connection: Connection object with row_factory set to sqlite3.Row.
     """
@@ -42,7 +43,7 @@ def get_random_exercise():
     conn.close()
     if exercise is None:
         return jsonify({"error": "No exercises found"}), 404
-    
+
     return jsonify(dict(exercise))
 
 @app.route('/api/mistakes/<user_id>', methods=['GET'])
@@ -69,9 +70,15 @@ def get_mistakes(user_id):
 
     return jsonify([dict(mistake) for mistake in mistakes])
 
-from ai_service import evaluate_submission, get_detailed_feedback, chat_with_ai
 from agent_service import generate_daily_review_agent
-from learner_service import create_learner_tables, update_learner_profile, get_learner_profile, backfill_learner_profile, update_learner_settings
+from ai_service import chat_with_ai, evaluate_submission, get_detailed_feedback
+from learner_service import (
+    backfill_learner_profile,
+    create_learner_tables,
+    get_learner_profile,
+    update_learner_profile,
+    update_learner_settings,
+)
 
 # Initialize Learner Tables
 try:
@@ -109,12 +116,12 @@ def submit_answer():
             return jsonify({"error": "Exercise not found"}), 404
 
         correct_answer = row['correct_answer']
-        question_sentence = row['question_sentence']
-        
+        row['question_sentence']
+
         # 1. First Layer: Simple String Matching (Kakasi)
         user_answer_hira = "".join([item['hira'] for item in k.convert(user_answer)])
         correct_answer_hira = "".join([item['hira'] for item in k.convert(correct_answer)])
-        
+
         # Default values
         score = 100
         feedback = "完全正確！"
@@ -123,35 +130,35 @@ def submit_answer():
 
         if user_answer_hira == correct_answer_hira:
             is_correct = True
-        
+
         # Log to database with new fields (Initial)
         log_id = str(uuid.uuid4())
         answered_timestamp = datetime.now().isoformat()
-        
+
         # Default empty values for AI fields
         feedback = None
         score = 100 if is_correct else 0
         error_type = "none" if is_correct else None
 
         conn.execute('''
-            INSERT INTO answer_log 
-            (log_id, user_id, exercise_id, user_answer, is_correct, answered_timestamp, feedback, score, error_type) 
+            INSERT INTO answer_log
+            (log_id, user_id, exercise_id, user_answer, is_correct, answered_timestamp, feedback, score, error_type)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (log_id, user_id, exercise_id, user_answer, is_correct, answered_timestamp, feedback, score, error_type))
-        
+
         # Update Learner Profile
         exercise_info = {
             "part_of_speech": row['part_of_speech'],
             "jlpt_level": row['jlpt_level']
         }
         _, focus_diff = update_learner_profile(conn, user_id, exercise_info, is_correct)
-        
+
         conn.commit()
 
-        
+
     finally:
         conn.close()
-        
+
     return jsonify({
         "is_correct": is_correct,
         "correct_answer": correct_answer,
@@ -170,40 +177,40 @@ def explain_answer():
     """
     data = request.get_json()
     log_id = data.get('log_id')
-    
+
     if not log_id:
         return jsonify({"error": "log_id is required"}), 400
-        
+
     conn = get_db_connection()
     try:
         # Fetch details to ensure data integrity
         row = conn.execute('''
-            SELECT al.user_answer, e.question_sentence, e.correct_answer 
+            SELECT al.user_answer, e.question_sentence, e.correct_answer
             FROM answer_log al
             JOIN exercise e ON al.exercise_id = e.exercise_id
             WHERE al.log_id = ?
         ''', (log_id,)).fetchone()
-        
+
         if not row:
             return jsonify({"error": "Log entry not found"}), 404
-            
+
         question = row['question_sentence']
         user_answer = row['user_answer']
         correct_answer = row['correct_answer']
-        
+
         print(f"Calling AI for evaluation (Log ID: {log_id})...")
         ai_result = evaluate_submission(question, user_answer, correct_answer)
-        
+
         # Update record
         conn.execute('''
-            UPDATE answer_log 
+            UPDATE answer_log
             SET feedback = ?, score = ?, error_type = ?
             WHERE log_id = ?
         ''', (ai_result['feedback'], ai_result['score'], ai_result['error_type'], log_id))
         conn.commit()
-        
+
         return jsonify(ai_result)
-        
+
     finally:
         conn.close()
 
@@ -218,30 +225,30 @@ def explain_answer_detailed():
     """
     data = request.get_json()
     log_id = data.get('log_id')
-    
+
     if not log_id:
         return jsonify({"error": "log_id is required"}), 400
-        
+
     conn = get_db_connection()
     try:
         row = conn.execute('''
-            SELECT al.user_answer, e.question_sentence, e.correct_answer 
+            SELECT al.user_answer, e.question_sentence, e.correct_answer
             FROM answer_log al
             JOIN exercise e ON al.exercise_id = e.exercise_id
             WHERE al.log_id = ?
         ''', (log_id,)).fetchone()
-        
+
         if not row:
             return jsonify({"error": "Log entry not found"}), 404
-            
+
         question = row['question_sentence']
         user_answer = row['user_answer']
         correct_answer = row['correct_answer']
-        
+
         detailed_feedback = get_detailed_feedback(question, user_answer, correct_answer)
-        
+
         return jsonify({"detailed_feedback": detailed_feedback})
-        
+
     finally:
         conn.close()
 
@@ -258,14 +265,14 @@ def chat_send():
     message = data.get('message')
     history = data.get('history', [])
     locale = data.get('locale', 'en') # Default to English if not provided
-    
+
     if not message:
         return jsonify({"error": "Message is required"}), 400
-        
+
     # Optional: Basic validation on history structure
     if not isinstance(history, list):
         return jsonify({"error": "History must be a list"}), 400
-        
+
     # Fetch Learner Profile if user_id is provided
     user_id = data.get('user_id')
     learner_profile = None
@@ -276,7 +283,7 @@ def chat_send():
             conn.close()
         except Exception as e:
             print(f"Error fetching profile for chat: {e}")
-            
+
     result = chat_with_ai(message, history, locale, learner_profile)
     return jsonify(result)
 
@@ -300,7 +307,7 @@ def register_user():
         # Check if the username is occupied
         if conn.execute('SELECT user_id FROM users WHERE username = ?', (username,)).fetchone() is not None:
             return jsonify({"error": "Username already occupied"}), 400
-        
+
         # Insert the new user
         user_id = str(uuid.uuid4())
         hashed_password = password_hash.hash(password)
@@ -311,7 +318,7 @@ def register_user():
         conn.close()
 
     return jsonify({"message": "User registered successfully", "user_id": user_id}), 201
-    
+
 @app.route('/api/users/login', methods=['POST'])
 def login_user():
     """
@@ -380,7 +387,7 @@ def get_user_statistics(user_id):
         e.jlpt_level;
     """
     stats = conn.execute(query, (user_id,)).fetchall()
-    
+
     # Process the stats to create the desired JSON structure
     processed_stats = {
         "pos_accuracy": {},
@@ -423,29 +430,29 @@ def get_user_statistics(user_id):
 
     for jlpt_level, totals in jlpt_totals.items():
         processed_stats["jlpt_level_accuracy"][jlpt_level] = (totals['correct'] / totals['total']) * 100 if totals['total'] > 0 else 0
-        
+
     # --- Summary ---
     # Use direct query to ensure we catch all answer logs, independent of joint constraints that might be tight
     summary_query = """
-    SELECT 
+    SELECT
         COUNT(log_id) as total,
         SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
     FROM answer_log
     WHERE user_id = ?
     """
     summary_row = conn.execute(summary_query, (user_id,)).fetchone()
-    
+
     if summary_row:
         overall_total = summary_row['total']
         overall_correct = summary_row['correct'] if summary_row['correct'] else 0
-        
+
         processed_stats["summary"]["total_exercises"] = overall_total
         processed_stats["summary"]["total_correct"] = overall_correct
         processed_stats["summary"]["average_accuracy"] = (overall_correct / overall_total) * 100 if overall_total > 0 else 0
 
     # --- History (Daily Accuracy) ---
     history_query = """
-    SELECT 
+    SELECT
         DATE(answered_timestamp) as date,
         COUNT(log_id) as total,
         SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
@@ -456,7 +463,7 @@ def get_user_statistics(user_id):
     """
     history_rows = conn.execute(history_query, (user_id,)).fetchall()
     conn.close() # Close connection here
-    
+
     history_data = []
     for row in history_rows:
         date_str = row['date']
@@ -468,7 +475,7 @@ def get_user_statistics(user_id):
             "accuracy": accuracy,
             "total": total
         })
-    
+
     processed_stats["history"] = history_data
 
     return jsonify(processed_stats)
@@ -486,14 +493,14 @@ def get_news_list():
     date_str = request.args.get('date')  # Expected format YYYY-MM-DD
 
     conn = get_db_connection()
-    
+
     query = "SELECT article_id, title, category, publish_timestamp FROM articles WHERE status = 'processed'"
     params = []
 
     if category:
         query += " AND category = ?"
         params.append(category)
-    
+
     if date_str:
         # Match date part of ISO timestamp
         query += " AND publish_timestamp LIKE ?"
@@ -520,26 +527,26 @@ def get_news_detail(article_id):
     conn = get_db_connection()
     article = conn.execute('SELECT * FROM articles WHERE article_id = ?', (article_id,)).fetchone()
     conn.close()
-    
+
     if not article:
         return jsonify({"error": "Article not found"}), 404
-    
+
     data = dict(article)
-    
+
     # Process paragraphs: split by newline, filter empty
     paragraphs = []
     raw_paragraphs = data['body_text'].split('\n')
-    
+
     for p in raw_paragraphs:
         p = p.strip()
         # Filter out separators or empty lines
-        if p and not p.startswith('---'): 
+        if p and not p.startswith('---'):
             paragraphs.append({
                 "text": p,
                 "translation": None,
                 "loadingTranslation": False
             })
-    
+
     return jsonify({
         "info": {
             "title": data['title'],
@@ -560,10 +567,10 @@ def translate_paragraph():
     data = request.get_json()
     text = data.get('text')
     target = data.get('target', 'zh-TW')  # Default to zh-TW if not provided
-    
+
     if not text:
         return jsonify({"error": "Text is required"}), 400
-    
+
     translated = translate_text(text, target)
     return jsonify({"translated_text": translated})
 
@@ -571,18 +578,18 @@ def translate_paragraph():
 def get_tts():
     """
     Generate Text-to-Speech audio for a given text.
-    
+
     Returns:
         Response: Audio file (WAV).
     """
     data = request.get_json()
     text = data.get('text')
-    
+
     if not text:
         return jsonify({"error": "Text is required"}), 400
-    
+
     audio_content = generate_audio(text)
-    
+
     if not audio_content:
         return jsonify({"error": "TTS generation failed"}), 500
 
@@ -641,7 +648,7 @@ def recalculate_learner_profile_route(user_id):
         user = conn.execute('SELECT 1 FROM users WHERE user_id = ?', (user_id,)).fetchone()
         if not user:
             return jsonify({"error": "User not found"}), 404
-            
+
         profile = backfill_learner_profile(conn, user_id)
         return jsonify(profile)
     finally:
@@ -659,10 +666,10 @@ def update_profile():
     data = request.json
     user_id = data.get('user_id')
     settings = data.get('settings')
-    
+
     if not user_id or not settings:
         return jsonify({"error": "Missing user_id or settings"}), 400
-        
+
     conn = get_db_connection()
     try:
         updated_profile = update_learner_settings(conn, user_id, settings)

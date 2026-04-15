@@ -1,7 +1,8 @@
-from google.cloud import translate_v2 as translate
-import os
-from dotenv import load_dotenv
 import html
+import os
+
+from dotenv import load_dotenv
+from google.cloud import translate_v2 as translate
 
 load_dotenv()
 

@@ -5,13 +5,14 @@ Graph: safety_check → build_context → call_llm → END
        (violation shortcircuits to END)
 """
 from typing import TypedDict
-from langgraph.graph import StateGraph, END
+
+from langgraph.graph import END, StateGraph
+
 from ai_core import (
+    build_learner_context,
     check_safety,
     query_llm_json,
-    build_learner_context,
 )
-
 
 # ---------------------------------------------------------------------------
 # State

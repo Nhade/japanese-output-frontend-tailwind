@@ -1,9 +1,9 @@
-import os
 import json
+import os
 import re
+from enum import StrEnum
+
 import requests
-from enum import Enum
-from typing import List, Dict
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -48,7 +48,7 @@ if GROQ_API_KEY and GROQ_API_BASE_URL:
         print(f"Failed to initialize Safeguard Client: {e}")
 
 # Define Error Types
-class ErrorType(str, Enum):
+class ErrorType(StrEnum):
     NONE = "none"               # Perfect
     TYPO = "typo"               # Kana/Kanji mistake -1
     VOCAB = "vocab"             # Wrong word choice -2
@@ -78,7 +78,7 @@ def calculate_score(error_type: ErrorType) -> int:
     }
     return mapping.get(error_type, -3)
 
-def query_llm(messages: List[Dict[str, str]], json_mode: bool = False, temperature: float = 0.7) -> str:
+def query_llm(messages: list[dict[str, str]], json_mode: bool = False, temperature: float = 0.7) -> str:
     """
     Unified function to query the configured LLM provider (Ollama or OpenAI).
 
@@ -167,7 +167,7 @@ def _parse_json_safe(content: str) -> dict:
 
     raise ValueError(f"Could not parse JSON from content: {content[:100]}...")
 
-def query_llm_json(messages: List[Dict[str, str]], retries: int = 3, temperature: float = 0.7) -> dict:
+def query_llm_json(messages: list[dict[str, str]], retries: int = 3, temperature: float = 0.7) -> dict:
     """
     Wrapper around query_llm to handle JSON parsing with retries.
 
@@ -213,7 +213,8 @@ def build_learner_context(profile: dict) -> dict:
     level = profile.get("level_est", "N5")
     # Retrieve weak_points, defaulting to empty list if missing/None
     weak = profile.get("weak_points", [])
-    if weak is None: weak = []
+    if weak is None:
+        weak = []
 
     # Take top 2 weak points
     top_weak = weak[:2]
