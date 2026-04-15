@@ -84,7 +84,12 @@
         "pos_desc": "文法タイプ別の正解率",
         "total_exercises": "総練習数",
         "total_correct": "総正解数",
-        "average_accuracy": "平均正解率"
+        "average_accuracy": "平均正解率",
+        "activity_heatmap": "アクティビティ",
+        "heatmap_desc": "過去1年間の日ごとの練習アクティビティ",
+        "heatmap_less": "少",
+        "heatmap_more": "多",
+        "heatmap_exercises": "回練習"
     },
     "news": {
         "title": "ニュース読解練習",

@@ -84,7 +84,12 @@
         "pos_desc": "Accuracy across grammar types",
         "total_exercises": "Total Exercises",
         "total_correct": "Total Correct",
-        "average_accuracy": "Average Accuracy"
+        "average_accuracy": "Average Accuracy",
+        "activity_heatmap": "Activity",
+        "heatmap_desc": "Your daily exercise activity over the past year",
+        "heatmap_less": "Less",
+        "heatmap_more": "More",
+        "heatmap_exercises": "exercises"
     },
     "news": {
         "title": "News Reading Practice",
