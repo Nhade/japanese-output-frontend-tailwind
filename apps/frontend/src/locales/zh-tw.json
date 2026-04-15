@@ -89,7 +89,9 @@
         "heatmap_desc": "過去一年的每日練習活動",
         "heatmap_less": "少",
         "heatmap_more": "多",
-        "heatmap_exercises": "次練習"
+        "heatmap_exercises": "次練習",
+        "heatmap_tooltip": "{date}有 {count} 次練習",
+        "heatmap_tooltip_zero": "{date}沒有練習"
     },
     "news": {
         "title": "新聞閱讀練習",

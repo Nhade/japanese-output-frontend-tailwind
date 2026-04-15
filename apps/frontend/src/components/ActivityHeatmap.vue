@@ -45,6 +45,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useThemeStore } from '../stores/theme';
+import { useI18n } from 'vue-i18n';
 
 interface DayData {
   date: string;
@@ -63,13 +64,21 @@ const props = withDefaults(defineProps<{
 });
 
 const themeStore = useThemeStore();
+const { t, locale } = useI18n();
 
 const lightColors = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
 const darkColors = ['rgba(255,255,255,0.05)', '#0e4429', '#006d32', '#26a641', '#39d353'];
 
 const levelThresholds = [0, 1, 3, 6, 10];
 
-const dayLabels = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+const dayLabels = computed(() => {
+  const getDayName = (dayIndex: number) => {
+    // 2024-01-01 is Monday (1). 2024-01-01 + dayIndex
+    const d = new Date(2024, 0, dayIndex);
+    return new Intl.DateTimeFormat(locale.value, { weekday: 'short' }).format(d);
+  };
+  return ['', getDayName(1), '', getDayName(3), '', getDayName(5), ''];
+});
 
 const dataMap = computed(() => {
   const map = new Map<string, number>();
@@ -112,8 +121,6 @@ const weeks = computed(() => {
 
 const monthLabels = computed(() => {
   const labels: Record<number, string> = {};
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   let lastMonth = -1;
 
   weeks.value.forEach((week, wi) => {
@@ -122,7 +129,8 @@ const monthLabels = computed(() => {
     if (firstDay) {
       const month = parseInt(firstDay.dateStr.split('-')[1], 10) - 1;
       if (month !== lastMonth) {
-        labels[wi] = monthNames[month];
+        const d = new Date(2024, month, 1);
+        labels[wi] = new Intl.DateTimeFormat(locale.value, { month: 'short' }).format(d);
         lastMonth = month;
       }
     }
@@ -153,8 +161,8 @@ function getCellColor(count: number): string {
 
 function getCellTooltip(day: { dateStr: string; count: number }): string {
   if (day.count === 0) {
-    return `No ${props.tooltipSuffix} on ${day.dateStr}`;
+    return t('statistics.heatmap_tooltip_zero', { date: day.dateStr });
   }
-  return `${day.count} ${props.tooltipSuffix} on ${day.dateStr}`;
+  return t('statistics.heatmap_tooltip', { count: day.count, date: day.dateStr });
 }
 </script>
