@@ -11,6 +11,7 @@
     "install:backend": "python -m pip install -r apps/backend/requirements.txt",
     "postinstall": "npm run install:backend",
     "dev:frontend": "npm run dev --prefix apps/frontend",
+    "build": "npm run build --prefix apps/frontend",
     "dev:backend": "python apps/backend/app.py",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
   },
