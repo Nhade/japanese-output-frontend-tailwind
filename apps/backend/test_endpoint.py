@@ -1,10 +1,10 @@
 
+
 import requests
-import json
 
 try:
     response = requests.post(
-        "http://127.0.0.1:5000/api/exercise/explain-detailed", 
+        "http://127.0.0.1:5000/api/exercise/explain-detailed",
         json={"log_id": "test"},
         timeout=10
     )

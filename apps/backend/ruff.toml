@@ -1,0 +1,17 @@
+target-version = "py313"
+line-length = 120
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501", # line too long — handled by formatter, not linter
+]
+
+[lint.per-file-ignores]
+"app.py" = ["E402"]  # imports after Flask app setup — intentional

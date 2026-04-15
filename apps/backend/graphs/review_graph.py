@@ -10,9 +10,10 @@ the best partial output from an earlier step is returned.
 import sqlite3
 from datetime import datetime
 from typing import TypedDict
-from langgraph.graph import StateGraph, END
-from ai_core import query_llm
 
+from langgraph.graph import END, StateGraph
+
+from ai_core import query_llm
 
 # ---------------------------------------------------------------------------
 # State
