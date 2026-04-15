@@ -232,8 +232,6 @@ def update_learner_profile(conn, user_id, exercise_info, is_correct):
                 # If no weak points exist yet, default to general practice focus
                 next_tag = "名詞" if focus["tag"] != "名詞" else "助詞"
 
-            focus["tag"]
-
             profile["current_focus"] = {
                 "tag": next_tag,
                 "progress": 0,

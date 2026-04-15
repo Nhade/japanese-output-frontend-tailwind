@@ -34,3 +34,4 @@ data/
 # Scratch / Tests
 test_openai_tts.py
 *.wav
+*.pem
