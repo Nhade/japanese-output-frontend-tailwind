@@ -89,7 +89,9 @@
         "heatmap_desc": "過去1年間の日ごとの練習アクティビティ",
         "heatmap_less": "少",
         "heatmap_more": "多",
-        "heatmap_exercises": "回練習"
+        "heatmap_exercises": "回練習",
+        "heatmap_tooltip": "{date}に{count}回練習",
+        "heatmap_tooltip_zero": "{date}は練習なし"
     },
     "news": {
         "title": "ニュース読解練習",

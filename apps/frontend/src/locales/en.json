@@ -89,7 +89,9 @@
         "heatmap_desc": "Your daily exercise activity over the past year",
         "heatmap_less": "Less",
         "heatmap_more": "More",
-        "heatmap_exercises": "exercises"
+        "heatmap_exercises": "exercises",
+        "heatmap_tooltip": "{count} exercises on {date}",
+        "heatmap_tooltip_zero": "No exercises on {date}"
     },
     "news": {
         "title": "News Reading Practice",
