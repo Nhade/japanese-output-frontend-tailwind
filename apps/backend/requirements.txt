@@ -12,3 +12,4 @@ pydantic
 gTTS
 gunicorn
 langgraph
+youtube-transcript-api

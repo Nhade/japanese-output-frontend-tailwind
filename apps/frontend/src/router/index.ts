@@ -43,6 +43,18 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/videos',
+      name: 'video-list',
+      component: () => import('../views/VideoListView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/videos/:id',
+      name: 'video-study',
+      component: () => import('../views/VideoStudyView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/chat',
       name: 'chat',
       component: () => import('../views/ChatView.vue'),

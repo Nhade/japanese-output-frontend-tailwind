@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import uuid
@@ -72,6 +73,7 @@ def get_mistakes(user_id):
 
 from agent_service import generate_daily_review_agent
 from ai_service import chat_with_ai, evaluate_submission, get_detailed_feedback
+from graphs.video_graph import check_comprehension_answer, generate_comprehension_questions
 from learner_service import (
     backfill_learner_profile,
     create_learner_tables,
@@ -79,11 +81,13 @@ from learner_service import (
     update_learner_profile,
     update_learner_settings,
 )
+from video_service import create_video_tables, import_video
 
 # Initialize Learner Tables
 try:
     with sqlite3.connect(DATABASE_PATH) as conn:
         create_learner_tables(conn)
+        create_video_tables(conn)
 except Exception as e:
     print(f"Database init error: {e}")
 
@@ -116,7 +120,6 @@ def submit_answer():
             return jsonify({"error": "Exercise not found"}), 404
 
         correct_answer = row['correct_answer']
-        row['question_sentence']
 
         # 1. First Layer: Simple String Matching (Kakasi)
         user_answer_hira = "".join([item['hira'] for item in k.convert(user_answer)])
@@ -555,6 +558,222 @@ def get_news_detail(article_id):
         },
         "paragraphs": paragraphs
     })
+
+# ---------------------------------------------------------------------------
+# Video endpoints
+# ---------------------------------------------------------------------------
+
+@app.route('/api/videos', methods=['GET'])
+def get_video_list():
+    """List imported videos with optional category filter."""
+    category = request.args.get('category')
+
+    conn = get_db_connection()
+    query = """SELECT video_id, title, channel_name, category, thumbnail_url,
+                      duration_seconds, publish_date, status
+               FROM videos WHERE status = 'processed'"""
+    params = []
+
+    if category:
+        query += " AND category = ?"
+        params.append(category)
+
+    query += " ORDER BY created_timestamp DESC LIMIT 30"
+    videos = conn.execute(query, params).fetchall()
+    conn.close()
+
+    return jsonify([dict(v) for v in videos])
+
+
+@app.route('/api/videos/<video_id>', methods=['GET'])
+def get_video_detail(video_id):
+    """Get video metadata and transcript segments."""
+    conn = get_db_connection()
+    video = conn.execute('SELECT * FROM videos WHERE video_id = ?', (video_id,)).fetchone()
+    conn.close()
+
+    if not video:
+        return jsonify({"error": "Video not found"}), 404
+
+    data = dict(video)
+    transcript = []
+    if data.get("transcript_json"):
+        try:
+            transcript = json.loads(data["transcript_json"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    return jsonify({
+        "info": {
+            "video_id": data["video_id"],
+            "title": data["title"],
+            "channel_name": data["channel_name"],
+            "external_id": data["external_id"],
+            "source": data["source"],
+            "thumbnail_url": data["thumbnail_url"],
+            "duration_seconds": data["duration_seconds"],
+            "publish_date": data["publish_date"],
+        },
+        "transcript": transcript,
+    })
+
+
+@app.route('/api/videos/<video_id>/exercises', methods=['GET'])
+def get_video_exercises(video_id):
+    """Get pre-generated cloze exercises for a video."""
+    conn = get_db_connection()
+    exercises = conn.execute('''
+        SELECT exercise_id, full_sentence, question_sentence, correct_answer,
+               part_of_speech, jlpt_level, hint_chinese, context_timestamp
+        FROM video_exercises WHERE video_id = ?
+        ORDER BY context_timestamp
+    ''', (video_id,)).fetchall()
+    conn.close()
+
+    return jsonify([dict(e) for e in exercises])
+
+
+@app.route('/api/videos/import', methods=['POST'])
+def import_video_route():
+    """Import a video from a YouTube URL."""
+    data = request.get_json()
+    url = data.get('url', '').strip()
+
+    if not url:
+        return jsonify({"error": "URL is required"}), 400
+
+    try:
+        result = import_video(url, DATABASE_PATH)
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        print(f"Video import error: {e}")
+        return jsonify({"error": "Failed to import video. Please check the URL and try again."}), 500
+
+
+@app.route('/api/videos/submit', methods=['POST'])
+def submit_video_answer():
+    """Submit an answer for a video cloze exercise."""
+    data = request.get_json()
+    exercise_id = data.get('exercise_id')
+    video_id = data.get('video_id')
+    user_answer = data.get('user_answer', '').strip()
+    user_id = data.get('user_id')
+
+    if not all([exercise_id, video_id, user_id]):
+        return jsonify({"error": "exercise_id, video_id, and user_id are required"}), 400
+
+    conn = get_db_connection()
+    try:
+        row = conn.execute(
+            'SELECT correct_answer FROM video_exercises WHERE exercise_id = ?',
+            (exercise_id,)
+        ).fetchone()
+
+        if not row:
+            return jsonify({"error": "Exercise not found"}), 404
+
+        correct_answer = row['correct_answer']
+
+        # Hiragana normalization (same as regular exercises)
+        user_hira = "".join([item['hira'] for item in k.convert(user_answer)])
+        correct_hira = "".join([item['hira'] for item in k.convert(correct_answer)])
+
+        is_correct = user_hira == correct_hira
+        score = 100 if is_correct else 0
+
+        log_id = str(uuid.uuid4())
+        conn.execute('''
+            INSERT INTO video_answer_log
+            (log_id, user_id, exercise_id, video_id, exercise_type, user_answer,
+             is_correct, score, feedback, answered_timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            log_id, user_id, exercise_id, video_id, 'cloze',
+            user_answer, is_correct, score, None, datetime.now().isoformat()
+        ))
+        conn.commit()
+
+        return jsonify({
+            "is_correct": is_correct,
+            "correct_answer": correct_answer,
+            "score": score,
+            "log_id": log_id,
+        })
+    finally:
+        conn.close()
+
+
+@app.route('/api/videos/<video_id>/comprehension', methods=['POST'])
+def generate_video_comprehension(video_id):
+    """Generate AI comprehension questions for a video."""
+    conn = get_db_connection()
+    video = conn.execute('SELECT title, transcript_json FROM videos WHERE video_id = ?', (video_id,)).fetchone()
+    conn.close()
+
+    if not video:
+        return jsonify({"error": "Video not found"}), 404
+
+    transcript_text = ""
+    if video["transcript_json"]:
+        try:
+            segments = json.loads(video["transcript_json"])
+            transcript_text = " ".join(seg.get("text", "") for seg in segments)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if not transcript_text:
+        return jsonify({"error": "No transcript available"}), 400
+
+    data = request.get_json() or {}
+    num = data.get('num_questions', 5)
+
+    try:
+        questions = generate_comprehension_questions(transcript_text, video["title"], num)
+        return jsonify({"questions": questions})
+    except Exception as e:
+        print(f"Comprehension generation error: {e}")
+        return jsonify({"error": "Failed to generate questions"}), 500
+
+
+@app.route('/api/videos/comprehension/check', methods=['POST'])
+def check_video_comprehension():
+    """Check a comprehension answer."""
+    data = request.get_json()
+    question = data.get('question', '')
+    choices = data.get('choices', [])
+    correct_index = data.get('correct_index', 0)
+    user_answer_index = data.get('user_answer_index', 0)
+    context = data.get('transcript_context', '')
+    user_id = data.get('user_id')
+    video_id = data.get('video_id')
+
+    result = check_comprehension_answer(question, choices, correct_index, user_answer_index, context)
+
+    # Log the answer if user_id and video_id provided
+    if user_id and video_id:
+        try:
+            conn = get_db_connection()
+            log_id = str(uuid.uuid4())
+            user_answer = choices[user_answer_index] if user_answer_index < len(choices) else ""
+            conn.execute('''
+                INSERT INTO video_answer_log
+                (log_id, user_id, exercise_id, video_id, exercise_type, user_answer,
+                 is_correct, score, feedback, answered_timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                log_id, user_id, str(uuid.uuid4()), video_id, 'comprehension',
+                user_answer, result["is_correct"], result["score"],
+                result["feedback"], datetime.now().isoformat()
+            ))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Failed to log comprehension answer: {e}")
+
+    return jsonify(result)
+
 
 @app.route('/api/translate', methods=['POST'])
 def translate_paragraph():
