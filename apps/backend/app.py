@@ -410,10 +410,12 @@ def get_user_statistics(user_id):
 
         # Aggregate JLPT level data
         if jlpt_level is not None:
-            if jlpt_level not in jlpt_totals:
-                jlpt_totals[jlpt_level] = {'total': 0, 'correct': 0}
-            jlpt_totals[jlpt_level]['total'] += total_answers
-            jlpt_totals[jlpt_level]['correct'] += correct_answers
+            # Ensure key is a string to avoid JSON serialization errors with mixed types (int vs str)
+            jlpt_key = str(jlpt_level)
+            if jlpt_key not in jlpt_totals:
+                jlpt_totals[jlpt_key] = {'total': 0, 'correct': 0}
+            jlpt_totals[jlpt_key]['total'] += total_answers
+            jlpt_totals[jlpt_key]['correct'] += correct_answers
 
     # Calculate accuracies
     for pos, totals in pos_totals.items():

@@ -10,3 +10,5 @@ beautifulsoup4
 openai
 pydantic
 gTTS
+gunicorn
+langgraph
