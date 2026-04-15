@@ -93,6 +93,18 @@
 
         </div>
 
+        <!-- Activity Heatmap -->
+        <div
+          class="bg-white dark:bg-zinc-900/60 rounded-xl shadow-sm shadow-zinc-200/50 border border-zinc-200 dark:border-white/10 dark:shadow-none p-6 hover:shadow-md dark:hover:shadow-none transition-all duration-300 dark:hover:bg-white/5 dark:hover:border-white/20">
+          <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+            <span class="w-2 h-8 bg-green-500 rounded-full"></span>
+            {{ $t('statistics.activity_heatmap') }}
+          </h2>
+          <ActivityHeatmap :data="heatmapData" :less-label="t('statistics.heatmap_less')"
+            :more-label="t('statistics.heatmap_more')" :tooltip-suffix="t('statistics.heatmap_exercises')" />
+          <p class="text-xs text-center text-zinc-400 mt-4">{{ $t('statistics.heatmap_desc') }}</p>
+        </div>
+
       </div>
 
       <!-- Empty State -->
@@ -115,9 +127,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
+import ActivityHeatmap from '../components/ActivityHeatmap.vue';
 import { Bar, Radar, Line } from 'vue-chartjs';
 import {
   Chart as ChartJS,
@@ -146,6 +160,7 @@ ChartJS.register(
   Filler
 );
 
+const { t } = useI18n();
 const auth = useAuthStore();
 const loading = ref(true);
 const hasData = ref(false);
@@ -268,6 +283,9 @@ const historyChartData = ref({
   datasets: [] as any[]
 });
 
+const historyRaw = ref<{ date: string; total: number }[]>([]);
+
+const heatmapData = computed(() => historyRaw.value);
 
 onMounted(async () => {
   if (auth.user_id) {
@@ -320,8 +338,13 @@ onMounted(async () => {
             }]
           };
 
-          // 3. History Line Data
+          // 3. History Line Data + Heatmap
           if (stats.history) {
+            historyRaw.value = stats.history.map((h: any) => ({
+              date: h.date,
+              total: h.total,
+            }));
+
             const historyLabels = stats.history.map((h: any) => h.date);
             const historyValues = stats.history.map((h: any) => h.accuracy);
 

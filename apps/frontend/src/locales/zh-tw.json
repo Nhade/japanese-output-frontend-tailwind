@@ -84,7 +84,12 @@
         "pos_desc": "各文法類型的準確率",
         "total_exercises": "總練習數",
         "total_correct": "總正解數",
-        "average_accuracy": "平均準確率"
+        "average_accuracy": "平均準確率",
+        "activity_heatmap": "活動紀錄",
+        "heatmap_desc": "過去一年的每日練習活動",
+        "heatmap_less": "少",
+        "heatmap_more": "多",
+        "heatmap_exercises": "次練習"
     },
     "news": {
         "title": "新聞閱讀練習",
