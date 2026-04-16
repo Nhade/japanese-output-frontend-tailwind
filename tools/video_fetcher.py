@@ -25,6 +25,8 @@ def main():
     parser = argparse.ArgumentParser(description="Import YouTube videos for Japanese learning exercises")
     parser.add_argument("urls", nargs="*", help="YouTube URLs to import")
     parser.add_argument("--file", "-f", help="Path to a text file with one URL per line")
+    parser.add_argument("--whisper", action="store_true",
+                        help="Transcribe audio via OpenAI Whisper instead of YouTube captions")
     args = parser.parse_args()
 
     urls = list(args.urls)
@@ -41,13 +43,13 @@ def main():
         print("\nError: No URLs provided.")
         sys.exit(1)
 
-    print(f"Importing {len(urls)} video(s)...\n")
+    print(f"Importing {len(urls)} video(s){'  [Whisper ASR]' if args.whisper else ''}...\n")
 
     success = 0
     for i, url in enumerate(urls, 1):
         print(f"[{i}/{len(urls)}] {url}")
         try:
-            result = import_video(url, DATABASE_PATH)
+            result = import_video(url, DATABASE_PATH, use_whisper=args.whisper)
             status = "already existed" if result.get("already_exists") else "imported"
             print(f"  -> {status}: {result['title']} (ID: {result['video_id']})\n")
             success += 1

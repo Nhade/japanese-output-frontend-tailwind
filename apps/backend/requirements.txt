@@ -13,3 +13,4 @@ gTTS
 gunicorn
 langgraph
 youtube-transcript-api
+yt-dlp

@@ -6,9 +6,11 @@ Public API:
   - import_video(url, db_path)  — full pipeline: fetch metadata + transcript → generate exercises
 """
 import json
+import os
 import random
 import re
 import sqlite3
+import tempfile
 import uuid
 from datetime import datetime
 from urllib.parse import parse_qs, urlparse
@@ -114,6 +116,53 @@ def fetch_youtube_metadata(video_id: str) -> dict:
     except Exception as e:
         print(f"oEmbed fetch failed: {e}")
         return {"title": "Untitled", "channel_name": "", "thumbnail_url": ""}
+
+
+def transcribe_with_whisper(external_id: str) -> list:
+    """Download audio from YouTube and transcribe with OpenAI Whisper.
+
+    Returns list of dicts: [{text, start, duration}, ...]
+    Requires yt-dlp and OPENAI_API_KEY in the environment.
+    """
+    import yt_dlp
+    from openai import OpenAI
+
+    client = OpenAI()
+    url = f"https://www.youtube.com/watch?v={external_id}"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ydl_opts = {
+            "format": "bestaudio[ext=m4a]/bestaudio",
+            "outtmpl": os.path.join(tmpdir, "audio.%(ext)s"),
+            "quiet": True,
+            "no_warnings": True,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+        files = os.listdir(tmpdir)
+        if not files:
+            raise RuntimeError("yt-dlp produced no output file")
+        audio_path = os.path.join(tmpdir, files[0])
+
+        with open(audio_path, "rb") as f:
+            response = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=f,
+                language="ja",
+                response_format="verbose_json",
+                timestamp_granularities=["segment"],
+            )
+
+    return [
+        {
+            "text": seg.text.strip(),
+            "start": round(seg.start, 3),
+            "duration": round(seg.end - seg.start, 3),
+        }
+        for seg in response.segments
+        if seg.text.strip()
+    ]
 
 
 def fetch_youtube_transcript(video_id: str) -> list:
@@ -270,10 +319,12 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
 # Main import pipeline
 # ---------------------------------------------------------------------------
 
-def import_video(url: str, db_path: str) -> dict:
+def import_video(url: str, db_path: str, use_whisper: bool = False) -> dict:
     """Import a YouTube video: fetch metadata + transcript, generate exercises.
 
     Returns dict with video_id and title, or raises on error.
+    If use_whisper=True, downloads audio and transcribes via OpenAI Whisper instead
+    of using YouTube captions; falls back to captions if Whisper fails.
     """
     video_ext_id = parse_youtube_url(url)
 
@@ -287,9 +338,20 @@ def import_video(url: str, db_path: str) -> dict:
         conn.close()
         return {"video_id": existing["video_id"], "title": existing["title"], "already_exists": True}
 
-    # Fetch metadata + transcript
+    # Fetch metadata
     meta = fetch_youtube_metadata(video_ext_id)
-    transcript = fetch_youtube_transcript(video_ext_id)
+
+    # Fetch transcript
+    if use_whisper:
+        try:
+            print("  Transcribing with Whisper (this may take a minute)...")
+            transcript = transcribe_with_whisper(video_ext_id)
+            print(f"  Whisper: {len(transcript)} segments")
+        except Exception as e:
+            print(f"  Whisper failed ({e}), falling back to YouTube captions")
+            transcript = fetch_youtube_transcript(video_ext_id)
+    else:
+        transcript = fetch_youtube_transcript(video_ext_id)
 
     video_id = str(uuid.uuid4())
     transcript_json = json.dumps(transcript, ensure_ascii=False)
