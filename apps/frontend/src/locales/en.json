@@ -54,7 +54,10 @@
         "network_error": "Network error or server unavailable.",
         "type_here": "Type here...",
         "focus_toast_completed": "Focus completed! Next: {tag}",
-        "focus_toast_progress": "Focus ({tag}): {progress} / {target}"
+        "focus_toast_progress": "Focus ({tag}): {progress} / {target}",
+        "mode_typing": "Typing",
+        "mode_mcq": "Multiple Choice",
+        "choose_answer": "Choose the correct answer"
     },
     "mistakes": {
         "title": "Past Mistakes",

@@ -54,7 +54,10 @@
         "network_error": "網路錯誤或伺服器無法連線。",
         "type_here": "在此輸入...",
         "focus_toast_completed": "重點學習已完成！接下來：{tag}",
-        "focus_toast_progress": "學習重點 ({tag})：{progress} / {target}"
+        "focus_toast_progress": "學習重點 ({tag})：{progress} / {target}",
+        "mode_typing": "手動輸入",
+        "mode_mcq": "選擇題",
+        "choose_answer": "選擇正確答案"
     },
     "mistakes": {
         "title": "過去的錯誤",
