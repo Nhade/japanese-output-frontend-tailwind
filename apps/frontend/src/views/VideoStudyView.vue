@@ -1,5 +1,5 @@
 <template>
-  <main class="min-h-[calc(100vh-4rem)] p-6 pt-24 text-zinc-900 dark:text-zinc-100">
+  <main class="min-h-[calc(100vh-4rem)] p-6 pt-24 pb-24 text-zinc-900 dark:text-zinc-100">
     <div class="mx-auto max-w-5xl">
       <!-- Loading -->
       <div v-if="loading" class="text-center text-zinc-600 dark:text-zinc-500 py-12">{{ $t('video.loading') }}</div>
@@ -232,6 +232,8 @@ const initPlayer = () => {
 const createPlayer = () => {
   player = new (window as any).YT.Player('yt-player', {
     videoId: video.value.info.external_id,
+    width: '100%',
+    height: '100%',
     playerVars: {
       rel: 0,
       modestbranding: 1,
@@ -421,5 +423,10 @@ onBeforeUnmount(() => {
 
 :global(.dark) .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #52525b;
+}
+
+:global(#yt-player iframe) {
+  width: 100% !important;
+  height: 100% !important;
 }
 </style>
