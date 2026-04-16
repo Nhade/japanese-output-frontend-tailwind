@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
 import Modal from '../components/Modal.vue';
@@ -6,6 +6,27 @@ import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
 import MarkdownIt from 'markdown-it';
 import { useI18n } from 'vue-i18n';
+
+interface Exercise {
+  exercise_id: string;
+  question_sentence: string;
+  hint_chinese: string;
+  correct_answer?: string;
+  part_of_speech?: string;
+  jlpt_level?: number | null;
+  choices?: string[];
+}
+
+interface Feedback {
+  is_correct: boolean;
+  correct_answer: string;
+  log_id: string;
+  focus_diff?: Record<string, unknown>;
+  feedback?: string;
+  score?: number;
+  error_type?: string;
+  retry_count?: number;
+}
 
 const { t } = useI18n();
 
@@ -15,19 +36,22 @@ const md = new MarkdownIt({
   typographer: true
 });
 
-const exercise = ref(null);
-const feedback = ref(null);
-const detailedFeedback = ref(null);
+const exercise = ref<Exercise | null>(null);
+const feedback = ref<Feedback | null>(null);
+const detailedFeedback = ref<string | null>(null);
 const showDetailModal = ref(false);
-const detailedError = ref(null);
+const detailedError = ref<string | null>(null);
 const isLoading = ref(true);
 const isLoadingDetailed = ref(false);
 const auth = useAuthStore();
 const toastStore = useToastStore();
 const userAnswer = ref('');
 const showHint = ref(false);
-const nextQuestionButton = ref(null);
-const answerInput = ref(null);
+const nextQuestionButton = ref<HTMLButtonElement | null>(null);
+const answerInput = ref<HTMLInputElement | null>(null);
+const exerciseMode = ref<'typing' | 'mcq'>('typing');
+const selectedChoice = ref<string | null>(null);
+const choices = ref<string[]>([]);
 
 
 async function fetchNewExercise() {
@@ -38,29 +62,47 @@ async function fetchNewExercise() {
   detailedError.value = null;
   exercise.value = null; // Clear old exercise
   userAnswer.value = '';
+  selectedChoice.value = null;
+  choices.value = [];
   showHint.value = false;
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/random`, {
+    const url = `${import.meta.env.VITE_API_BASE_URL}/api/exercise/random`
+      + (exerciseMode.value === 'mcq' ? '?mode=mcq' : '');
+    const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
       }
     });
     if (!response.ok) throw new Error('Network response was not ok');
-    exercise.value = await response.json();
+    const data = await response.json();
+    exercise.value = data;
+    if (data.choices) choices.value = data.choices;
   } catch (error) {
     console.error('Failed to fetch exercise:', error);
   } finally {
     isLoading.value = false;
     await nextTick();
-    answerInput.value?.focus();
+    if (exerciseMode.value === 'typing') answerInput.value?.focus();
   }
 }
 
 const isExplaining = ref(false);
 
+function switchMode(mode: 'typing' | 'mcq') {
+  if (exerciseMode.value === mode) return;
+  exerciseMode.value = mode;
+  fetchNewExercise();
+}
+
 async function handleAnswerSubmit() {
-  if (!exercise.value || !userAnswer.value.trim()) return;
+  if (!exercise.value) return;
+  if (exerciseMode.value === 'mcq') {
+    if (!selectedChoice.value) return;
+    userAnswer.value = selectedChoice.value;
+  } else {
+    if (!userAnswer.value.trim()) return;
+  }
 
   try {
     // Step 1: Submit for immediate correctness check
@@ -191,7 +233,7 @@ async function fetchDetailedFeedback() {
 }
 
 
-function handleKeydown(event) {
+function handleKeydown(event: KeyboardEvent) {
   if (event.altKey && event.key === 'h') {
     event.preventDefault();
     revealHint();
@@ -216,6 +258,26 @@ onUnmounted(() => {
       <LoadingSpinner v-if="isLoading" />
 
       <div v-else-if="exercise">
+        <!-- Mode Toggle -->
+        <div class="flex items-center justify-end mb-4">
+          <div class="inline-flex rounded-xl border bg-zinc-100 p-1 border-zinc-200 dark:bg-zinc-800 dark:border-white/10">
+            <button @click="switchMode('typing')"
+              :class="['rounded-lg px-4 py-1.5 text-sm font-medium transition-all',
+                exerciseMode === 'typing'
+                  ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100'
+                  : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200']">
+              {{ $t('exercise.mode_typing') }}
+            </button>
+            <button @click="switchMode('mcq')"
+              :class="['rounded-lg px-4 py-1.5 text-sm font-medium transition-all',
+                exerciseMode === 'mcq'
+                  ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100'
+                  : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200']">
+              {{ $t('exercise.mode_mcq') }}
+            </button>
+          </div>
+        </div>
+
         <!-- Question Card -->
         <transition name="slide-up" mode="out-in">
           <section :key="exercise.exercise_id"
@@ -231,8 +293,8 @@ onUnmounted(() => {
               {{ exercise.hint_chinese }}
             </div>
 
-            <!-- Input -->
-            <form @submit.prevent="handleAnswerSubmit" class="space-y-4" v-if="!feedback">
+            <!-- Typing Input -->
+            <form @submit.prevent="handleAnswerSubmit" class="space-y-4" v-if="!feedback && exerciseMode === 'typing'">
               <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300" for="answer">{{
                 $t('exercise.your_answer') }}</label>
               <input id="answer" ref="answerInput" v-model.trim="userAnswer"
@@ -247,6 +309,52 @@ onUnmounted(() => {
                     $t('exercise.show_hint') }}</button>
               </div>
             </form>
+
+            <!-- MCQ Choice Cards -->
+            <div v-if="!feedback && exerciseMode === 'mcq'" class="space-y-3">
+              <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{{ $t('exercise.choose_answer') }}</p>
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  v-for="(choice, index) in choices"
+                  :key="choice"
+                  type="button"
+                  @click="selectedChoice = choice"
+                  :class="[
+                    'flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all active:scale-[0.99]',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50',
+                    selectedChoice === choice
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:border-emerald-400/60 dark:text-emerald-100'
+                      : 'border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 hover:bg-zinc-50 dark:bg-zinc-900 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/5'
+                  ]">
+                  <span :class="[
+                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold',
+                    selectedChoice === choice
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                  ]">
+                    {{ ['A', 'B', 'C', 'D'][index] }}
+                  </span>
+                  <span lang="ja" class="text-base">{{ choice }}</span>
+                </button>
+              </div>
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  @click="handleAnswerSubmit"
+                  :disabled="!selectedChoice"
+                  class="rounded-xl px-6 py-2.5 font-medium text-white shadow-lg transition-all active:scale-95
+                         bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600
+                         shadow-emerald-200/40 disabled:opacity-40 disabled:cursor-not-allowed
+                         dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500
+                         dark:shadow-emerald-900/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+                  {{ $t('exercise.check_answer') }}
+                </button>
+                <button type="button" @click="revealHint"
+                  class="rounded-xl px-4 py-2.5 text-sm border transition-colors bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:bg-white/5 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40">
+                  {{ $t('exercise.show_hint') }}
+                </button>
+              </div>
+            </div>
 
             <!-- Feedback -->
             <transition name="fade">
@@ -406,7 +514,7 @@ onUnmounted(() => {
         </transition>
 
         <!-- Footer helper -->
-        <i18n-t keypath="exercise.footer_helper" tag="p"
+        <i18n-t v-if="exerciseMode === 'typing'" keypath="exercise.footer_helper" tag="p"
           class="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-400">
           <template #enter>
             <kbd

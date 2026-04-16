@@ -54,7 +54,10 @@
         "network_error": "ネットワークエラーまたはサーバーが利用できません。",
         "type_here": "ここに入力...",
         "focus_toast_completed": "学習重点完了！次は：{tag}",
-        "focus_toast_progress": "学習重点 ({tag}): {progress} / {target}"
+        "focus_toast_progress": "学習重点 ({tag}): {progress} / {target}",
+        "mode_typing": "入力モード",
+        "mode_mcq": "選択問題",
+        "choose_answer": "正しい答えを選んでください"
     },
     "mistakes": {
         "title": "過去の間違い",

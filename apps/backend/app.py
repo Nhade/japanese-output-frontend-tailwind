@@ -1,4 +1,5 @@
 import os
+import random
 import sqlite3
 import uuid
 from datetime import datetime
@@ -35,16 +36,68 @@ def get_random_exercise():
     """
     Fetch a random exercise from the database.
 
-    Returns:
-        JSON: A dictionary containing the exercise details (id, question, hint).
-    """
-    conn = get_db_connection()
-    exercise = conn.execute('SELECT exercise_id, question_sentence, hint_chinese FROM exercise ORDER BY RANDOM() LIMIT 1').fetchone()
-    conn.close()
-    if exercise is None:
-        return jsonify({"error": "No exercises found"}), 404
+    Supports ?mode=mcq to return a shuffled choices array (1 correct + 3 distractors).
+    Typing mode (default) returns the original response shape unchanged.
 
-    return jsonify(dict(exercise))
+    Returns:
+        JSON: Exercise details. MCQ mode adds correct_answer, part_of_speech,
+              jlpt_level, and choices fields.
+    """
+    mode = request.args.get('mode', 'typing')
+    conn = get_db_connection()
+    try:
+        if mode == 'mcq':
+            exercise = conn.execute(
+                'SELECT exercise_id, question_sentence, hint_chinese, '
+                'correct_answer, part_of_speech, jlpt_level '
+                'FROM exercise ORDER BY RANDOM() LIMIT 1'
+            ).fetchone()
+            if exercise is None:
+                return jsonify({"error": "No exercises found"}), 404
+
+            exercise_dict = dict(exercise)
+            pos = exercise_dict['part_of_speech']
+            current_id = exercise_dict['exercise_id']
+
+            # Stage 1: same POS, distinct answers, excluding the correct answer
+            distractors = conn.execute(
+                'SELECT DISTINCT correct_answer FROM exercise '
+                'WHERE part_of_speech = ? AND exercise_id != ? AND correct_answer != ? '
+                'ORDER BY RANDOM() LIMIT 3',
+                (pos, current_id, exercise_dict['correct_answer'])
+            ).fetchall()
+
+            # Stage 2: fallback to any POS if fewer than 3 distinct distractors found
+            if len(distractors) < 3:
+                needed = 3 - len(distractors)
+                existing = [d['correct_answer'] for d in distractors] + [exercise_dict['correct_answer']]
+                placeholders = ','.join('?' * len(existing))
+                fallback = conn.execute(
+                    f'SELECT DISTINCT correct_answer FROM exercise '
+                    f'WHERE exercise_id != ? AND correct_answer NOT IN ({placeholders}) '
+                    f'ORDER BY RANDOM() LIMIT ?',
+                    [current_id] + existing + [needed]
+                ).fetchall()
+                distractors = list(distractors) + list(fallback)
+
+            choices = [d['correct_answer'] for d in distractors]
+            choices.append(exercise_dict['correct_answer'])
+            random.shuffle(choices)
+            exercise_dict['choices'] = choices
+            return jsonify(exercise_dict)
+
+        else:
+            # Original typing mode — response shape unchanged
+            exercise = conn.execute(
+                'SELECT exercise_id, question_sentence, hint_chinese '
+                'FROM exercise ORDER BY RANDOM() LIMIT 1'
+            ).fetchone()
+            if exercise is None:
+                return jsonify({"error": "No exercises found"}), 404
+            return jsonify(dict(exercise))
+    finally:
+        conn.close()
+
 
 @app.route('/api/mistakes/<user_id>', methods=['GET'])
 def get_mistakes(user_id):
