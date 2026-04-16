@@ -202,41 +202,76 @@ def _merge_transcript_to_sentences(transcript: list) -> list:
     """Merge subtitle segments into proper Japanese sentences.
 
     Returns list of dicts: [{text, start}, ...]
+
+    Uses punctuation density to decide strategy:
+    - Dense punctuation (YouTube captions): split at 。？！
+    - Sparse/no punctuation (Whisper ASR): group segments up to ~40 chars,
+      still flushing early at any punctuation mark found.
     """
-    full_text = ""
-    # Build a mapping of character offset to timestamp
-    char_timestamps = []
+    if not transcript:
+        return []
 
-    for seg in transcript:
-        start_offset = len(full_text)
-        full_text += seg["text"]
-        char_timestamps.append((start_offset, seg["start"]))
-        # Add space between segments only if they don't end with punctuation
-        if not full_text.endswith(("。", "？", "！", "\n")):
-            full_text += " "
+    SENTENCE_ENDERS = "。？！?!"
+    TARGET_LEN = 40
 
-    # Split into sentences at Japanese sentence-ending punctuation (full-width and half-width)
-    raw_sentences = re.split(r'(?<=[。？！?!])\s*', full_text)
+    total_chars = sum(len(seg.get("text", "")) for seg in transcript)
+    punct_count = sum(
+        sum(1 for c in seg.get("text", "") if c in SENTENCE_ENDERS)
+        for seg in transcript
+    )
+    # Dense: average sentence ends with punctuation within ~80 chars
+    dense_punctuation = punct_count > 0 and total_chars / punct_count < 80
 
-    sentences = []
-    search_offset = 0
-    for s in raw_sentences:
-        s = s.strip()
-        if not s or len(s) < 5:
-            continue
-        # Find the approximate timestamp for this sentence
-        pos = full_text.find(s, search_offset)
-        if pos >= 0:
-            search_offset = pos + len(s)
-        timestamp = 0.0
-        for char_off, ts in char_timestamps:
-            if char_off <= (pos if pos >= 0 else 0):
-                timestamp = ts
-            else:
-                break
-        sentences.append({"text": s, "start": timestamp})
+    if dense_punctuation:
+        # Punctuation-based splitting for YouTube captions
+        full_text = ""
+        char_timestamps = []
+        for seg in transcript:
+            start_offset = len(full_text)
+            full_text += seg["text"]
+            char_timestamps.append((start_offset, seg["start"]))
+            if not full_text.endswith(("。", "？", "！", "\n")):
+                full_text += " "
 
-    return sentences
+        raw_sentences = re.split(r'(?<=[。？！?!])\s*', full_text)
+        sentences = []
+        search_offset = 0
+        for s in raw_sentences:
+            s = s.strip()
+            if not s or len(s) < 5:
+                continue
+            pos = full_text.find(s, search_offset)
+            if pos >= 0:
+                search_offset = pos + len(s)
+            timestamp = 0.0
+            for char_off, ts in char_timestamps:
+                if char_off <= (pos if pos >= 0 else 0):
+                    timestamp = ts
+                else:
+                    break
+            sentences.append({"text": s, "start": timestamp})
+        return sentences
+    else:
+        # Segment-based grouping for Whisper output
+        # Accumulate up to TARGET_LEN chars; also flush at any punctuation mark.
+        sentences = []
+        current_text = ""
+        current_start = None
+        for seg in transcript:
+            text = seg["text"].strip()
+            if not text:
+                continue
+            if current_start is None:
+                current_start = seg["start"]
+            current_text += text
+            if len(current_text) >= TARGET_LEN or any(c in current_text for c in SENTENCE_ENDERS):
+                if len(current_text) >= 5:
+                    sentences.append({"text": current_text, "start": current_start})
+                current_text = ""
+                current_start = None
+        if current_text and len(current_text) >= 5:
+            sentences.append({"text": current_text, "start": current_start})
+        return sentences
 
 
 def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.Connection, max_exercises: int = 12):
