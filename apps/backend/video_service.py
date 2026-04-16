@@ -308,7 +308,10 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
         ))
 
         exercises_created += 1
-        print(f"  -> Video exercise {exercises_created}: blanked '{correct_answer}' (POS: {pos}, JLPT: N{jlpt_level or 'A'})")
+        try:
+            print(f"  -> Video exercise {exercises_created}: blanked '{correct_answer}' (POS: {pos}, JLPT: N{jlpt_level or 'A'})")
+        except UnicodeEncodeError:
+            print(f"  -> Video exercise {exercises_created}: created (POS: {pos}, JLPT: N{jlpt_level or 'A'})")
 
     conn.commit()
     print(f"Created {exercises_created} video exercises for video {video_id}")
