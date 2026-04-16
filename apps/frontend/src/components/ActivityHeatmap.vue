@@ -14,9 +14,9 @@
       <div class="flex flex-col gap-[3px]">
         <!-- Month labels row -->
         <div class="flex gap-[3px] h-[15px]">
-          <div v-for="(week, wi) in weeks" :key="wi"
+          <div v-for="wi in weeks.length" :key="wi - 1"
             class="w-[13px] text-[10px] leading-[15px] text-zinc-400 dark:text-zinc-500 select-none">
-            {{ monthLabels[wi] || '' }}
+            {{ monthLabels[wi - 1] || '' }}
           </div>
         </div>
 
@@ -24,8 +24,8 @@
         <div v-for="dayIndex in 7" :key="dayIndex" class="flex gap-[3px]">
           <template v-for="(week, wi) in weeks" :key="wi">
             <div v-if="week[dayIndex - 1]" class="w-[13px] h-[13px] rounded-sm transition-colors"
-              :style="{ backgroundColor: getCellColor(week[dayIndex - 1].count) }"
-              :title="getCellTooltip(week[dayIndex - 1])"></div>
+              :style="{ backgroundColor: getCellColor(week[dayIndex - 1]!.count) }"
+              :title="getCellTooltip(week[dayIndex - 1]!)"></div>
             <div v-else class="w-[13px] h-[13px]"></div>
           </template>
         </div>
