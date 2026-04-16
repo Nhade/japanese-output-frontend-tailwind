@@ -71,6 +71,12 @@
           </div>
           <div v-for="(ex, idx) in exercises" :key="ex.exercise_id"
             class="rounded-xl border p-5 bg-white border-zinc-200 dark:bg-zinc-900/50 dark:border-white/10">
+            <!-- Context lines from surrounding transcript -->
+            <div v-if="getContextLines(ex.context_timestamp).length"
+              class="mb-3 pl-3 border-l-2 border-zinc-200 dark:border-white/10 space-y-0.5">
+              <p v-for="(line, li) in getContextLines(ex.context_timestamp)" :key="li"
+                class="text-xs text-zinc-400 dark:text-zinc-500 leading-relaxed">{{ line }}</p>
+            </div>
             <div class="flex items-start justify-between mb-3">
               <p class="text-base font-medium">
                 <span class="text-zinc-400 dark:text-zinc-500 mr-2">Q{{ idx + 1 }}.</span>
@@ -212,6 +218,14 @@ const seekTo = (seconds: number) => {
   if (player && player.seekTo) {
     player.seekTo(seconds, true)
   }
+}
+
+const getContextLines = (timestamp: number | null): string[] => {
+  if (timestamp == null || !transcript.value.length) return []
+  const idx = transcript.value.findIndex((seg: any) => seg.start >= timestamp)
+  const pos = idx === -1 ? transcript.value.length - 1 : Math.max(0, idx - 1)
+  const start = Math.max(0, pos - 2)
+  return transcript.value.slice(start, pos).map((seg: any) => seg.text)
 }
 
 // YouTube IFrame API

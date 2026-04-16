@@ -141,10 +141,10 @@ _tokenizer = Tokenizer()
 
 
 def _load_jlpt_vocab(conn: sqlite3.Connection) -> dict:
-    """Load JLPT vocab map if the vocabulary table exists."""
+    """Load JLPT vocab map (expression → {level, meaning}) if the vocabulary table exists."""
     try:
-        rows = conn.execute("SELECT expression, jlpt_level FROM vocabulary WHERE jlpt_level IS NOT NULL").fetchall()
-        return {row[0]: row[1] for row in rows}
+        rows = conn.execute("SELECT expression, jlpt_level, meaning FROM vocabulary WHERE jlpt_level IS NOT NULL").fetchall()
+        return {row[0]: {"level": row[1], "meaning": row[2]} for row in rows}
     except sqlite3.OperationalError:
         return {}
 
@@ -218,17 +218,17 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
         candidates = []
         for i, token in enumerate(tokens):
             pos = token.part_of_speech.split(",")[0]
-            jlpt = jlpt_vocab.get(token.surface) or jlpt_vocab.get(token.base_form)
+            vocab_entry = jlpt_vocab.get(token.surface) or jlpt_vocab.get(token.base_form)
 
-            if jlpt is not None:
-                candidates.append((i, token, jlpt))
+            if vocab_entry is not None:
+                candidates.append((i, token, vocab_entry["level"], vocab_entry.get("meaning", "")))
             elif pos in ["助詞", "動詞"] and len(token.surface) > 0:
-                candidates.append((i, token, None))
+                candidates.append((i, token, None, ""))
 
         if not candidates:
             continue
 
-        idx, chosen, jlpt_level = random.choice(candidates)
+        idx, chosen, jlpt_level, word_meaning = random.choice(candidates)
         correct_answer = chosen.surface
         pos = chosen.part_of_speech.split(",")[0]
 
@@ -238,11 +238,14 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
             parts.append("[＿＿＿]" if j == idx else token.surface)
         question_sentence = "".join(parts)
 
-        # Translate full sentence as hint
-        try:
-            hint_chinese = translate_text(sentence, target="zh-TW")
-        except Exception:
-            hint_chinese = ""
+        # Use vocabulary meaning as hint if available; fall back to sentence translation
+        if word_meaning:
+            hint_chinese = word_meaning
+        else:
+            try:
+                hint_chinese = translate_text(sentence, target="zh-TW")
+            except Exception:
+                hint_chinese = ""
 
         exercise_id = str(uuid.uuid4())
         conn.execute('''
