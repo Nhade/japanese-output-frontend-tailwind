@@ -7,6 +7,27 @@ import { useToastStore } from '../stores/toast';
 import MarkdownIt from 'markdown-it';
 import { useI18n } from 'vue-i18n';
 
+interface Exercise {
+  exercise_id: string;
+  question_sentence: string;
+  hint_chinese: string;
+  correct_answer?: string;
+  part_of_speech?: string;
+  jlpt_level?: number | null;
+  choices?: string[];
+}
+
+interface Feedback {
+  is_correct: boolean;
+  correct_answer: string;
+  log_id: string;
+  focus_diff?: Record<string, unknown>;
+  feedback?: string;
+  score?: number;
+  error_type?: string;
+  retry_count?: number;
+}
+
 const { t } = useI18n();
 
 const md = new MarkdownIt({
@@ -15,19 +36,19 @@ const md = new MarkdownIt({
   typographer: true
 });
 
-const exercise = ref(null);
-const feedback = ref(null);
-const detailedFeedback = ref(null);
+const exercise = ref<Exercise | null>(null);
+const feedback = ref<Feedback | null>(null);
+const detailedFeedback = ref<string | null>(null);
 const showDetailModal = ref(false);
-const detailedError = ref(null);
+const detailedError = ref<string | null>(null);
 const isLoading = ref(true);
 const isLoadingDetailed = ref(false);
 const auth = useAuthStore();
 const toastStore = useToastStore();
 const userAnswer = ref('');
 const showHint = ref(false);
-const nextQuestionButton = ref(null);
-const answerInput = ref(null);
+const nextQuestionButton = ref<HTMLButtonElement | null>(null);
+const answerInput = ref<HTMLInputElement | null>(null);
 const exerciseMode = ref<'typing' | 'mcq'>('typing');
 const selectedChoice = ref<string | null>(null);
 const choices = ref<string[]>([]);
@@ -212,7 +233,7 @@ async function fetchDetailedFeedback() {
 }
 
 
-function handleKeydown(event) {
+function handleKeydown(event: KeyboardEvent) {
   if (event.altKey && event.key === 'h') {
     event.preventDefault();
     revealHint();
