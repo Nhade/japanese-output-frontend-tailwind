@@ -58,7 +58,22 @@
         "focus_toast_progress": "學習重點 ({tag})：{progress} / {target}",
         "mode_typing": "手動輸入",
         "mode_mcq": "選擇題",
-        "choose_answer": "選擇正確答案"
+        "choose_answer": "選擇正確答案",
+        "hint_label": "提示",
+        "mastered": "已掌握",
+        "retried": "重試",
+        "kbd_submit_hint": "檢查答案",
+        "kbd_hint_hint": "顯示提示",
+        "no_brief_note": "尚無簡短說明 — 點擊「解釋」查看完整解析。",
+        "eyebrow_fill_blank": "填入空白",
+        "eyebrow_your_reading": "你的解讀",
+        "eyebrow_your_answer": "你的答案",
+        "eyebrow_options": "選項",
+        "eyebrow_hint": "提示",
+        "eyebrow_reading_confirmed": "解讀已確認",
+        "eyebrow_revision": "修正",
+        "eyebrow_selected": "已選",
+        "explain_in_full": "完整解析"
     },
     "mistakes": {
         "title": "過去的錯誤",

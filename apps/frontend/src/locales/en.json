@@ -58,7 +58,22 @@
         "focus_toast_progress": "Focus ({tag}): {progress} / {target}",
         "mode_typing": "Typing",
         "mode_mcq": "Multiple Choice",
-        "choose_answer": "Choose the correct answer"
+        "choose_answer": "Choose the correct answer",
+        "hint_label": "Hint",
+        "mastered": "Mastered",
+        "retried": "Retried",
+        "kbd_submit_hint": "to check",
+        "kbd_hint_hint": "for hint",
+        "no_brief_note": "No brief yet — tap Explain for a full breakdown.",
+        "eyebrow_fill_blank": "Fill the blank",
+        "eyebrow_your_reading": "Your reading",
+        "eyebrow_your_answer": "Your answer",
+        "eyebrow_options": "Options",
+        "eyebrow_hint": "Hint",
+        "eyebrow_reading_confirmed": "Reading confirmed",
+        "eyebrow_revision": "Revision",
+        "eyebrow_selected": "Selected",
+        "explain_in_full": "Explain in full"
     },
     "mistakes": {
         "title": "Past Mistakes",

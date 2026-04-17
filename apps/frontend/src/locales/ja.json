@@ -58,7 +58,22 @@
         "focus_toast_progress": "学習重点 ({tag}): {progress} / {target}",
         "mode_typing": "入力モード",
         "mode_mcq": "選択問題",
-        "choose_answer": "正しい答えを選んでください"
+        "choose_answer": "正しい答えを選んでください",
+        "hint_label": "ヒント",
+        "mastered": "正解",
+        "retried": "再挑戦",
+        "kbd_submit_hint": "で確認",
+        "kbd_hint_hint": "でヒント",
+        "no_brief_note": "簡易解説はまだありません — 「解説」をタップして詳細を表示。",
+        "eyebrow_fill_blank": "空欄を埋めて",
+        "eyebrow_your_reading": "あなたの読み",
+        "eyebrow_your_answer": "あなたの答え",
+        "eyebrow_options": "選択肢",
+        "eyebrow_hint": "ヒント",
+        "eyebrow_reading_confirmed": "正解の確認",
+        "eyebrow_revision": "訂正",
+        "eyebrow_selected": "選択",
+        "explain_in_full": "詳しく解説"
     },
     "mistakes": {
         "title": "過去の間違い",
