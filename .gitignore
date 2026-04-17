@@ -2,6 +2,7 @@
 .DS_Store
 .vscode/
 .idea/
+.claude/
 *.log
 
 # Dependencies
@@ -35,3 +36,6 @@ data/
 test_openai_tts.py
 *.wav
 *.pem
+
+# Design references (kept locally only)
+shiori-design-system.md
