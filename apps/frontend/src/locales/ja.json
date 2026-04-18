@@ -214,6 +214,24 @@
         "analysis_ready": "添削を確認",
         "analysis_pending": "添削を書いています…"
     },
+    "settings": {
+        "title": "ユーザー設定",
+        "eyebrow": "設定",
+        "heading": "学習の好み",
+        "subtitle": "先生の語り口と難易度をあなたに合わせます。",
+        "jlpt_level": "推定JLPTレベル",
+        "feedback_preference": "添削のスタイル",
+        "pref_gentle": "やさしめ",
+        "pref_normal": "ふつう",
+        "pref_strict": "きびしめ",
+        "pref_gentle_desc": "控えめな添削。挑戦を後押しします。",
+        "pref_normal_desc": "バランスの取れた添削。既定の設定です。",
+        "pref_strict_desc": "細部まで指摘。じっくり読み直したい方へ。",
+        "save": "設定を保存",
+        "saving": "保存中…",
+        "close": "閉じる",
+        "saved_success": "設定を保存しました。"
+    },
     "pos": {
         "general": "一般",
         "名詞": "名詞",

@@ -216,12 +216,20 @@
     },
     "settings": {
         "title": "使用者設定",
+        "eyebrow": "偏好",
+        "heading": "學習偏好",
+        "subtitle": "調整老師的語氣，以及為你量身挑選的難度。",
         "jlpt_level": "JLPT 預估等級",
         "feedback_preference": "回饋風格",
-        "pref_gentle": "溫和 (鼓勵為主)",
-        "pref_normal": "一般 (平衡)",
-        "pref_strict": "嚴格 (詳細糾錯)",
+        "pref_gentle": "溫和",
+        "pref_normal": "一般",
+        "pref_strict": "嚴格",
+        "pref_gentle_desc": "溫和糾正，以鼓勵為主。",
+        "pref_normal_desc": "平衡的批註——預設值。",
+        "pref_strict_desc": "細微之處皆指出，請耐心閱讀。",
         "save": "儲存設定",
+        "saving": "儲存中…",
+        "close": "關閉",
         "saved_success": "設定已儲存。"
     },
     "pos": {

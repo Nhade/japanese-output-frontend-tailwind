@@ -179,12 +179,30 @@ onMounted(async () => {
   if (saved) {
     try {
       const parsed = JSON.parse(saved) as Message[];
-      // Older persisted entries may lack a time field — backfill with a
-      // stable placeholder so the template doesn't error out.
-      messages.value = parsed.map(m => ({
+      const migrated = parsed.map(m => ({
         ...m,
         time: m.time || new Date().toISOString(),
       }));
+      // Legacy persisted data attached feedback to the assistant turn.
+      // The redesigned UI renders feedback under the preceding user turn,
+      // so migrate each assistant feedback onto the user message before it.
+      for (let i = 0; i < migrated.length; i++) {
+        const m = migrated[i];
+        if (m.role === 'assistant' && m.feedback) {
+          for (let j = i - 1; j >= 0; j--) {
+            if (migrated[j].role === 'user') {
+              if (!migrated[j].feedback) {
+                migrated[j].feedback = m.feedback;
+                migrated[j].showFeedback = false;
+              }
+              break;
+            }
+          }
+          delete m.feedback;
+          delete m.showFeedback;
+        }
+      }
+      messages.value = migrated;
       scrollToBottom();
     } catch (e) {
       console.error('Failed to load chat history', e);
@@ -415,8 +433,12 @@ watch(messages, (val) => {
    Shell — pinned height so chat header stays visible while only
    the message stream scrolls. App.vue's main has pt-16 (64px).
 -------------------------------------------------------------- */
+/* Top nav is pt-16 (4rem). TheFooter is fixed to the bottom of the
+   viewport at ~45px tall (see TheFooter.vue); the workspace shrinks
+   to clear it so the composer/disclaimer aren't hidden underneath. */
 .chat-shell {
   min-height: calc(100vh - 4rem);
+  padding-bottom: 3rem;
   background-image: linear-gradient(
     180deg,
     var(--background) 0%,
@@ -425,7 +447,7 @@ watch(messages, (val) => {
 }
 
 .ch-workspace-page {
-  height: calc(100dvh - 4rem);
+  height: calc(100dvh - 4rem - 3rem);
   max-width: 1260px;
   width: 100%;
   margin: 0 auto;
@@ -435,7 +457,7 @@ watch(messages, (val) => {
   min-height: 0;
 }
 @media (max-width: 900px) {
-  .ch-workspace-page { padding: 0 20px; height: auto; min-height: calc(100vh - 4rem); }
+  .ch-workspace-page { padding: 0 20px; height: auto; min-height: calc(100vh - 4rem - 3rem); }
 }
 
 /* Header ------------------------------------------------------ */

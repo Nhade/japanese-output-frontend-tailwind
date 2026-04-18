@@ -216,12 +216,20 @@
     },
     "settings": {
         "title": "User Settings",
+        "eyebrow": "Preferences",
+        "heading": "Study preferences",
+        "subtitle": "Tune the tutor's voice and the level it pitches to.",
         "jlpt_level": "Est. JLPT Level",
         "feedback_preference": "Feedback Style",
         "pref_gentle": "Gentle",
         "pref_normal": "Normal",
         "pref_strict": "Strict",
+        "pref_gentle_desc": "Soft corrections; encourages exploration.",
+        "pref_normal_desc": "Balanced commentary — the editorial default.",
+        "pref_strict_desc": "Every nuance flagged; read with patience.",
         "save": "Save Settings",
+        "saving": "Saving…",
+        "close": "Close",
         "saved_success": "Settings saved successfully."
     },
     "pos": {
