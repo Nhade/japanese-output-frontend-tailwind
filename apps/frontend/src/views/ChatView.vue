@@ -433,12 +433,10 @@ watch(messages, (val) => {
    Shell — pinned height so chat header stays visible while only
    the message stream scrolls. App.vue's main has pt-16 (64px).
 -------------------------------------------------------------- */
-/* Top nav is pt-16 (4rem). TheFooter is fixed to the bottom of the
-   viewport at ~45px tall (see TheFooter.vue); the workspace shrinks
-   to clear it so the composer/disclaimer aren't hidden underneath. */
+/* Top nav is fixed at ~4rem; footer is now static (sits below the
+   content flow), so the workspace fills the full content area. */
 .chat-shell {
   min-height: calc(100vh - 4rem);
-  padding-bottom: 3rem;
   background-image: linear-gradient(
     180deg,
     var(--background) 0%,
@@ -447,7 +445,7 @@ watch(messages, (val) => {
 }
 
 .ch-workspace-page {
-  height: calc(100dvh - 4rem - 3rem);
+  height: calc(100dvh - 4rem);
   max-width: 1260px;
   width: 100%;
   margin: 0 auto;
@@ -457,7 +455,7 @@ watch(messages, (val) => {
   min-height: 0;
 }
 @media (max-width: 900px) {
-  .ch-workspace-page { padding: 0 20px; height: auto; min-height: calc(100vh - 4rem - 3rem); }
+  .ch-workspace-page { padding: 0 20px; height: auto; min-height: calc(100vh - 4rem); }
 }
 
 /* Header ------------------------------------------------------ */
