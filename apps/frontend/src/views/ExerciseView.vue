@@ -333,7 +333,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="exercise-shell relative min-h-[calc(100vh-4rem)] text-foreground">
+  <main class="exercise-shell relative text-foreground">
     <div class="mx-auto max-w-6xl px-6 md:px-12 pt-6 md:pt-8 pb-12 md:pb-16">
       <!-- Initial load -->
       <div v-if="isLoading" class="flex items-center justify-center py-32">
@@ -606,6 +606,7 @@ onUnmounted(() => {
    spread sits on top, anchored by the global app shell.
 -------------------------------------------------------------------- */
 .exercise-shell {
+  min-height: calc(100vh - var(--app-chrome-h));
   background-image: linear-gradient(
     180deg,
     var(--background) 0%,

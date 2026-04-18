@@ -1,5 +1,5 @@
 <template>
-  <main class="grid min-h-[calc(100vh-4rem)] place-items-center px-4 text-zinc-900 dark:text-zinc-100">
+  <main class="grid place-items-center px-4 text-zinc-900 dark:text-zinc-100">
     <section
       class="w-full max-w-md rounded-2xl border p-6 shadow-xl bg-white border-zinc-200 shadow-zinc-200/50 dark:bg-zinc-900/60 dark:border-white/5 dark:shadow-black/30">
       <div class="mb-8 text-center">

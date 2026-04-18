@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 pt-10 min-h-screen text-zinc-900 dark:text-zinc-100 font-sans pb-24">
+  <div class="p-6 pt-10 min-h-[calc(100vh-var(--app-chrome-h))] text-zinc-900 dark:text-zinc-100 font-sans pb-24">
     <div class="max-w-7xl mx-auto space-y-8">
 
       <!-- Header Section -->

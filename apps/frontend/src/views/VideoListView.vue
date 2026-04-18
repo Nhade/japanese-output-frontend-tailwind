@@ -327,7 +327,7 @@ onMounted(() => {
 
 <style scoped>
 .videos-shell {
-  min-height: calc(100vh - 4rem);
+  min-height: calc(100vh - var(--app-chrome-h));
   background-image: linear-gradient(
     180deg,
     var(--background) 0%,

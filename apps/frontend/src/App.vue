@@ -29,7 +29,7 @@ watch(locale, (newLocale) => {
     <ToastNotification :show="toastStore.show" :message="toastStore.message" :type="toastStore.type"
       @close="toastStore.close" />
     <main
-      class="main-content pt-16 min-h-screen bg-zinc-50 dark:bg-zinc-900 dark:bg-linear-to-b dark:from-zinc-900 dark:to-zinc-950 transition-colors duration-300">
+      class="main-content pt-16 bg-zinc-50 dark:bg-zinc-900 dark:bg-linear-to-b dark:from-zinc-900 dark:to-zinc-950 transition-colors duration-300">
       <router-view v-slot="{ Component }">
         <transition name="page" mode="out-in">
           <component :is="Component" />

@@ -24,11 +24,17 @@ const currentYear = computed(() => new Date().getFullYear());
 .site-footer {
   background: var(--background);
   border-top: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
+  /* Fixed chrome height — view shells subtract this from 100vh so
+     single-screen layouts fit without introducing a scroll. */
+  height: var(--footer-h);
+  display: flex;
+  align-items: center;
 }
 .site-footer-inner {
+  width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 18px 32px;
+  padding: 0 32px;
   display: flex;
   align-items: baseline;
   gap: 14px;
