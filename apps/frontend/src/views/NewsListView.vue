@@ -126,7 +126,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="news-shell text-foreground">
+  <main class="news-shell ei-shell-bg text-foreground">
     <div class="list-page">
       <!-- Masthead ------------------------------------------------ -->
       <header class="masthead">
@@ -258,13 +258,10 @@ onMounted(() => {
 /* --------------------------------------------------------------
    Warm paper surface — mirrors ExerciseView's vertical gradient.
 -------------------------------------------------------------- */
+/* .news-shell also carries the global `.ei-shell-bg` utility for the
+   paper gradient; this block just adds the per-view min-height. */
 .news-shell {
   min-height: calc(100vh - var(--app-chrome-h));
-  background-image: linear-gradient(
-    180deg,
-    var(--background) 0%,
-    var(--surface-container-low) 100%
-  );
 }
 
 .list-page {
@@ -333,55 +330,11 @@ onMounted(() => {
   .masthead-meta { align-items: flex-start; }
 }
 
-/* Filter bar — editorial, not a boxy toolbar ------------------ */
-.filter-bar {
-  display: flex;
-  align-items: baseline;
-  gap: 40px;
-  flex-wrap: wrap;
-  padding: 18px 0 30px;
-  margin-bottom: 40px;
-  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
-}
-.filter-group {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-}
-.filter-label {
-  font-family: var(--font-sans);
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  font-size: 0.62rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--foreground) 50%, transparent);
-}
-.chip-row {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-.chip {
-  font-family: var(--font-sans);
-  font-size: 0.78rem;
-  padding: 6px 12px;
-  color: color-mix(in oklab, var(--foreground) 65%, transparent);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  border-bottom: 1px solid transparent;
-  transition: color 160ms ease, border-color 160ms ease;
-  letter-spacing: 0.01em;
-}
+/* Filter bar primitives (.filter-bar/.chip/.filter-clear) are global —
+   see styles/editorial.css. This block keeps only view-specific extras. */
 .chip-jp {
   font-family: var(--font-sans), 'Noto Sans JP';
   font-size: 0.85rem;
-}
-.chip:hover { color: var(--foreground); }
-.chip.is-active {
-  color: var(--primary);
-  border-bottom-color: var(--secondary);
-  font-weight: 500;
 }
 .date-input {
   font-family: var(--font-serif);
@@ -397,19 +350,6 @@ onMounted(() => {
   cursor: pointer;
 }
 .date-input:focus { border-bottom-color: var(--primary); }
-.filter-clear {
-  font-family: var(--font-sans);
-  font-size: 0.7rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--foreground) 40%, transparent);
-  margin-left: auto;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 6px 0;
-}
-.filter-clear:hover { color: var(--secondary); }
 
 /* Lead article ----------------------------------------------- */
 .lead-article {
@@ -484,30 +424,8 @@ onMounted(() => {
   background: var(--secondary);
 }
 
-/* Today's Edition section ------------------------------------ */
-.section-title-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 36px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
-}
-.section-title {
-  font-family: var(--font-serif);
-  font-size: 1.3rem;
-  color: var(--foreground);
-  margin: 0;
-  font-weight: 500;
-}
-.section-count {
-  font-family: var(--font-sans);
-  font-size: 0.7rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--foreground) 50%, transparent);
-}
-
+/* .section-title-row/.section-title/.section-count are global — see
+   styles/editorial.css. */
 .article-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -575,12 +493,5 @@ onMounted(() => {
 }
 
 /* Empty / loading ------------------------------------------- */
-.empty-state {
-  padding: 72px 0;
-  text-align: center;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 1.05rem;
-  color: color-mix(in oklab, var(--foreground) 55%, transparent);
-}
+/* .empty-state is global — see styles/editorial.css. */
 </style>

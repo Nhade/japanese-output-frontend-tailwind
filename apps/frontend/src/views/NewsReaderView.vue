@@ -265,7 +265,7 @@ watch(() => route.params.id, async (newId) => {
 </script>
 
 <template>
-  <main class="reader-shell text-foreground">
+  <main class="reader-shell ei-shell-bg text-foreground">
     <!-- Kohaku ink-wash scroll progress -->
     <div class="progress-wash" :style="{ width: `${progress}%` }" aria-hidden="true" />
 
@@ -418,12 +418,8 @@ watch(() => route.params.id, async (newId) => {
 <style scoped>
 .reader-shell {
   min-height: calc(100vh - var(--app-chrome-h));
-  background-image: linear-gradient(
-    180deg,
-    var(--background) 0%,
-    var(--surface-container-low) 100%
-  );
   position: relative;
+  /* paper gradient comes from the global .ei-shell-bg utility */
 }
 
 .reader-page {
@@ -453,28 +449,8 @@ watch(() => route.params.id, async (newId) => {
 }
 
 /* Back link --------------------------------------------------- */
-.reader-back {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 10px;
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--foreground) 55%, transparent);
-  padding: 8px 0;
-  margin-bottom: 40px;
-  cursor: pointer;
-  background: none;
-  border: none;
-  transition: color 180ms ease, gap 200ms ease;
-}
-.reader-back:hover { color: var(--primary); gap: 14px; }
-.reader-back .arrow {
-  font-family: var(--font-serif);
-  font-size: 0.95rem;
-  font-style: italic;
-}
+/* .reader-back is global — see styles/editorial.css. */
+.reader-back { margin-bottom: 40px; }
 
 .reader-loading {
   padding: 96px 0;

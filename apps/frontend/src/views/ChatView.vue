@@ -227,7 +227,7 @@ watch(messages, (val) => {
 </script>
 
 <template>
-  <main class="chat-shell text-foreground">
+  <main class="chat-shell ei-shell-bg text-foreground">
     <div class="ch-workspace-page">
       <!-- Unified masthead ---------------------------------------- -->
       <header class="ch-header">
@@ -438,11 +438,7 @@ watch(messages, (val) => {
    screen without pushing the footer below the fold. */
 .chat-shell {
   min-height: calc(100vh - var(--app-chrome-h));
-  background-image: linear-gradient(
-    180deg,
-    var(--background) 0%,
-    var(--surface-container-low) 100%
-  );
+  /* paper gradient comes from the global .ei-shell-bg utility */
 }
 
 .ch-workspace-page {
@@ -969,13 +965,5 @@ watch(messages, (val) => {
 }
 
 /* Eyebrow helpers — scoped versions matching design mock ------ */
-.eyebrow-sm {
-  font-family: var(--font-sans);
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  font-size: 0.62rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--foreground) 55%, transparent);
-}
-.eyebrow-kohaku { color: var(--secondary); }
+/* .eyebrow-sm / .eyebrow-kohaku are global — see styles/editorial.css. */
 </style>

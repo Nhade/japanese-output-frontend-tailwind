@@ -170,7 +170,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="practice-shell text-foreground">
+  <main class="practice-shell ei-shell-bg text-foreground">
     <div class="practice-page">
       <!-- Quiet desk header --------------------------------- -->
       <header class="practice-header">
@@ -363,14 +363,10 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* Shell + warm tokens --------------------------------------- */
+/* Shell + warm tokens ---------------------------------------
+   The paper gradient comes from the global `.ei-shell-bg` utility. */
 .practice-shell {
   min-height: calc(100vh - var(--app-chrome-h));
-  background-image: linear-gradient(
-    180deg,
-    var(--background) 0%,
-    var(--surface-container-low) 100%
-  );
   --ink-soft: color-mix(in oklab, var(--foreground) 62%, transparent);
   --ink-faint: color-mix(in oklab, var(--foreground) 38%, transparent);
   --rule: color-mix(in oklab, var(--foreground) 12%, transparent);
@@ -515,83 +511,11 @@ onUnmounted(() => {
   40% { opacity: 1; }
 }
 
-/* Filter bar ------------------------------------------------- */
-.filter-bar {
-  display: flex;
-  align-items: baseline;
-  gap: 40px;
-  flex-wrap: wrap;
-  padding: 0 0 22px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid var(--rule-soft);
-}
+/* Filter bar + section title primitives are global — see
+   styles/editorial.css. Only practice-specific overrides stay here. */
 .practice-filter-bar { padding-top: 0; margin-bottom: 28px; }
-.filter-group { display: flex; align-items: baseline; gap: 14px; }
-.filter-label {
-  font-family: var(--font-sans);
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  font-size: 0.62rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--foreground) 50%, transparent);
-}
-.chip-row { display: flex; gap: 4px; flex-wrap: wrap; }
-.chip {
-  font-family: var(--font-sans);
-  font-size: 0.78rem;
-  padding: 6px 12px;
-  color: color-mix(in oklab, var(--foreground) 65%, transparent);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  border-bottom: 1px solid transparent;
-  transition: color 160ms ease, border-color 160ms ease;
-}
-.chip:hover { color: var(--foreground); }
-.chip.is-active {
-  color: var(--primary);
-  border-bottom-color: var(--secondary);
-  font-weight: 500;
-}
-.filter-clear {
-  font-family: var(--font-sans);
-  font-size: 0.7rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  margin-left: auto;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 6px 0;
-}
-.filter-clear:hover { color: var(--secondary); }
-
-/* Section title row ---------------------------------------- */
-.section-title-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 0;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--rule);
-}
 .practice-section-row { margin-top: 12px; }
-.section-title {
-  font-family: var(--font-serif);
-  font-size: 1.3rem;
-  color: var(--foreground);
-  margin: 0;
-  font-weight: 500;
-}
-.section-count {
-  font-family: var(--font-sans);
-  font-size: 0.7rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--foreground) 50%, transparent);
-  margin-left: 14px;
-}
+.section-count { margin-left: 14px; }
 
 /* Spread entries ------------------------------------------- */
 .errata-list {
@@ -747,16 +671,7 @@ onUnmounted(() => {
   font-size: 1.05rem;
 }
 
-/* Eyebrow helpers ------------------------------------------ */
-.eyebrow-sm {
-  font-family: var(--font-sans);
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  font-size: 0.62rem;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--foreground) 55%, transparent);
-}
-.eyebrow-kohaku { color: var(--secondary); }
+/* .eyebrow-sm / .eyebrow-kohaku are global — see styles/editorial.css. */
 
 /* Daily review dialog (glass overlay) ---------------------- */
 .review-overlay {

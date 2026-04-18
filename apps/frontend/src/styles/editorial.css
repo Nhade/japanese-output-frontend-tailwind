@@ -1,0 +1,162 @@
+/* ------------------------------------------------------------------ */
+/*  Editorial Intelligence — shared primitives                         */
+/*                                                                     */
+/*  Classes shared across the redesigned views (News, Videos, Chat,    */
+/*  Mistakes, Auth, Exercise). Keeping them global avoids repeating    */
+/*  near-identical scoped blocks in every SFC.                         */
+/*                                                                     */
+/*  Conventions:                                                       */
+/*    • Layout + one-off chrome stays in each view's <style scoped>.   */
+/*    • Typography atoms (.eyebrow*), filter chips, back link,         */
+/*      section titles and the paper gradient live here.               */
+/*    • Extend per-view by adding more specific modifier classes       */
+/*      (`.chip-jp`, `.errata-strike`) in the view's scoped block.     */
+/* ------------------------------------------------------------------ */
+
+/* Paper gradient — applied on the outermost "shell" of warm views.   */
+.ei-shell-bg {
+  background-image: linear-gradient(
+    180deg,
+    var(--background) 0%,
+    var(--surface-container-low) 100%
+  );
+}
+
+/* Eyebrow helpers ---------------------------------------------------- */
+.eyebrow,
+.eyebrow-sm {
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-weight: 500;
+}
+.eyebrow {
+  font-size: 0.68rem;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+}
+.eyebrow-sm {
+  font-size: 0.62rem;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+}
+.eyebrow-kohaku { color: var(--secondary); }
+.eyebrow-indigo { color: var(--primary); }
+
+/* Filter bar (chips + date) ------------------------------------------ */
+.filter-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 40px;
+  flex-wrap: wrap;
+  padding: 18px 0 30px;
+  margin-bottom: 40px;
+  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+.filter-group {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.filter-label {
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--foreground) 50%, transparent);
+}
+.chip-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.chip {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  padding: 6px 12px;
+  color: color-mix(in oklab, var(--foreground) 65%, transparent);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: color 160ms ease, border-color 160ms ease;
+  letter-spacing: 0.01em;
+}
+.chip:hover { color: var(--foreground); }
+.chip.is-active {
+  color: var(--primary);
+  border-bottom-color: var(--secondary);
+  font-weight: 500;
+}
+.filter-clear {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 40%, transparent);
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 0;
+}
+.filter-clear:hover { color: var(--secondary); }
+
+/* Section title row (paired hairline under a H3 + count) ------------ */
+.section-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 36px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+.section-title {
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  color: var(--foreground);
+  margin: 0;
+  font-weight: 500;
+}
+.section-count {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 50%, transparent);
+}
+
+/* Back link (used on reader/study/video-study views) ---------------- */
+.reader-back {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+  padding: 8px 0;
+  cursor: pointer;
+  background: none;
+  border: none;
+  transition: color 180ms ease, gap 200ms ease;
+}
+.reader-back:hover {
+  color: var(--primary);
+  gap: 14px;
+}
+.reader-back .arrow {
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
+/* Empty state -------------------------------------------------------- */
+.empty-state {
+  padding: 72px 0;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+}

@@ -174,81 +174,10 @@ async function register() {
 </template>
 
 <style scoped>
-.auth-heading {
-  font-family: var(--font-serif);
-  font-size: clamp(34px, 2.5vw + 1.4rem, 44px);
-  line-height: 1.05;
-  font-weight: 500;
-  margin: 0 0 12px 0;
-  letter-spacing: -0.015em;
-  color: var(--foreground);
-}
-.auth-heading .emphasis {
-  font-style: italic;
-  color: var(--secondary);
-}
-.auth-sub {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 15px;
-  color: color-mix(in oklab, var(--foreground) 62%, transparent);
-  margin: 0 0 36px 0;
-  line-height: 1.6;
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-
-/* Underline field w/ floating margin label ------------------- */
-.auth-field {
-  position: relative;
-  padding-top: 18px;
-}
-.auth-field-label {
-  position: absolute;
-  left: 0;
-  top: 24px;
-  font-family: var(--font-sans);
-  font-size: 14px;
-  color: color-mix(in oklab, var(--foreground) 60%, transparent);
-  pointer-events: none;
-  transition: top 200ms ease, font-size 200ms ease, color 200ms ease, letter-spacing 200ms ease;
-}
-.auth-field.is-active .auth-field-label {
-  top: 0;
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-.auth-field.is-focused .auth-field-label {
-  color: var(--primary);
-}
-.auth-field-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 8px 0;
-  font-family: var(--font-serif);
-  font-size: 16px;
-  color: var(--foreground);
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 20%, transparent);
-  outline: none;
-  transition: border-color 180ms ease;
-}
-.auth-field.is-focused .auth-field-input {
-  border-bottom-color: var(--primary);
-  border-bottom-width: 2px;
-  padding-bottom: 7px;
-}
-.auth-field-input::placeholder {
-  color: color-mix(in oklab, var(--foreground) 35%, transparent);
-  font-style: italic;
-}
+/* Shared auth form atoms (.auth-heading, .auth-field*, .auth-cta,
+   .auth-divider*, .auth-toggle*) are global — see styles/auth.css.
+   The blocks below are register-only: strength meter, legal note and
+   success block. */
 
 /* Strength meter --------------------------------------------- */
 .strength-meter {
@@ -290,42 +219,10 @@ async function register() {
   color: color-mix(in oklab, var(--foreground) 60%, transparent);
 }
 
-/* CTA -------------------------------------------------------- */
-.auth-cta {
-  margin-top: 4px;
-  width: 100%;
-  padding: 14px 20px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--background);
-  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-container) 100%);
-  border: none;
-  border-radius: 2px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
-  box-shadow: 0 2px 0 color-mix(in oklab, var(--primary) 16%, transparent);
-}
-.auth-cta:hover:not(:disabled) {
-  transform: translateY(3px);
-  box-shadow: 0 8px 24px color-mix(in oklab, var(--primary) 22%, transparent);
-}
-.auth-cta:active:not(:disabled) { transform: translateY(2px); }
-.auth-cta:disabled { opacity: 0.55; cursor: not-allowed; }
+/* Register-specific CTA override — sits closer to the margin note
+   above (shared .auth-cta has a larger default top margin). */
+.auth-cta { margin-top: 4px; }
 
-.auth-error {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 14px;
-  color: var(--destructive);
-}
 .auth-success {
   padding: 14px 18px;
   background: var(--surface-container-low);
@@ -344,47 +241,4 @@ async function register() {
   line-height: 1.6;
 }
 
-/* Divider + toggle ------------------------------------------- */
-.auth-divider {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--foreground) 40%, transparent);
-  font-weight: 600;
-  margin: 4px 0;
-}
-.auth-divider-rule {
-  flex: 1;
-  height: 1px;
-  background: color-mix(in oklab, var(--foreground) 12%, transparent);
-}
-.auth-toggle {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 14px;
-  font-family: var(--font-serif);
-  font-size: 14px;
-  color: color-mix(in oklab, var(--foreground) 62%, transparent);
-}
-.auth-toggle-link {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--primary);
-  border-bottom: 1px solid var(--primary);
-  padding: 2px 0;
-  text-decoration: none;
-  transition: border-color 160ms ease, color 160ms ease;
-}
-.auth-toggle-link:hover {
-  color: var(--primary-container);
-  border-bottom-color: var(--secondary);
-}
 </style>
