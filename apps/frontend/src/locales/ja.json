@@ -13,7 +13,14 @@
     "common": {
         "language": "言語",
         "title": "栞",
-        "loading": "読み込み中..."
+        "loading": "読み込み中...",
+        "divider_or": "または"
+    },
+    "chrome": {
+        "colophon": "奥付",
+        "edition": "栞 · {year}年版",
+        "toggle_theme_dark": "ダークモードに切り替える",
+        "toggle_theme_light": "ライトモードに切り替える"
     },
     "auth": {
         "login_title": "おかえりなさい",
@@ -31,10 +38,10 @@
         "register_link": "こちらから登録",
         "login_link": "こちらからログイン",
         "error_generic": "エラーが発生しました。もう一度お試しください。",
-        "cover_headline_1": "読むことは、",
-        "cover_headline_2": "訪れる",
-        "cover_headline_3": "場所。",
-        "cover_descriptor": "Shiori は、あなたがすでに親しんでいる記事・映画・音楽と、間隔反復の復習問題を結び合わせます。日本語は「教科」ではなく、あなたが通う場所になります。",
+        "cover_headline_1": "好きになった",
+        "cover_headline_2": "あの言葉を、",
+        "cover_headline_3": "自分のものに。",
+        "cover_descriptor": "Shiori は、あなたがすでに親しんでいる記事・映画・音楽と、間隔反復の復習問題を結びつけます。一日、少しずつ。",
         "cover_caption_ja": "日々、少しずつ。",
         "eyebrow_return": "棚に戻る",
         "eyebrow_join": "読書室に参加",
@@ -54,7 +61,7 @@
         "has_account_line": "すでに棚をお持ちですか？",
         "to_register": "アカウント作成",
         "to_login": "ログイン",
-        "strength_label": "パスフレーズ",
+        "strength_label": "強度",
         "strength_1": "脆い",
         "strength_2": "普通",
         "strength_3": "確か",
@@ -67,7 +74,7 @@
         "show_hint": "ヒントを表示",
         "correct": "正解！",
         "incorrect": "不正解。",
-        "correct_answer_label": "正解：",
+        "correct_answer_label": "正解",
         "feedback_label": "フィードバック",
         "score": "スコア：",
         "ai_analysis": "AI 分析",
@@ -102,7 +109,10 @@
         "eyebrow_reading_confirmed": "正解の確認",
         "eyebrow_revision": "訂正",
         "eyebrow_selected": "選択",
-        "explain_in_full": "詳しく解説"
+        "explain_in_full": "詳しく解説",
+        "error_title": "机の上には、まだ何もありません。",
+        "error_body": "問題を取り寄せられませんでした。少し待ってから、もう一度お試しください。",
+        "error_retry": "もう一度試す"
     },
     "mistakes": {
         "title": "過去の間違い",
@@ -139,7 +149,8 @@
         "view_review": "クリックしてパーソナライズされた学習プランを表示",
         "login_required": "間違いを表示するにはログインしてください。",
         "load_error": "間違いの読み込みに失敗しました。",
-        "agent_working": "AI エージェント作業中..."
+        "agent_working": "AI エージェント作業中...",
+        "strike_aria": "誤答：{answer}"
     },
     "statistics": {
         "title": "統計",

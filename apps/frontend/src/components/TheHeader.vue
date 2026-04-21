@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
-import { useThemeStore } from '../stores/theme';
 
 import ThemeToggle from './ThemeToggle.vue';
 import LanguageSelector from './LanguageSelector.vue';
 
 const authStore = useAuthStore();
-const themeStore = useThemeStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -18,10 +16,6 @@ function logout() {
   authStore.logout();
   router.push('/login');
 }
-
-onMounted(() => {
-  themeStore.initTheme();
-});
 
 // Exercise is mounted at "/", so treat any descendant of "/" that isn't
 // another top-level route as the active one.

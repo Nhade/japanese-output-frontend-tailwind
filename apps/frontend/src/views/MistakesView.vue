@@ -303,7 +303,7 @@ onUnmounted(() => {
               <template v-if="splitSentence(m.question_sentence).hasBlank">
                 {{ splitSentence(m.question_sentence).before }}<span
                   class="errata-strike"
-                  :aria-label="`Incorrect: ${m.user_answer}`"
+                  :aria-label="$t('mistakes.strike_aria', { answer: m.user_answer })"
                 >{{ m.user_answer }}</span>{{ splitSentence(m.question_sentence).after }}
               </template>
               <template v-else>{{ m.question_sentence }}</template>

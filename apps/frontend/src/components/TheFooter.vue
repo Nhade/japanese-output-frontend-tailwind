@@ -9,7 +9,7 @@ const currentYear = computed(() => new Date().getFullYear());
 <template>
   <footer class="site-footer">
     <div class="site-footer-inner">
-      <span class="colophon-eyebrow">Colophon</span>
+      <span class="colophon-eyebrow">{{ $t('chrome.colophon') }}</span>
       <span class="colophon-rule" aria-hidden="true" />
       <span class="colophon-text">
         &copy; {{ currentYear }}

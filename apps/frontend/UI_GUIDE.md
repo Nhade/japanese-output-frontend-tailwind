@@ -167,9 +167,12 @@ To add another bare route, set `meta.hideChrome: true` on its route entry;
   namespace (`news.*`, `video.*`, `chat.*`, `mistakes.*`, `auth.*`).
 - **Always add new chrome in all three locales.** Missing keys fall back
   to English silently — easy to miss in review.
-- UI chrome in English; **Japanese strings are reserved for content**
-  (actual Japanese the learner reads). Japanese accents (e.g. 栞, 了) are
-  fine as display glyphs, but don't mix them with English UI labels.
+- **Chrome is translated** when the UI locale is `ja` or `zh-tw`. The
+  editorial voice travels — "Colophon" / "奥付" / "版權頁", "or" / "または"
+  / "或", "Shiori · Edition {year}" etc. all live under `common.*` and
+  `chrome.*` and must be kept in sync. Japanese accents used as
+  **display glyphs** (e.g. the 栞 watermark in AuthLayout) stay regardless
+  of locale — those are decorative brand marks, not labels.
 - Use `Intl.DateTimeFormat` with a locale-aware helper for dates —
   never hardcode date strings. Example pattern lives in NewsListView.
 
@@ -191,7 +194,37 @@ Precedents:
 
 ---
 
-## 9. When in doubt
+## 9. Known gaps (deferred to follow-up branches)
+
+Logged here so a PR reviewer (or future agent) doesn't burn time
+re-discovering them. None of these block the current UI redesign.
+
+- **Mobile navigation.** `TheHeader` relies on `flex-wrap` at ≤720px, which
+  piles the seven primary links into multiple rows over the brand mark,
+  and the `LOGOUT` button is hidden on mobile (`@media (max-width: 720px)`
+  in `TheHeader.vue`). Needs a dedicated responsiveness pass — probably a
+  drawer or disclosure.
+- **Dark mode is unwired.** `ThemeToggle` / `useThemeStore` add
+  `<html class="dark">` and persist the preference, but there is no
+  `.dark { --background: … }` token block in `style.css`, so the toggle
+  has no visible effect. Handle in a dedicated dark-mode branch where the
+  full palette (surfaces, gradients, ink-wash assets) can be re-derived.
+- **News section filter is untranslated.** Chip labels (国際 / 社会 / …) come
+  straight from backend article tags. A clean i18n story needs a backend
+  schema update (canonical slugs + translations) — track alongside that.
+- **Chinese tutor feedback on non-zh-tw UIs.** Exercise and Mistakes render
+  `feedback.feedback` and the hardcoded gloss `完全正確。` regardless of the
+  user's locale. Driving it from a user feedback-language preference is a
+  backend-side change.
+- **Mistakes score on incorrect answers.** Shows `SCORE 90` on an
+  incorrect item. Backend scoring logic, not the UI.
+- **Empty Chat canvas.** The Tutor's Desk leaves a lot of empty middle
+  column when there are no exchanges yet — worth a placeholder transcript
+  or "sample prompt" treatment, needs design first.
+
+---
+
+## 10. When in doubt
 
 - Reread `shiori-design-system.md` §1–§6 before making colour / shape /
   type decisions.

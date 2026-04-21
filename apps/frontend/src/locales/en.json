@@ -13,7 +13,14 @@
     "common": {
         "language": "Language",
         "title": "栞",
-        "loading": "Loading..."
+        "loading": "Loading...",
+        "divider_or": "or"
+    },
+    "chrome": {
+        "colophon": "Colophon",
+        "edition": "Shiori · Edition {year}",
+        "toggle_theme_dark": "Switch to dark mode",
+        "toggle_theme_light": "Switch to light mode"
     },
     "auth": {
         "login_title": "Welcome back",
@@ -31,10 +38,10 @@
         "register_link": "Register here",
         "login_link": "Login here",
         "error_generic": "An error occurred. Please try again.",
-        "cover_headline_1": "Reading,",
-        "cover_headline_2": "as a place",
-        "cover_headline_3": "you visit.",
-        "cover_descriptor": "Shiori pairs the articles, films and songs you already love with spaced-review exercises — so Japanese stops feeling like a subject and starts feeling like a place you visit.",
+        "cover_headline_1": "The lines",
+        "cover_headline_2": "you loved,",
+        "cover_headline_3": "made yours.",
+        "cover_descriptor": "Shiori pairs the articles, films and songs you already love with spaced-review exercises — a little every day.",
         "cover_caption_ja": "日々、少しずつ。",
         "eyebrow_return": "Return to your shelf",
         "eyebrow_join": "Join the reading room",
@@ -54,7 +61,7 @@
         "has_account_line": "Already on the shelf?",
         "to_register": "Create account",
         "to_login": "Sign in",
-        "strength_label": "Passphrase",
+        "strength_label": "Strength",
         "strength_1": "Fragile",
         "strength_2": "Ordinary",
         "strength_3": "Resolute",
@@ -67,7 +74,7 @@
         "show_hint": "Show Hint",
         "correct": "Correct!",
         "incorrect": "Not quite.",
-        "correct_answer_label": "Correct answer:",
+        "correct_answer_label": "The answer",
         "feedback_label": "Feedback",
         "score": "Score:",
         "ai_analysis": "AI Analysis",
@@ -102,7 +109,10 @@
         "eyebrow_reading_confirmed": "Reading confirmed",
         "eyebrow_revision": "Revision",
         "eyebrow_selected": "Selected",
-        "explain_in_full": "Explain in full"
+        "explain_in_full": "Explain in full",
+        "error_title": "The desk is empty.",
+        "error_body": "We couldn't fetch an exercise right now. Give it a moment, then try again.",
+        "error_retry": "Try again"
     },
     "mistakes": {
         "title": "Past Mistakes",
@@ -139,7 +149,8 @@
         "view_review": "Click to view your personalized study plan",
         "login_required": "Please login to see your mistakes.",
         "load_error": "Failed to load mistakes.",
-        "agent_working": "AI Agent Working..."
+        "agent_working": "AI Agent Working...",
+        "strike_aria": "Incorrect answer: {answer}"
     },
     "statistics": {
         "title": "Statistics",

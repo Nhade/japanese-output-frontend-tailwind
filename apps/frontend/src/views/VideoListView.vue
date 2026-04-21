@@ -35,7 +35,7 @@ function intlLocale(): string {
 
 const todayDate = computed(() => {
   return new Intl.DateTimeFormat(intlLocale(), {
-    weekday: 'long', month: 'long', day: 'numeric',
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   }).format(new Date());
 });
 
@@ -590,21 +590,33 @@ onMounted(() => {
   align-items: center;
   margin-top: 4px;
 }
+/* "Open dossier" — editorial ghost CTA. Italic serif with a firm
+   kohaku (amber) underline; text shifts to the indigo primary on hover.
+   Matches the `ghost-serif` Button variant used elsewhere. */
 .vid-cta-primary {
-  font-family: var(--font-sans);
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--background);
-  background: var(--primary);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.02rem;
+  color: var(--foreground);
+  background: transparent;
   border: none;
-  padding: 12px 22px;
-  border-radius: 2px;
+  padding: 2px 1px;
   cursor: pointer;
-  font-weight: 500;
-  transition: background 180ms ease;
+  text-decoration: underline;
+  text-decoration-color: var(--secondary);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 6px;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
 }
-.vid-cta-primary:hover { background: var(--primary-container); }
+.vid-cta-primary::after {
+  content: " →";
+  font-style: normal;
+  letter-spacing: 0;
+}
+.vid-cta-primary:hover {
+  color: var(--primary);
+  text-decoration-color: var(--primary);
+}
 
 /* .section-title-row/.section-title/.section-count are global — see
    styles/editorial.css. Tighten the bottom margin for this view. */

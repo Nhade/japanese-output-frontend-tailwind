@@ -579,8 +579,13 @@ onUnmounted(() => {
         </article>
       </template>
 
-      <div v-else class="text-center font-sans text-foreground/60">
-        <p>{{ $t('auth.error_generic') }}</p>
+      <div v-else class="exercise-empty">
+        <div class="eyebrow exercise-empty-eyebrow">{{ $t('exercise.eyebrow_fill_blank') }}</div>
+        <h2 class="exercise-empty-title">{{ $t('exercise.error_title') }}</h2>
+        <p class="exercise-empty-body">{{ $t('exercise.error_body') }}</p>
+        <Button variant="shiori" size="auto" class="exercise-empty-cta" @click="fetchNewExercise">
+          {{ $t('exercise.error_retry') }}
+        </Button>
       </div>
     </div>
 
@@ -609,6 +614,39 @@ onUnmounted(() => {
   min-height: calc(100vh - var(--app-chrome-h));
   /* paper gradient comes from the global .ei-shell-bg utility */
 }
+
+/* Empty / error state — paper-quiet, mirrors the Exercise editorial
+   typography so a failed fetch still sits inside the spread language. */
+.exercise-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  max-width: 520px;
+  margin: 80px auto 0;
+  padding: 0 8px;
+}
+.exercise-empty-eyebrow {
+  color: color-mix(in oklab, var(--secondary) 85%, transparent);
+}
+.exercise-empty-title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  letter-spacing: -0.005em;
+  line-height: 1.18;
+  color: var(--foreground);
+  margin: 0;
+}
+.exercise-empty-body {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: color-mix(in oklab, var(--foreground) 65%, transparent);
+  margin: 0;
+  max-width: 440px;
+}
+.exercise-empty-cta { margin-top: 10px; }
 
 /* Header row -------------------------------------------------------- */
 .exercise-header {

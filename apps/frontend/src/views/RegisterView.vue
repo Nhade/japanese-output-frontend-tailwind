@@ -159,7 +159,7 @@ async function register() {
 
       <div class="auth-divider" aria-hidden="true">
         <span class="auth-divider-rule" />
-        <span>or</span>
+        <span>{{ $t('common.divider_or') }}</span>
         <span class="auth-divider-rule" />
       </div>
 

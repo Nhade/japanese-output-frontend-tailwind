@@ -112,7 +112,7 @@ async function login() {
 
       <div class="auth-divider" aria-hidden="true">
         <span class="auth-divider-rule" />
-        <span class="auth-divider-word">or</span>
+        <span class="auth-divider-word">{{ $t('common.divider_or') }}</span>
         <span class="auth-divider-rule" />
       </div>
 

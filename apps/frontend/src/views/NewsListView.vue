@@ -130,9 +130,7 @@ onMounted(() => {
     <div class="list-page">
       <!-- Masthead ------------------------------------------------ -->
       <header class="masthead">
-        <h1 class="masthead-title">
-          <span class="kanji" lang="ja">{{ $t('common.title') }}</span>{{ $t('nav.news') }}
-        </h1>
+        <h1 class="masthead-title">{{ $t('nav.news') }}</h1>
         <div class="masthead-meta">
           <span class="issue">
             {{ $t('news.issue_no', { n: issueNumber }) }} · {{ editionLabel }}
@@ -291,14 +289,6 @@ onMounted(() => {
   margin: 0;
   letter-spacing: -0.01em;
   font-weight: 500;
-}
-.masthead-title .kanji {
-  /* Force the editorial serif even though the element carries lang="ja"
-     (the global [lang="ja"] rule otherwise wins over inheritance and
-     would render this as Noto Sans JP). */
-  font-family: var(--font-serif);
-  color: var(--primary);
-  margin-right: 0.2em;
 }
 .masthead-meta {
   display: flex;

@@ -13,7 +13,14 @@
     "common": {
         "language": "語言",
         "title": "栞",
-        "loading": "載入中..."
+        "loading": "載入中...",
+        "divider_or": "或"
+    },
+    "chrome": {
+        "colophon": "版權頁",
+        "edition": "栞 · {year}年版",
+        "toggle_theme_dark": "切換為深色模式",
+        "toggle_theme_light": "切換為淺色模式"
     },
     "auth": {
         "login_title": "歡迎回來",
@@ -31,10 +38,10 @@
         "register_link": "在此註冊",
         "login_link": "在此登入",
         "error_generic": "發生錯誤。請再試一次。",
-        "cover_headline_1": "閱讀，",
-        "cover_headline_2": "是一處",
-        "cover_headline_3": "造訪之地。",
-        "cover_descriptor": "Shiori 把你已經喜愛的文章、影片與歌曲，與間隔複習結合起來——讓日文不再像一門科目，而更像一個你常去的地方。",
+        "cover_headline_1": "把你喜愛的",
+        "cover_headline_2": "那些句子，",
+        "cover_headline_3": "練成自己的。",
+        "cover_descriptor": "Shiori 把你已經喜愛的文章、影片與歌曲，與間隔複習結合起來——每天一點點。",
         "cover_caption_ja": "日々、少しずつ。",
         "eyebrow_return": "回到你的書架",
         "eyebrow_join": "加入閱讀室",
@@ -67,7 +74,7 @@
         "show_hint": "顯示提示",
         "correct": "答對了！",
         "incorrect": "答錯了。",
-        "correct_answer_label": "正確答案：",
+        "correct_answer_label": "正解",
         "feedback_label": "回饋",
         "score": "分數：",
         "ai_analysis": "AI 分析",
@@ -102,7 +109,10 @@
         "eyebrow_reading_confirmed": "解讀已確認",
         "eyebrow_revision": "修正",
         "eyebrow_selected": "已選",
-        "explain_in_full": "完整解析"
+        "explain_in_full": "完整解析",
+        "error_title": "桌上還沒有題目。",
+        "error_body": "目前無法取得題目。請稍候片刻，再試一次。",
+        "error_retry": "再試一次"
     },
     "mistakes": {
         "title": "過去的錯誤",
@@ -139,7 +149,8 @@
         "view_review": "點擊查看您的個人化學習計畫",
         "login_required": "請先登入以查看您的錯誤。",
         "load_error": "載入錯誤失敗。",
-        "agent_working": "AI 代理工作中..."
+        "agent_working": "AI 代理工作中...",
+        "strike_aria": "錯誤答案：{answer}"
     },
     "statistics": {
         "title": "統計資料",

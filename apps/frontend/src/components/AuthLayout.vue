@@ -51,7 +51,7 @@ defineProps<{
       </div>
 
       <footer class="auth-footer">
-        <span>Shiori · Edition {{ new Date().getFullYear() }}</span>
+        <span>{{ $t('chrome.edition', { year: new Date().getFullYear() }) }}</span>
       </footer>
     </section>
   </main>
