@@ -102,7 +102,7 @@ const blankState = computed<'initial' | 'correct' | 'incorrect'>(() => {
 const promptLengthClass = computed<'lg' | 'md' | 'sm' | 'xs'>(() => {
   if (!exercise.value) return 'lg';
   // Strip the blank marker so its width isn't counted.
-  const visible = exercise.value.question_sentence.replaceAll(BLANK_MARKER, '');
+  const visible = exercise.value.question_sentence.split(BLANK_MARKER).join('');
   const n = [...visible].length;
   if (n <= 25) return 'lg';
   if (n <= 45) return 'md';

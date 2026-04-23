@@ -234,6 +234,9 @@ re-discovering them. None of these block the current UI redesign.
 - **Empty Chat canvas.** The Tutor's Desk leaves a lot of empty middle
   column when there are no exchanges yet — worth a placeholder transcript
   or "sample prompt" treatment, needs design first.
+- **StatisticsView not yet redesigned.** Still running the pre-EI shadcn
+  layout. It's the one primary view the redesign skipped in iteration 1
+  — tracked for a follow-up branch so this PR stays scoped.
 
 ---
 

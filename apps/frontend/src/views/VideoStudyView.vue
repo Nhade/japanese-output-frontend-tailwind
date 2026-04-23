@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
 
 interface TranscriptSegment { start: number; text: string }
@@ -40,7 +39,6 @@ interface CompQuestion {
   feedback: string;
 }
 
-const { t, locale } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
@@ -59,12 +57,6 @@ const tab = ref<'cloze' | 'comp'>('cloze');
 
 let player: any = null;
 let timeInterval: ReturnType<typeof setInterval> | null = null;
-
-function intlLocale(): string {
-  if (locale.value === 'ja') return 'ja-JP';
-  if (locale.value === 'zh-tw') return 'zh-Hant';
-  return 'en-US';
-}
 
 function formatT(seconds?: number): string {
   if (seconds == null) return '0:00';
