@@ -23,6 +23,9 @@ apps/frontend/src/
 │   ├── TheHeader.vue       # Fixed editorial top-nav
 │   ├── TheFooter.vue       # Static colophon (height locked to --footer-h)
 │   ├── AuthLayout.vue      # Two-column editorial split for auth views
+│   ├── BaseSelect.vue      # Editorial select (warm paper menu, kohaku active state)
+│   ├── LanguageSelector.vue # Wraps BaseSelect with the locale list
+│   ├── ThemeToggle.vue     # Icon-only toggle on editorial tokens
 │   ├── SettingsModal.vue   # Custom glass-overlay dialog (not Modal.vue)
 │   ├── Modal.vue           # Legacy modal — only ExerciseView uses it now
 │   └── exercise/           # Exercise-specific primitives (HankoSeal, MarginNote…)
@@ -89,6 +92,12 @@ Promote any pattern that appears in ≥3 views to this file. Current contents:
 **Auth primitives** live in `styles/auth.css`: `.auth-heading`,
 `.auth-sub`, `.auth-form`, `.auth-field*`, `.auth-cta`, `.auth-divider*`,
 `.auth-toggle*`. Only LoginView / RegisterView need them.
+
+The form-column emphasis (`.auth-heading .emphasis`, wrapping words like
+"back" or "lifetime") is a kohaku **underline** under the same foreground
+serif — not italic, not amber-tinted. The italic + amber treatment is
+reserved for the hero headline (`AuthLayout .auth-cover-headline
+.emphasis`) so only one loud mark appears per view.
 
 ### How to use them
 
@@ -158,6 +167,10 @@ Global header + footer render everywhere **except** routes tagged with
 
 To add another bare route, set `meta.hideChrome: true` on its route entry;
 `App.vue` reads `route.meta.hideChrome` to decide.
+
+`App.vue` also owns `themeStore.initTheme()` — don't move it back into
+`TheHeader`, or bare routes (which render without the header) will ship
+with no theme class at all.
 
 ---
 
