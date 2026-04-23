@@ -135,7 +135,15 @@ from learner_service import (
     update_learner_settings,
 )
 from video_service import create_video_tables, import_video
-from document_service import create_document_tables
+from document_service import (
+    create_document_tables,
+    create_range,
+    get_chunks,
+    get_document,
+    ingest_document,
+    list_documents,
+    list_ranges,
+)
 from practice_service import create_practice_tables
 
 # Initialize Learner Tables
@@ -927,6 +935,145 @@ def recalculate_learner_profile_route(user_id):
 
         profile = backfill_learner_profile(conn, user_id)
         return jsonify(profile)
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Documents + practice ranges
+# ---------------------------------------------------------------------------
+
+_MAX_DOC_BYTES = 2 * 1024 * 1024  # 2 MB cap for grammar notes / text
+_ALLOWED_DOC_EXT = {"md", "markdown", "txt"}
+
+
+def _read_upload_payload():
+    """Accept either multipart (file upload) or JSON body.
+
+    Returns (user_id, title, source_type, content, filename) or raises ValueError.
+    """
+    if request.files:
+        f = request.files.get('file')
+        if not f:
+            raise ValueError("file field is required")
+        filename = f.filename or "document"
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        if ext not in _ALLOWED_DOC_EXT:
+            raise ValueError(f"Unsupported file type: .{ext}")
+        raw = f.read(_MAX_DOC_BYTES + 1)
+        if len(raw) > _MAX_DOC_BYTES:
+            raise ValueError("File exceeds 2 MB limit")
+        content = raw.decode("utf-8", errors="replace")
+        form = request.form
+        return (
+            form.get('user_id'),
+            form.get('title') or filename.rsplit(".", 1)[0],
+            form.get('source_type', 'grammar_notes'),
+            content,
+            filename,
+        )
+
+    data = request.get_json() or {}
+    content = data.get('content', '')
+    if len(content.encode("utf-8")) > _MAX_DOC_BYTES:
+        raise ValueError("content exceeds 2 MB limit")
+    return (
+        data.get('user_id'),
+        data.get('title'),
+        data.get('source_type', 'grammar_notes'),
+        content,
+        data.get('filename'),
+    )
+
+
+@app.route('/api/documents/upload', methods=['POST'])
+def upload_document():
+    """Upload a grammar-note / text document. Parses + chunks synchronously.
+
+    Extraction of grammar patterns runs as a follow-up step (Phase 2b).
+    """
+    try:
+        user_id, title, source_type, content, filename = _read_upload_payload()
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    if not user_id or not title or not content.strip():
+        return jsonify({"error": "user_id, title, and content are required"}), 400
+
+    conn = get_db_connection()
+    try:
+        result = ingest_document(conn, user_id, title, source_type,
+                                 content, filename)
+        return jsonify({
+            "doc_id": result["doc_id"],
+            "title": title,
+            "chunk_count": result["chunk_count"],
+            "status": "chunked",
+        })
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        print(f"Document upload error: {e}")
+        return jsonify({"error": "Failed to ingest document"}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/documents', methods=['GET'])
+def list_documents_route():
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id query param is required"}), 400
+    conn = get_db_connection()
+    try:
+        return jsonify(list_documents(conn, user_id))
+    finally:
+        conn.close()
+
+
+@app.route('/api/documents/<doc_id>/chunks', methods=['GET'])
+def list_chunks_route(doc_id):
+    conn = get_db_connection()
+    try:
+        doc = get_document(conn, doc_id)
+        if not doc:
+            return jsonify({"error": "Document not found"}), 404
+        return jsonify({
+            "doc_id": doc_id,
+            "title": doc["title"],
+            "chunks": get_chunks(conn, doc_id),
+        })
+    finally:
+        conn.close()
+
+
+@app.route('/api/documents/<doc_id>/ranges', methods=['GET', 'POST'])
+def document_ranges_route(doc_id):
+    conn = get_db_connection()
+    try:
+        if request.method == 'GET':
+            user_id = request.args.get('user_id')
+            if not user_id:
+                return jsonify({"error": "user_id query param is required"}), 400
+            return jsonify(list_ranges(conn, user_id, doc_id))
+
+        data = request.get_json() or {}
+        user_id = data.get('user_id')
+        label = (data.get('label') or '').strip()
+        chunk_ids = data.get('chunk_ids') or []
+        if not user_id or not label or not chunk_ids:
+            return jsonify({
+                "error": "user_id, label, and non-empty chunk_ids are required"
+            }), 400
+
+        doc = get_document(conn, doc_id)
+        if not doc:
+            return jsonify({"error": "Document not found"}), 404
+        try:
+            result = create_range(conn, user_id, doc_id, label, chunk_ids)
+            return jsonify(result)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
     finally:
         conn.close()
 
