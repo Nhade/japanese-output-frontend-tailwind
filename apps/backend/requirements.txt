@@ -14,3 +14,4 @@ gunicorn
 langgraph
 youtube-transcript-api
 yt-dlp
+markdown-it-py
