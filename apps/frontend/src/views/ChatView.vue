@@ -1,345 +1,969 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch, computed } from 'vue';
+import { ref, computed, nextTick, onMounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
-interface FeedbackCorrection {
-    original: string;
-    corrected: string;
-    explanation: string;
-}
-
-interface Feedback {
-    overall: string;
-    corrections: FeedbackCorrection[];
-    retry_count?: number;
-}
-
-interface Message {
-    role: 'user' | 'assistant';
-    content: string;
-    feedback?: Feedback; // Only for assistant
-    showFeedback?: boolean; // UI state
-}
-
-import LearningFocusCard from '../components/LearningFocusCard.vue';
+import SettingsModal from '../components/SettingsModal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
 
-import SettingsModal from '../components/SettingsModal.vue';
+interface FeedbackCorrection {
+  original: string;
+  corrected: string;
+  explanation: string;
+}
+
+interface Feedback {
+  overall: string;
+  corrections: FeedbackCorrection[];
+  retry_count?: number;
+}
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  time: string;
+  feedback?: Feedback;
+  showFeedback?: boolean;
+}
+
+interface LearnerFocus {
+  tag: string;
+  progress: number;
+  target: number;
+}
+
+interface LearnerProfile {
+  current_focus?: LearnerFocus;
+}
 
 const { t, locale } = useI18n();
 const authStore = useAuthStore();
 const toastStore = useToastStore();
 
+const LOCAL_STORAGE_KEY = 'japanese_agent_chat_history';
+
 const messages = ref<Message[]>([]);
 const inputMessage = ref('');
 const isLoading = ref(false);
-const chatContainer = ref<HTMLElement | null>(null);
-const learnerProfile = ref<any>(null);
+const streamEl = ref<HTMLElement | null>(null);
+const learnerProfile = ref<LearnerProfile | null>(null);
 const showSettings = ref(false);
-const currentFocus = computed(() => {
-    return learnerProfile.value?.current_focus || null;
+
+const currentFocus = computed<LearnerFocus | null>(() => {
+  const f = learnerProfile.value?.current_focus;
+  if (!f || !f.tag) return null;
+  return f;
 });
 
-// Load history from localStorage if available (Optional, but good for UX)
-const LOCAL_STORAGE_KEY = 'japanese_agent_chat_history';
+const userExchanges = computed(() =>
+  messages.value.filter(m => m.role === 'user').length,
+);
+
+const corrections = computed<FeedbackCorrection[]>(() =>
+  messages.value
+    .filter(m => m.role === 'user' && m.feedback && m.feedback.corrections?.length)
+    .flatMap(m => m.feedback!.corrections),
+);
+
+function intlLocale(): string {
+  if (locale.value === 'ja') return 'ja-JP';
+  if (locale.value === 'zh-tw') return 'zh-Hant';
+  return 'en-US';
+}
+
+const headerDate = computed(() => {
+  const now = new Date();
+  const dateStr = new Intl.DateTimeFormat(intlLocale(), { month: 'short', day: 'numeric' }).format(now);
+  const timeStr = new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
+  return `${dateStr} · ${timeStr}`;
+});
+
+function localizedFocusTag(tag: string): string {
+  return t(`pos.${tag.toLowerCase()}`, tag);
+}
+
+function formatTime(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+async function scrollToBottom() {
+  await nextTick();
+  if (streamEl.value) {
+    streamEl.value.scrollTop = streamEl.value.scrollHeight;
+  }
+}
+
+async function sendMessage(rawText?: string) {
+  const text = (rawText ?? inputMessage.value).trim();
+  if (!text || isLoading.value) return;
+  inputMessage.value = '';
+
+  const nowISO = new Date().toISOString();
+  messages.value.push({ role: 'user', content: text, time: nowISO });
+  await scrollToBottom();
+  isLoading.value = true;
+
+  try {
+    const historyPayload = messages.value.map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/chat/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: text,
+        history: historyPayload,
+        locale: locale.value,
+        user_id: authStore.user_id,
+      }),
+    });
+
+    if (!response.ok) throw new Error('Network response was not ok');
+
+    const data = await response.json();
+
+    if (data.feedback?.overall?.includes?.('Safety violation')) {
+      toastStore.trigger(t('chat.safety_violation'), 'error');
+    }
+
+    // Feedback semantically belongs to the user's turn; attach it to the
+    // preceding user message so the margin-note appears alongside it.
+    if (data.feedback) {
+      const lastUser = [...messages.value].reverse().find(m => m.role === 'user');
+      if (lastUser) {
+        lastUser.feedback = data.feedback;
+        lastUser.showFeedback = true;
+      }
+    }
+
+    messages.value.push({
+      role: 'assistant',
+      content: data.response || t('chat.error_response'),
+      time: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Chat error:', err);
+    messages.value.push({
+      role: 'assistant',
+      content: t('chat.error_response'),
+      time: new Date().toISOString(),
+    });
+  } finally {
+    isLoading.value = false;
+    await scrollToBottom();
+  }
+}
+
+function onComposerKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function toggleFeedback(index: number) {
+  const msg = messages.value[index];
+  if (msg && msg.role === 'user' && msg.feedback) {
+    msg.showFeedback = !msg.showFeedback;
+  }
+}
 
 onMounted(async () => {
-    // History
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) {
-        try {
-            messages.value = JSON.parse(saved);
-            scrollToBottom();
-        } catch (e) {
-            console.error("Failed to load chat history", e);
-        }
-    }
-
-    // Fetch Profile
-    if (authStore.user_id) {
-        try {
-            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/learner/profile/${authStore.user_id}`);
-            if (res.ok) {
-                learnerProfile.value = await res.json();
+  const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved) as Message[];
+      const migrated = parsed.map(m => ({
+        ...m,
+        time: m.time || new Date().toISOString(),
+      }));
+      // Legacy persisted data attached feedback to the assistant turn.
+      // The redesigned UI renders feedback under the preceding user turn,
+      // so migrate each assistant feedback onto the user message before it.
+      for (let i = 0; i < migrated.length; i++) {
+        const m = migrated[i];
+        if (m.role === 'assistant' && m.feedback) {
+          for (let j = i - 1; j >= 0; j--) {
+            if (migrated[j].role === 'user') {
+              if (!migrated[j].feedback) {
+                migrated[j].feedback = m.feedback;
+                migrated[j].showFeedback = false;
+              }
+              break;
             }
-        } catch (e) {
-            console.error("Failed to fetch learner profile", e);
+          }
+          delete m.feedback;
+          delete m.showFeedback;
         }
+      }
+      messages.value = migrated;
+      scrollToBottom();
+    } catch (e) {
+      console.error('Failed to load chat history', e);
     }
+  }
+
+  if (authStore.user_id) {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/learner/profile/${authStore.user_id}`);
+      if (res.ok) {
+        learnerProfile.value = await res.json();
+      }
+    } catch (e) {
+      console.error('Failed to fetch learner profile', e);
+    }
+  }
 });
 
-watch(messages, (newVal) => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newVal));
+watch(messages, (val) => {
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(val));
 }, { deep: true });
-
-const scrollToBottom = async () => {
-    await nextTick();
-    if (chatContainer.value) {
-        chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
-    }
-};
-
-const sendMessage = async () => {
-    if (!inputMessage.value.trim() || isLoading.value) return;
-
-    const userMsg = inputMessage.value.trim();
-    inputMessage.value = '';
-
-    // Add user message
-    messages.value.push({ role: 'user', content: userMsg });
-    scrollToBottom();
-    isLoading.value = true;
-
-    try {
-        // Prepare history for API (excluding feedback and UI state)
-        const historyPayload = messages.value.map(m => ({
-            role: m.role,
-            content: m.content
-        }));
-
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/chat/send`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: userMsg,
-                history: historyPayload,
-                locale: locale.value, // Send current locale
-                user_id: authStore.user_id
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-
-        const data = await response.json();
-
-        // Check for safety violation (heuristic: check overall feedback text)
-        // Ideally backend should return specific flag, but checking text works for now as configured
-        if (data.feedback && data.feedback.overall && data.feedback.overall.includes("Safety violation")) {
-            toastStore.trigger(t('chat.safety_violation'), 'error');
-        }
-
-        // Add assistant message
-        messages.value.push({
-            role: 'assistant',
-            content: data.response || "Error: No response",
-            feedback: data.feedback,
-            showFeedback: false
-        });
-
-    } catch (error) {
-        console.error("Chat error:", error);
-        messages.value.push({
-            role: 'assistant',
-            content: t('chat.error_response')
-        });
-    } finally {
-        isLoading.value = false;
-        scrollToBottom();
-    }
-};
-
-const toggleFeedback = (index: number) => {
-    if (messages.value[index].role === 'assistant') {
-        messages.value[index].showFeedback = !messages.value[index].showFeedback;
-    }
-};
 </script>
 
 <template>
-    <div class="container mx-auto px-4 max-w-4xl h-[calc(100vh-6rem)] flex flex-col">
-        <!-- Header -->
-        <div class="py-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0 flex items-center justify-between">
-            <div>
-                <h1
-                    class="text-2xl font-bold bg-linear-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
-                    {{ t('chat.title') }}
-                </h1>
-                <p class="text-zinc-500 dark:text-zinc-400 text-sm">
-                    {{ t('chat.subtitle') }}
-                </p>
-            </div>
-            <!-- Settings Button -->
-            <button @click="showSettings = true"
-                class="p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-colors"
-                :title="t('settings.title')">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path
-                        d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.39a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-                    <circle cx="12" cy="12" r="3" />
-                </svg>
-            </button>
+  <main class="chat-shell ei-shell-bg text-foreground">
+    <div class="ch-workspace-page">
+      <!-- Unified masthead ---------------------------------------- -->
+      <header class="ch-header">
+        <div class="ch-header-lede">
+          <div class="eyebrow-sm eyebrow-kohaku">{{ $t('chat.tutor_desk') }}</div>
+          <h1 class="ch-h1">{{ $t('chat.study_session') }}</h1>
         </div>
 
-        <SettingsModal :show="showSettings" @close="showSettings = false" />
-
-        <!-- Personalized Hint / Learning Focus -->
-        <div v-if="currentFocus && currentFocus.tag" class="py-2 shrink-0">
-            <LearningFocusCard :focus="currentFocus" />
+        <div v-if="currentFocus" class="ch-header-focus">
+          <div class="ch-header-focus-row">
+            <span class="focus-tag" lang="ja">{{ localizedFocusTag(currentFocus.tag) }}</span>
+            <span class="focus-progress" aria-hidden="true">
+              <span
+                v-for="n in currentFocus.target"
+                :key="n"
+                class="focus-dot"
+                :class="{ 'is-on': n <= currentFocus.progress }"
+              />
+              <span class="focus-count">
+                {{ currentFocus.progress }} / {{ currentFocus.target }}
+              </span>
+            </span>
+          </div>
         </div>
-        <div v-else-if="learnerProfile" class="py-2 shrink-0">
-            <!-- Fallback if no focus (shouldn't happen with P2 logic but safe to keep) -->
-            <div
-                class="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-lg px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400">
-                {{ t('chat.focus_default', 'Chat freely to build your profile.') }}
-            </div>
+        <div v-else class="ch-header-focus ch-header-focus--empty" />
+
+        <div class="ch-header-meta">
+          <div class="ch-header-date">{{ headerDate }}</div>
+          <div class="ch-header-count">{{ $t('chat.exchanges', { n: userExchanges }) }}</div>
+          <button
+            class="ch-settings-btn"
+            type="button"
+            @click="showSettings = true"
+            :aria-label="$t('chat.settings')"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
         </div>
+      </header>
 
-        <!-- Chat Area -->
-        <div ref="chatContainer" class="flex-1 overflow-y-auto py-6 space-y-6 scroll-smooth">
-            <div v-if="messages.length === 0" class="text-center text-zinc-400 py-20">
-                <div class="mb-4 text-6xl">👋</div>
-                <p>{{ t('chat.welcome') }}</p>
-            </div>
+      <SettingsModal :show="showSettings" @close="showSettings = false" />
 
-            <div v-for="(msg, index) in messages" :key="index"
-                :class="['flex w-full', msg.role === 'user' ? 'justify-end' : 'justify-start']">
+      <!-- Desk workspace ------------------------------------------ -->
+      <div class="ch-workspace ch-workspace-desk">
+        <div class="ch-workspace-main">
+          <div ref="streamEl" class="ch-stream">
+            <div class="ch-stream-inner">
+              <!-- Empty state -->
+              <div v-if="messages.length === 0" class="ch-empty">
+                {{ $t('chat.empty_stream') }}
+              </div>
 
-                <!-- Assistant Avatar (Optional) -->
-                <div v-if="msg.role === 'assistant'" class="mr-3 shrink-0">
-                    <div
-                        class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                        🤖
-                    </div>
-                </div>
-
-                <div class="max-w-[85%] sm:max-w-[75%] space-y-2">
-                    <!-- Message Bubble -->
-                    <div lang="ja" :class="[
-                        'p-4 rounded-2xl shadow-sm text-base leading-relaxed whitespace-pre-wrap font-ja',
-                        msg.role === 'user'
-                            ? 'bg-emerald-600 text-white rounded-tr-sm'
-                            : 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border border-zinc-100 dark:border-zinc-700/50 rounded-tl-sm'
-                    ]">
-                        {{ msg.content }}
-                    </div>
-
-                    <!-- Feedback Section (Assistant Only) -->
-                    <div v-if="msg.role === 'assistant' && msg.feedback" class="flex flex-col items-start gap-2">
-                        <!-- Toggle Button -->
-                        <button @click="toggleFeedback(index)"
-                            class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800/50 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors text-zinc-500 dark:text-zinc-400">
-                            <span v-if="msg.showFeedback">{{ t('chat.hide_feedback') }}</span>
-                            <span v-else>{{ t('chat.show_feedback') }}</span>
-                            <svg v-if="!msg.showFeedback" xmlns="http://www.w3.org/2000/svg" width="14" height="14"
-                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lightbulb">
-                                <path
-                                    d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
-                                <path d="M9 18h6" />
-                                <path d="M10 22h4" />
-                            </svg>
-                        </button>
-
-                        <!-- Feedback Content -->
-                        <transition enter-active-class="transition-all duration-300 ease-out"
-                            enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0"
-                            leave-active-class="transition-all duration-200 ease-in"
-                            leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 -translate-y-2">
-                            <div v-if="msg.showFeedback" lang="zh-Hant"
-                                class="w-full bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-xl p-4 text-sm text-zinc-700 dark:text-zinc-300">
-                                <div
-                                    class="mb-3 font-medium text-amber-700 dark:text-amber-500 flex items-center gap-2">
-                                    <span>📝 {{ t('chat.analysis') }}</span>
-                                    <span v-if="msg.feedback.retry_count && msg.feedback.retry_count > 0"
-                                        class="text-xs bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/15 px-2 py-0.5 rounded border uppercase tracking-wider ml-auto">
-                                        Retried: {{ msg.feedback.retry_count }}
-                                    </span>
-                                </div>
-
-                                <p class="mb-3 italic">{{ msg.feedback.overall }}</p>
-
-                                <div v-if="msg.feedback.corrections && msg.feedback.corrections.length > 0"
-                                    class="space-y-3">
-                                    <div v-for="(correction, cIndex) in msg.feedback.corrections" :key="cIndex"
-                                        class="bg-white/50 dark:bg-black/20 p-3 rounded-lg">
-                                        <div class="flex items-start gap-2 mb-1">
-                                            <span class="text-red-500 font-mono text-xs mt-0.5">✖</span>
-                                            <span class="line-through opacity-60" lang="ja">{{ correction.original
-                                                }}</span>
-                                        </div>
-                                        <div class="flex items-start gap-2 mb-2">
-                                            <span class="text-green-500 font-mono text-xs mt-0.5">✔</span>
-                                            <span class="font-bold text-emerald-700 dark:text-emerald-400" lang="ja">{{
-                                                correction.corrected }}</span>
-                                        </div>
-                                        <div class="text-xs text-zinc-500 dark:text-zinc-400 pl-5">
-                                            💡 {{ correction.explanation }}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div v-else class="text-zinc-400 text-xs pl-1">
-                                    {{ t('chat.no_errors') }}
-                                </div>
-                            </div>
-                        </transition>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Loading Indicator -->
-            <div v-if="isLoading" class="flex justify-start">
-                <div class="mr-3 shrink-0">
-                    <div
-                        class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                        🤖
-                    </div>
-                </div>
+              <div
+                v-for="(msg, i) in messages"
+                :key="i"
+                class="ch-row"
+                :class="{
+                  'is-user': msg.role === 'user',
+                  'is-assistant': msg.role === 'assistant',
+                }"
+              >
                 <div
-                    class="bg-white dark:bg-zinc-800 p-4 rounded-2xl rounded-tl-sm border border-zinc-100 dark:border-zinc-700/50 shadow-sm flex items-center gap-2">
-                    <div class="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
-                    <div class="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                    <div class="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                  class="ch-bubble"
+                  :class="msg.role === 'user' ? 'is-user' : 'is-assistant'"
+                >
+                  <div class="ch-bubble-head">
+                    <span class="ch-bubble-role">
+                      {{ msg.role === 'user' ? $t('chat.you') : $t('chat.tutor') }}
+                    </span>
+                    <span class="ch-bubble-time">{{ formatTime(msg.time) }}</span>
+                  </div>
+                  <div class="ch-bubble-body" lang="ja">{{ msg.content }}</div>
                 </div>
+
+                <!-- Inline feedback under the user's turn ------- -->
+                <div
+                  v-if="msg.role === 'user' && msg.feedback"
+                  class="ch-inline-feedback-wrap"
+                >
+                  <button
+                    class="ch-feedback-toggle"
+                    type="button"
+                    @click="toggleFeedback(i)"
+                  >
+                    <span class="ch-feedback-toggle-dot" :class="{ 'has-errors': (msg.feedback.corrections?.length ?? 0) > 0 }" />
+                    {{ msg.showFeedback ? $t('chat.hide_feedback') : $t('chat.analysis_ready') }}
+                  </button>
+
+                  <div v-if="msg.showFeedback" class="ch-inline-feedback">
+                    <div class="ch-margin-eyebrow">{{ $t('chat.tutors_note') }}</div>
+                    <p v-if="msg.feedback.overall" class="ch-margin-overall">
+                      {{ msg.feedback.overall }}
+                    </p>
+                    <ul
+                      v-if="msg.feedback.corrections && msg.feedback.corrections.length"
+                      class="ch-margin-corrections"
+                    >
+                      <li v-for="(c, cIx) in msg.feedback.corrections" :key="cIx">
+                        <div class="ch-corr-line">
+                          <span class="ch-corr-strike" lang="ja">{{ c.original }}</span>
+                          <span class="ch-corr-arrow">→</span>
+                          <span class="ch-corr-right" lang="ja">{{ c.corrected }}</span>
+                        </div>
+                        <div class="ch-corr-note">{{ c.explanation }}</div>
+                      </li>
+                    </ul>
+                    <div v-else class="ch-margin-empty">{{ $t('chat.no_errors') }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Loading -->
+              <div v-if="isLoading" class="ch-row is-assistant">
+                <div class="ch-bubble is-assistant is-loading">
+                  <div class="ch-bubble-head">
+                    <span class="ch-bubble-role">{{ $t('chat.tutor') }}</span>
+                  </div>
+                  <div class="ch-loading-dots" aria-hidden="true">
+                    <span /><span /><span />
+                  </div>
+                </div>
+              </div>
             </div>
+          </div>
+
+          <!-- Composer ------------------------------------------- -->
+          <div class="ch-composer">
+            <div class="ch-composer-eyebrow">
+              <span class="eyebrow-sm">{{ $t('chat.compose_eyebrow') }}</span>
+              <span class="ch-composer-hint">{{ $t('chat.compose_hint') }}</span>
+            </div>
+            <div class="ch-composer-row">
+              <textarea
+                v-model="inputMessage"
+                class="ch-composer-input"
+                :placeholder="$t('chat.placeholder_ja')"
+                rows="2"
+                lang="ja"
+                @keydown="onComposerKeydown"
+              />
+              <button
+                class="ch-send"
+                type="button"
+                :disabled="!inputMessage.trim() || isLoading"
+                @click="sendMessage()"
+              >
+                {{ $t('chat.send') }}
+              </button>
+            </div>
+            <p class="ch-disclaimer">{{ $t('chat.disclaimer') }}</p>
+          </div>
         </div>
 
-        <!-- Input Area -->
-        <div class="py-4 shrink-0">
-            <div
-                class="relative flex items-end gap-2 bg-white dark:bg-zinc-900 shadow-lg border border-zinc-200 dark:border-zinc-800 rounded-2xl p-2 focus-within:ring-2 focus-within:ring-emerald-500/50 transition-shadow">
-                <textarea v-model="inputMessage" @keydown.enter.prevent="sendMessage"
-                    :placeholder="t('chat.placeholder')"
-                    class="w-full bg-transparent border-0 focus:ring-0 outline-none focus:outline-none resize-none max-h-32 min-h-[50px] py-3 px-3 text-zinc-800 dark:text-zinc-100 placeholder-zinc-400"
-                    rows="1"></textarea>
-                <button @click="sendMessage" :disabled="!inputMessage.trim() || isLoading"
-                    class="mb-1 p-3 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md active:scale-95">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                        class="lucide lucide-send">
-                        <path d="m22 2-7 20-4-9-9-4Z" />
-                        <path d="M22 2 11 13" />
-                    </svg>
-                </button>
-            </div>
-            <p class="text-center text-xs text-zinc-400 mt-2">
-                {{ t('chat.disclaimer') }}
+        <!-- Desk rail --------------------------------------------- -->
+        <aside class="ch-desk">
+          <div class="ch-desk-section">
+            <div class="eyebrow-sm eyebrow-kohaku">{{ $t('chat.todays_focus') }}</div>
+            <template v-if="currentFocus">
+              <div class="ch-desk-focus-tag" lang="ja">
+                {{ localizedFocusTag(currentFocus.tag) }}
+              </div>
+              <div class="ch-desk-bar" aria-hidden="true">
+                <div
+                  class="ch-desk-bar-fill"
+                  :style="{ width: `${Math.min(100, (currentFocus.progress / currentFocus.target) * 100)}%` }"
+                />
+              </div>
+              <div class="ch-desk-bar-label">
+                {{ $t('chat.exchanges_of', { n: currentFocus.progress, total: currentFocus.target }) }}
+              </div>
+            </template>
+            <p v-else class="ch-desk-empty">{{ $t('chat.focus_default') }}</p>
+          </div>
+
+          <div class="ch-desk-section">
+            <div class="eyebrow-sm eyebrow-kohaku">{{ $t('chat.running_errata') }}</div>
+            <p v-if="corrections.length === 0" class="ch-desk-empty">
+              {{ $t('chat.empty_errata') }}
             </p>
-        </div>
+            <ul v-else class="ch-desk-errata">
+              <li v-for="(c, i) in corrections" :key="i">
+                <div class="ch-desk-errata-line">
+                  <span class="ch-corr-strike" lang="ja">{{ c.original }}</span>
+                  <span lang="ja">{{ c.corrected }}</span>
+                </div>
+                <div class="ch-desk-errata-note">{{ c.explanation }}</div>
+              </li>
+            </ul>
+          </div>
+        </aside>
+      </div>
     </div>
+  </main>
 </template>
 
 <style scoped>
-/* Custom scrollbar for better blend */
-::-webkit-scrollbar {
-    width: 6px;
+/* --------------------------------------------------------------
+   Shell — pinned height so chat header stays visible while only
+   the message stream scrolls. App.vue's main has pt-16 (64px).
+-------------------------------------------------------------- */
+/* Chat is a fixed-height workspace — the shell claims exactly the
+   viewport area not consumed by chrome so composer + header stay on
+   screen without pushing the footer below the fold. */
+.chat-shell {
+  min-height: calc(100vh - var(--app-chrome-h));
+  /* paper gradient comes from the global .ei-shell-bg utility */
 }
 
-::-webkit-scrollbar-track {
-    background: transparent;
+.ch-workspace-page {
+  height: calc(100dvh - var(--app-chrome-h));
+  max-width: 1260px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 48px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+@media (max-width: 900px) {
+  .ch-workspace-page { padding: 0 20px; height: auto; min-height: calc(100vh - var(--app-chrome-h)); }
 }
 
-::-webkit-scrollbar-thumb {
-    background-color: rgba(156, 163, 175, 0.3);
-    border-radius: 20px;
+/* Header ------------------------------------------------------ */
+.ch-header {
+  flex: 0 0 auto;
+  padding: 22px 0 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 36px;
+  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+.ch-header-lede { min-width: 0; }
+.ch-header-lede .eyebrow-sm { margin-bottom: 8px; }
+.ch-h1 {
+  font-family: var(--font-serif);
+  font-size: clamp(1.6rem, 1.5vw + 0.9rem, 2.2rem);
+  line-height: 1.15;
+  margin: 0;
+  font-weight: 500;
+  letter-spacing: -0.005em;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-    background-color: rgba(71, 85, 105, 0.5);
+.ch-header-focus {
+  min-width: 0;
+  padding-left: 28px;
+  padding-bottom: 4px;
+  border-left: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
 }
+.ch-header-focus--empty { border-left: none; }
+.ch-header-focus-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.focus-tag {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  color: var(--primary);
+  font-weight: 500;
+}
+.focus-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.focus-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--foreground) 15%, transparent);
+  transition: background 180ms ease, border-color 180ms ease;
+}
+.focus-dot.is-on { background: var(--secondary); border-color: var(--secondary); }
+.focus-count {
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+  margin-left: 6px;
+}
+
+.ch-header-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  padding-bottom: 4px;
+}
+.ch-header-date {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.92rem;
+  color: color-mix(in oklab, var(--foreground) 60%, transparent);
+}
+.ch-header-count {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+}
+.ch-settings-btn {
+  margin-top: 4px;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: color-mix(in oklab, var(--foreground) 45%, transparent);
+  transition: color 160ms ease;
+}
+.ch-settings-btn:hover { color: var(--primary); }
+
+@media (max-width: 900px) {
+  .ch-header {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 20px 0 14px;
+  }
+  .ch-header-focus {
+    padding-left: 0;
+    border-left: none;
+    border-top: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
+    padding-top: 14px;
+  }
+  .ch-header-meta { flex-direction: row; align-items: center; gap: 16px; }
+}
+
+/* Workspace --------------------------------------------------- */
+.ch-workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ch-workspace-desk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 48px;
+  min-height: 0;
+}
+.ch-workspace-main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 900px) {
+  .ch-workspace-desk { grid-template-columns: 1fr; gap: 28px; }
+}
+
+/* Stream ------------------------------------------------------ */
+.ch-stream {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  /* soft fade at top/bottom so messages dissolve into chrome */
+  mask-image: linear-gradient(to bottom, transparent 0, black 18px, black calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 18px, black calc(100% - 24px), transparent 100%);
+}
+.ch-stream-inner { padding: 10px 2px 28px; }
+
+.ch-empty {
+  padding: 60px 0;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1rem;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+  max-width: 32em;
+  margin: 0 auto;
+}
+
+/* Row + bubbles ----------------------------------------------- */
+.ch-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 0 18px;
+  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 7%, transparent);
+}
+.ch-row:last-child { border-bottom: none; }
+.ch-row.is-user { align-items: flex-end; }
+.ch-row.is-assistant { align-items: flex-start; }
+
+.ch-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 40em;
+  min-width: 0;
+}
+.ch-bubble.is-user { text-align: right; align-items: flex-end; }
+.ch-bubble.is-assistant { align-items: flex-start; }
+
+.ch-bubble-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-sans);
+}
+.ch-bubble.is-user .ch-bubble-head { justify-content: flex-end; flex-direction: row-reverse; }
+.ch-bubble-role {
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.ch-bubble.is-user .ch-bubble-role { color: var(--secondary); }
+.ch-bubble.is-assistant .ch-bubble-role { color: var(--primary); }
+.ch-bubble-time {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.78rem;
+  color: color-mix(in oklab, var(--foreground) 45%, transparent);
+}
+.ch-bubble-body {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  line-height: 1.85;
+  color: var(--foreground);
+  word-break: auto-phrase;
+  padding: 6px 0;
+}
+.ch-bubble.is-user .ch-bubble-body {
+  border-right: 2px solid var(--secondary);
+  padding-right: 14px;
+}
+.ch-bubble.is-assistant .ch-bubble-body {
+  border-left: 2px solid var(--primary);
+  padding-left: 14px;
+}
+
+.ch-bubble.is-loading .ch-loading-dots {
+  padding: 10px 14px;
+  border-left: 2px solid var(--primary);
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-height: 28px;
+}
+.ch-bubble.is-loading .ch-loading-dots span {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: color-mix(in oklab, var(--foreground) 35%, transparent);
+  animation: ch-dot 1.2s ease-in-out infinite;
+}
+.ch-bubble.is-loading .ch-loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+.ch-bubble.is-loading .ch-loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ch-dot {
+  0%, 80%, 100% { opacity: 0.3; }
+  40% { opacity: 1; }
+}
+
+/* Inline feedback --------------------------------------------- */
+.ch-inline-feedback-wrap {
+  margin-top: 4px;
+  max-width: 40em;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: flex-end; /* align with user bubble */
+}
+.ch-feedback-toggle {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 60%, transparent);
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+.ch-feedback-toggle:hover { color: var(--primary); border-bottom-color: var(--secondary); }
+.ch-feedback-toggle-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: color-mix(in oklab, var(--foreground) 25%, transparent);
+}
+.ch-feedback-toggle-dot.has-errors { background: var(--secondary); }
+
+.ch-inline-feedback {
+  padding: 14px 18px;
+  background: var(--surface-container-low);
+  border-left: 2px solid var(--secondary);
+  border-radius: 0 3px 3px 0;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: color-mix(in oklab, var(--foreground) 82%, transparent);
+  text-align: left;
+  animation: ch-feedback-in 240ms ease both;
+}
+@keyframes ch-feedback-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ch-margin-eyebrow {
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.6rem;
+  color: var(--secondary);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.ch-margin-overall {
+  margin: 0 0 12px;
+  font-style: italic;
+}
+.ch-margin-empty {
+  font-style: italic;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+  font-size: 0.9rem;
+}
+.ch-margin-corrections {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ch-margin-corrections li {
+  padding-bottom: 10px;
+  border-bottom: 1px dotted color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+.ch-margin-corrections li:last-child { border-bottom: none; padding-bottom: 0; }
+
+.ch-corr-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.ch-corr-strike {
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: var(--secondary);
+  text-decoration-thickness: 1.5px;
+}
+.ch-corr-arrow {
+  color: var(--secondary);
+  font-family: var(--font-serif);
+  font-style: italic;
+}
+.ch-corr-right {
+  color: var(--primary);
+  font-weight: 500;
+}
+.ch-corr-note {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: color-mix(in oklab, var(--foreground) 65%, transparent);
+  line-height: 1.65;
+}
+
+/* Composer ---------------------------------------------------- */
+.ch-composer {
+  flex: 0 0 auto;
+  padding: 16px 0 18px;
+  border-top: 1px solid var(--foreground);
+  background: var(--background);
+}
+.ch-composer-eyebrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.ch-composer-eyebrow .eyebrow-sm {
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+}
+.ch-composer-hint {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.8rem;
+  color: color-mix(in oklab, var(--foreground) 50%, transparent);
+}
+.ch-composer-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: end;
+}
+.ch-composer-input {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  resize: vertical;
+  min-height: 58px;
+  max-height: 180px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--input);
+  padding: 8px 0;
+  color: var(--foreground);
+  outline: none;
+  transition: border-color 180ms ease;
+}
+.ch-composer-input:focus { border-bottom-color: var(--primary); border-bottom-width: 2px; }
+.ch-composer-input::placeholder {
+  color: color-mix(in oklab, var(--foreground) 35%, transparent);
+  font-style: italic;
+}
+.ch-send {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  background: var(--primary);
+  color: var(--background);
+  border: none;
+  padding: 12px 22px;
+  border-radius: 2px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 180ms ease, opacity 180ms ease;
+}
+.ch-send:hover:not(:disabled) { background: var(--primary-container); }
+.ch-send:disabled { opacity: 0.45; cursor: not-allowed; }
+.ch-disclaimer {
+  margin: 8px 0 0;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  color: color-mix(in oklab, var(--foreground) 45%, transparent);
+  text-align: center;
+}
+
+/* Desk rail --------------------------------------------------- */
+.ch-desk {
+  align-self: stretch;
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 22px 24px;
+  background: var(--surface-container-low);
+  border-radius: 4px;
+  border: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+.ch-desk-section:not(:last-child) {
+  padding-bottom: 22px;
+  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+.ch-desk-focus-tag {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  color: var(--primary);
+  margin-top: 10px;
+  margin-bottom: 14px;
+}
+.ch-desk-bar {
+  height: 3px;
+  background: color-mix(in oklab, var(--foreground) 9%, transparent);
+  overflow: hidden;
+}
+.ch-desk-bar-fill {
+  height: 100%;
+  background: var(--secondary);
+  transition: width 260ms ease;
+}
+.ch-desk-bar-label {
+  margin-top: 8px;
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+}
+.ch-desk-empty {
+  margin: 10px 0 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.ch-desk-errata {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ch-desk-errata li {
+  padding-bottom: 12px;
+  border-bottom: 1px dotted color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+.ch-desk-errata li:last-child { border-bottom: none; padding-bottom: 0; }
+.ch-desk-errata-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+.ch-desk-errata-line [lang="ja"]:not(.ch-corr-strike) {
+  color: var(--primary);
+  font-weight: 500;
+}
+.ch-desk-errata-note {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.82rem;
+  color: color-mix(in oklab, var(--foreground) 62%, transparent);
+  line-height: 1.6;
+}
+
+/* Eyebrow helpers — scoped versions matching design mock ------ */
+/* .eyebrow-sm / .eyebrow-kohaku are global — see styles/editorial.css. */
 </style>

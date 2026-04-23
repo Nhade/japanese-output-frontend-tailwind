@@ -60,40 +60,52 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="relative inline-block w-full" ref="containerRef">
-        <!-- Trigger Button -->
-        <button type="button" @click="toggle"
-            class="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:text-zinc-200"
-            :class="[
-                bordered
-                    ? 'bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/20'
-                    : 'bg-transparent border border-transparent hover:border-zinc-200 dark:hover:border-white/10 hover:text-zinc-900 dark:hover:text-white',
-                { 'ring-1 ring-emerald-500 border-emerald-500 dark:border-emerald-500': isOpen }
-            ]">
-            <div class="flex items-center gap-2 truncate">
-                <slot name="prefix"></slot>
-                <span class="truncate">{{ selectedOption ? selectedOption.label : placeholder || 'Select' }}</span>
-            </div>
-            <svg class="ml-2 h-4 w-4 text-zinc-400 transition-transform duration-200" :class="{ 'rotate-180': isOpen }"
-                xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
+    <div ref="containerRef" class="ed-select" :class="{ 'is-open': isOpen, 'is-ghost': !bordered }">
+        <button
+            type="button"
+            class="ed-select-trigger"
+            :class="{ 'is-bordered': bordered }"
+            @click="toggle"
+        >
+            <span class="ed-select-value">
+                <slot name="prefix" />
+                <span class="ed-select-label">
+                    {{ selectedOption ? selectedOption.label : placeholder || 'Select' }}
+                </span>
+            </span>
+            <svg
+                class="ed-select-chevron"
+                :class="{ 'is-open': isOpen }"
+                width="12"
+                height="12"
+                viewBox="0 0 20 20"
+                aria-hidden="true"
+            >
+                <path
                     d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                    clip-rule="evenodd" />
+                    fill="currentColor"
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                />
             </svg>
         </button>
 
-        <!-- Dropdown Menu -->
-        <transition enter-active-class="transition duration-100 ease-out"
-            enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100"
-            leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100"
-            leave-to-class="transform scale-95 opacity-0">
-            <div v-if="isOpen"
-                class="absolute right-0 z-50 mt-1 max-h-60 w-full min-w-max overflow-auto rounded-lg bg-white py-1 shadow-lg ring-1 ring-zinc-200 ring-opacity-100 focus:outline-none dark:bg-zinc-800 dark:ring-white/10 custom-scrollbar">
-                <ul class="py-1">
-                    <li v-for="option in formattedOptions" :key="option.value" @click="select(option)"
-                        class="relative cursor-pointer select-none px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-700/50"
-                        :class="{ 'text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50/50 dark:bg-emerald-500/10': modelValue === option.value }">
-                        <span class="block truncate whitespace-nowrap">{{ option.label }}</span>
+        <transition
+            enter-active-class="ed-fade-in"
+            leave-active-class="ed-fade-out"
+        >
+            <div v-if="isOpen" class="ed-select-menu" role="listbox">
+                <ul>
+                    <li
+                        v-for="option in formattedOptions"
+                        :key="option.value"
+                        role="option"
+                        class="ed-select-option"
+                        :class="{ 'is-selected': modelValue === option.value }"
+                        :aria-selected="modelValue === option.value"
+                        @click="select(option)"
+                    >
+                        {{ option.label }}
                     </li>
                 </ul>
             </div>
@@ -102,29 +114,130 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
+/* Editorial select — warm paper surface, serif labels, kohaku underline
+   on hover/selection. Uses the shared editorial tokens so it matches the
+   Shiori shell everywhere it appears (header language toggle, filter UI). */
+.ed-select {
+    position: relative;
+    display: inline-block;
+    width: 100%;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
+.ed-select-trigger {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 10px;
     background: transparent;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
+    color: color-mix(in oklab, var(--foreground) 70%, transparent);
+    cursor: pointer;
+    transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+.ed-select-trigger.is-bordered {
+    background: var(--background);
+    border-color: color-mix(in oklab, var(--foreground) 14%, transparent);
+}
+.ed-select-trigger:hover {
+    color: var(--foreground);
+    border-color: color-mix(in oklab, var(--foreground) 28%, transparent);
+}
+.ed-select-trigger:focus-visible {
+    outline: none;
+    border-color: var(--secondary);
+    box-shadow: 0 1px 0 0 var(--secondary);
+}
+.ed-select.is-open .ed-select-trigger {
+    color: var(--foreground);
+    border-color: var(--secondary);
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgba(161, 161, 170, 0.3);
-    /* zinc-400 with opacity */
-    border-radius: 3px;
+.ed-select-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.ed-select-label {
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    letter-spacing: 0;
+    color: inherit;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.2);
+.ed-select-chevron {
+    flex-shrink: 0;
+    color: color-mix(in oklab, var(--foreground) 45%, transparent);
+    transition: transform 180ms ease;
+}
+.ed-select-chevron.is-open { transform: rotate(180deg); }
+
+/* Menu ------------------------------------------------------ */
+.ed-select-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 50;
+    min-width: 100%;
+    background: var(--background);
+    border: 1px solid color-mix(in oklab, var(--foreground) 12%, transparent);
+    border-radius: 2px;
+    box-shadow: 0 6px 20px color-mix(in oklab, var(--foreground) 10%, transparent);
+    overflow: hidden;
+}
+.ed-select-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+    max-height: 260px;
+    overflow-y: auto;
+}
+.ed-select-option {
+    padding: 8px 14px;
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    color: color-mix(in oklab, var(--foreground) 78%, transparent);
+    cursor: pointer;
+    white-space: nowrap;
+    border-left: 2px solid transparent;
+    transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+.ed-select-option:hover {
+    color: var(--foreground);
+    background: color-mix(in oklab, var(--foreground) 4%, transparent);
+}
+.ed-select-option.is-selected {
+    color: var(--foreground);
+    font-style: italic;
+    background: color-mix(in oklab, var(--secondary) 10%, transparent);
+    border-left-color: var(--secondary);
+}
+.ed-select-option.is-selected:hover {
+    background: color-mix(in oklab, var(--secondary) 16%, transparent);
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(161, 161, 170, 0.5);
+/* Transitions ---------------------------------------------- */
+.ed-fade-in {
+    animation: ed-select-in 120ms ease-out;
 }
-
-.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.3);
+.ed-fade-out {
+    animation: ed-select-out 80ms ease-in forwards;
+}
+@keyframes ed-select-in {
+    from { opacity: 0; transform: translateY(-2px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ed-select-out {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-2px); }
 }
 </style>

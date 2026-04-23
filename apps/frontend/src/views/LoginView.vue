@@ -1,71 +1,133 @@
-<template>
-  <main class="grid min-h-[calc(100vh-4rem)] place-items-center px-4 text-zinc-900 dark:text-zinc-100">
-    <section
-      class="w-full max-w-md rounded-2xl border p-6 shadow-xl bg-white border-zinc-200 shadow-zinc-200/50 dark:bg-zinc-900/60 dark:border-white/5 dark:shadow-black/30">
-      <div class="mb-8 text-center">
-        <img src="/shiori.png" class="mx-auto mb-4 h-24 w-24 object-contain" alt="Logo" />
-        <p class="mb-6 text-xs font-medium uppercase tracking-widest text-zinc-500 dark:text-zinc-400">{{
-          $t('auth.brand_descriptor') }}</p>
-      </div>
-      <div class="mb-6">
-        <h2 class="text-lg font-semibold text-center">{{ $t('auth.login_title') }}</h2>
-      </div>
-      <form @submit.prevent="login" class="space-y-4">
-        <div>
-          <label class="mb-1 block text-sm text-zinc-700 dark:text-zinc-300" autocomplete="username">{{
-            $t('auth.username') }}</label>
-          <input v-model="username"
-            class="w-full rounded-xl px-4 py-3 text-base outline-none focus:ring-2 border shadow-inner transition-all bg-white text-zinc-900 border-zinc-200 placeholder-zinc-400 focus:ring-emerald-500/40 dark:bg-zinc-800 dark:text-white dark:border-white/10 dark:placeholder-zinc-500 dark:focus:ring-emerald-400"
-            :placeholder="$t('auth.username_placeholder')" />
-        </div>
-        <div>
-          <label class="mb-1 block text-sm text-zinc-700 dark:text-zinc-300">{{ $t('auth.password') }}</label>
-          <input v-model="password" type="password"
-            class="w-full rounded-xl px-4 py-3 text-base outline-none focus:ring-2 border shadow-inner transition-all bg-white text-zinc-900 border-zinc-200 placeholder-zinc-400 focus:ring-emerald-500/40 dark:bg-zinc-800 dark:text-white dark:border-white/10 dark:placeholder-zinc-500 dark:focus:ring-emerald-400"
-            :placeholder="$t('auth.password_placeholder')" />
-        </div>
-        <button type="submit"
-          class="w-full rounded-xl px-4 py-2.5 font-medium shadow-lg transition-all active:scale-95 bg-linear-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500">{{
-            $t('auth.login_button') }}</button>
-      </form>
-      <p v-if="error" class="mt-4 text-center text-sm text-red-400">{{ error }}</p>
-      <p class="mt-4 text-center text-sm text-zinc-600 dark:text-zinc-400">{{ $t('auth.no_account') }}
-        <router-link to="/register" class="text-emerald-700 hover:underline dark:text-emerald-300">{{
-          $t('auth.register_link') }}</router-link>
-      </p>
-    </section>
-  </main>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
 import { useI18n } from 'vue-i18n';
+import { useAuthStore } from '../stores/auth';
+
+import AuthLayout from '../components/AuthLayout.vue';
 
 const { t } = useI18n();
-const username = ref('');
-const password = ref('');
-const error = ref('');
 const router = useRouter();
 const auth = useAuthStore();
 
-const login = async () => {
+const username = ref('');
+const password = ref('');
+const error = ref('');
+const isSubmitting = ref(false);
+
+const usernameFocused = ref(false);
+const passwordFocused = ref(false);
+
+async function login() {
+  if (isSubmitting.value) return;
+  error.value = '';
+  isSubmitting.value = true;
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/login`, {
+    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username.value, password: password.value })
+      body: JSON.stringify({ username: username.value, password: password.value }),
     });
-    const data = await response.json();
-    if (response.ok) {
+    const data = await res.json();
+    if (res.ok) {
       auth.login(data.user_id);
       router.push('/');
     } else {
-      error.value = data.error;
+      error.value = data.error || t('auth.error_generic');
     }
   } catch (err) {
     error.value = t('auth.error_generic');
+  } finally {
+    isSubmitting.value = false;
   }
-};
+}
 </script>
+
+<template>
+  <AuthLayout :eyebrow="$t('auth.eyebrow_return')">
+    <h2 class="auth-heading">
+      {{ $t('auth.welcome_back') }}
+      <span class="emphasis">{{ $t('auth.welcome_back_emphasis') }}</span>{{ $t('auth.welcome_back_suffix') }}
+    </h2>
+    <p class="auth-sub">{{ $t('auth.login_sub') }}</p>
+
+    <form class="auth-form" @submit.prevent="login">
+      <div
+        class="auth-field"
+        :class="{ 'is-active': usernameFocused || username.length > 0, 'is-focused': usernameFocused }"
+      >
+        <label for="login-username" class="auth-field-label">
+          {{ $t('auth.username') }}
+        </label>
+        <input
+          id="login-username"
+          v-model="username"
+          class="auth-field-input"
+          type="text"
+          autocomplete="username"
+          :placeholder="usernameFocused ? $t('auth.username_placeholder') : ''"
+          @focus="usernameFocused = true"
+          @blur="usernameFocused = false"
+        />
+      </div>
+
+      <div
+        class="auth-field"
+        :class="{ 'is-active': passwordFocused || password.length > 0, 'is-focused': passwordFocused }"
+      >
+        <label for="login-password" class="auth-field-label">
+          {{ $t('auth.password') }}
+        </label>
+        <input
+          id="login-password"
+          v-model="password"
+          class="auth-field-input"
+          type="password"
+          autocomplete="current-password"
+          :placeholder="passwordFocused ? $t('auth.password_placeholder') : ''"
+          @focus="passwordFocused = true"
+          @blur="passwordFocused = false"
+        />
+      </div>
+
+      <button
+        type="submit"
+        class="auth-cta"
+        :disabled="isSubmitting || !username.trim() || !password"
+      >
+        {{ $t('auth.login_cta') }}
+        <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
+          <path
+            d="M1 5 H12 M8 1 L12 5 L8 9"
+            stroke="currentColor"
+            stroke-width="1.4"
+            fill="none"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+
+      <p v-if="error" class="auth-error" role="alert">{{ error }}</p>
+
+      <div class="auth-divider" aria-hidden="true">
+        <span class="auth-divider-rule" />
+        <span class="auth-divider-word">{{ $t('common.divider_or') }}</span>
+        <span class="auth-divider-rule" />
+      </div>
+
+      <div class="auth-toggle">
+        <span>{{ $t('auth.no_account_line') }}</span>
+        <router-link to="/register" class="auth-toggle-link">
+          {{ $t('auth.to_register') }} →
+        </router-link>
+      </div>
+    </form>
+  </AuthLayout>
+</template>
+
+<!--
+  All shared auth form styles (.auth-heading, .auth-field*, .auth-cta,
+  .auth-divider*, .auth-toggle*) live globally in styles/auth.css.
+  LoginView has no view-specific styles worth adding a scoped block for.
+-->

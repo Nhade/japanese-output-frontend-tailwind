@@ -1,70 +1,244 @@
-<template>
-  <main class="grid min-h-[calc(100vh-4rem)] place-items-center px-4 text-zinc-900 dark:text-zinc-100">
-    <section
-      class="w-full max-w-md rounded-2xl border p-6 shadow-xl bg-white border-zinc-200 shadow-zinc-200/50 dark:bg-zinc-900/60 dark:border-white/5 dark:shadow-black/30">
-      <div class="mb-8 text-center">
-        <img src="/shiori.png" class="mx-auto mb-4 h-24 w-24 object-contain" alt="Logo" />
-        <p class="mb-6 text-xs font-medium uppercase tracking-widest text-zinc-500 dark:text-zinc-400">{{
-          $t('auth.brand_descriptor') }}</p>
-      </div>
-      <div class="mb-6">
-        <h2 class="text-lg font-semibold text-center">{{ $t('auth.register_title') }}</h2>
-      </div>
-      <form @submit.prevent="register" class="space-y-4">
-        <div>
-          <label class="mb-1 block text-sm text-zinc-700 dark:text-zinc-300">{{ $t('auth.username') }}</label>
-          <input v-model="username"
-            class="w-full rounded-xl px-4 py-3 text-base outline-none focus:ring-2 border shadow-inner transition-all bg-white text-zinc-900 border-zinc-200 placeholder-zinc-400 focus:ring-emerald-500/40 dark:bg-zinc-800 dark:text-white dark:border-white/10 dark:placeholder-zinc-500 dark:focus:ring-emerald-400"
-            :placeholder="$t('auth.username_placeholder')" />
-        </div>
-        <div>
-          <label class="mb-1 block text-sm text-zinc-700 dark:text-zinc-300">{{ $t('auth.password') }}</label>
-          <input v-model="password" type="password"
-            class="w-full rounded-xl px-4 py-3 text-base outline-none focus:ring-2 border shadow-inner transition-all bg-white text-zinc-900 border-zinc-200 placeholder-zinc-400 focus:ring-emerald-500/40 dark:bg-zinc-800 dark:text-white dark:border-white/10 dark:placeholder-zinc-500 dark:focus:ring-emerald-400"
-            :placeholder="$t('auth.create_password_placeholder')" />
-        </div>
-        <button type="submit"
-          class="w-full rounded-xl px-4 py-2.5 font-medium shadow-lg transition-all active:scale-95 bg-linear-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white dark:from-emerald-500 dark:to-emerald-600 dark:hover:from-emerald-400 dark:hover:to-emerald-500">{{
-            $t('auth.register_button') }}</button>
-      </form>
-      <p v-if="error" class="mt-4 text-center text-sm text-red-400">{{ error }}</p>
-      <p v-if="message" class="mt-4 text-center text-sm text-emerald-700 dark:text-emerald-400">{{ message }}</p>
-      <p class="mt-4 text-center text-sm text-zinc-600 dark:text-zinc-400">{{ $t('auth.has_account') }}
-        <router-link to="/login" class="text-emerald-700 hover:underline dark:text-emerald-300">{{ $t('auth.login_link')
-        }}</router-link>
-      </p>
-    </section>
-  </main>
-</template>
-
-<script setup>
-import { ref } from 'vue';
+<script setup lang="ts">
+import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
+import AuthLayout from '../components/AuthLayout.vue';
+
 const { t } = useI18n();
+
 const username = ref('');
 const password = ref('');
 const error = ref('');
 const message = ref('');
+const isSubmitting = ref(false);
 
-const register = async () => {
+const usernameFocused = ref(false);
+const passwordFocused = ref(false);
+
+// Passphrase strength — 0 (none) .. 4 (masterful). The labels mirror
+// the mock's editorial scale ("Fragile" → "Masterful").
+const strengthScore = computed<number>(() => {
+  const v = password.value;
+  if (!v) return 0;
+  let s = 0;
+  if (v.length >= 8) s += 1;
+  if (/[A-Z]/.test(v)) s += 1;
+  if (/\d/.test(v)) s += 1;
+  if (/[^A-Za-z0-9]/.test(v)) s += 1;
+  if (v.length >= 14) s += 1;
+  return Math.min(s, 4);
+});
+
+const strengthLabel = computed<string>(() => {
+  if (!password.value) return t('auth.strength_empty');
+  return t(`auth.strength_${strengthScore.value || 1}`);
+});
+
+async function register() {
+  if (isSubmitting.value) return;
+  error.value = '';
+  message.value = '';
+  isSubmitting.value = true;
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/register`, {
+    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username.value, password: password.value })
+      body: JSON.stringify({ username: username.value, password: password.value }),
     });
-    const data = await response.json();
-    if (response.ok) {
+    const data = await res.json();
+    if (res.ok) {
       message.value = data.message;
-      error.value = '';
     } else {
-      error.value = data.error;
-      message.value = '';
+      error.value = data.error || t('auth.error_generic');
     }
   } catch (err) {
     error.value = t('auth.error_generic');
-    message.value = '';
+  } finally {
+    isSubmitting.value = false;
   }
-};
+}
 </script>
+
+<template>
+  <AuthLayout :eyebrow="$t('auth.eyebrow_join')">
+    <h2 class="auth-heading">
+      {{ $t('auth.begin_habit_prefix') }}
+      <span class="emphasis">{{ $t('auth.begin_habit_emphasis') }}</span>{{ $t('auth.begin_habit_suffix') }}
+    </h2>
+    <p class="auth-sub">{{ $t('auth.register_sub') }}</p>
+
+    <form class="auth-form" @submit.prevent="register">
+      <div
+        class="auth-field"
+        :class="{ 'is-active': usernameFocused || username.length > 0, 'is-focused': usernameFocused }"
+      >
+        <label for="reg-username" class="auth-field-label">
+          {{ $t('auth.username') }}
+        </label>
+        <input
+          id="reg-username"
+          v-model="username"
+          class="auth-field-input"
+          type="text"
+          autocomplete="username"
+          :placeholder="usernameFocused ? $t('auth.username_placeholder') : ''"
+          @focus="usernameFocused = true"
+          @blur="usernameFocused = false"
+        />
+      </div>
+
+      <div>
+        <div
+          class="auth-field"
+          :class="{ 'is-active': passwordFocused || password.length > 0, 'is-focused': passwordFocused }"
+        >
+          <label for="reg-password" class="auth-field-label">
+            {{ $t('auth.password') }}
+          </label>
+          <input
+            id="reg-password"
+            v-model="password"
+            class="auth-field-input"
+            type="password"
+            autocomplete="new-password"
+            :placeholder="passwordFocused ? $t('auth.create_password_placeholder') : ''"
+            @focus="passwordFocused = true"
+            @blur="passwordFocused = false"
+          />
+        </div>
+
+        <!-- Ink-wash strength meter -->
+        <div class="strength-meter">
+          <div class="strength-bars" aria-hidden="true">
+            <span
+              v-for="i in 4"
+              :key="i"
+              class="strength-bar"
+              :class="{ 'is-on': i <= strengthScore }"
+            />
+          </div>
+          <div class="strength-row">
+            <span>{{ $t('auth.strength_label') }}</span>
+            <span
+              class="strength-label"
+              :class="{ 'is-strong': strengthScore >= 3 }"
+            >
+              {{ strengthLabel }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <p class="auth-margin-note">{{ $t('auth.register_legal') }}</p>
+
+      <button
+        type="submit"
+        class="auth-cta"
+        :disabled="isSubmitting || !username.trim() || !password"
+      >
+        {{ $t('auth.register_cta') }}
+        <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true">
+          <path
+            d="M1 5 H12 M8 1 L12 5 L8 9"
+            stroke="currentColor"
+            stroke-width="1.4"
+            fill="none"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+
+      <p v-if="error" class="auth-error" role="alert">{{ error }}</p>
+      <div v-if="message" class="auth-success" role="status">
+        <p class="auth-success-text">{{ message }}</p>
+        <router-link to="/login" class="auth-toggle-link">
+          {{ $t('auth.register_success_cta') }} →
+        </router-link>
+      </div>
+
+      <div class="auth-divider" aria-hidden="true">
+        <span class="auth-divider-rule" />
+        <span>{{ $t('common.divider_or') }}</span>
+        <span class="auth-divider-rule" />
+      </div>
+
+      <div class="auth-toggle">
+        <span>{{ $t('auth.has_account_line') }}</span>
+        <router-link to="/login" class="auth-toggle-link">
+          {{ $t('auth.to_login') }} →
+        </router-link>
+      </div>
+    </form>
+  </AuthLayout>
+</template>
+
+<style scoped>
+/* Shared auth form atoms (.auth-heading, .auth-field*, .auth-cta,
+   .auth-divider*, .auth-toggle*) are global — see styles/auth.css.
+   The blocks below are register-only: strength meter, legal note and
+   success block. */
+
+/* Strength meter --------------------------------------------- */
+.strength-meter {
+  margin-top: 10px;
+}
+.strength-bars {
+  display: flex;
+  gap: 4px;
+  height: 3px;
+}
+.strength-bar {
+  flex: 1;
+  background: color-mix(in oklab, var(--foreground) 9%, transparent);
+  transition: background 240ms ease;
+}
+.strength-bar.is-on { background: var(--primary); }
+.strength-row {
+  margin-top: 6px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 60%, transparent);
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+}
+.strength-label.is-strong { color: var(--primary); }
+
+/* Margin note ------------------------------------------------ */
+.auth-margin-note {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.65;
+  color: color-mix(in oklab, var(--foreground) 60%, transparent);
+}
+
+/* Register-specific CTA override — sits closer to the margin note
+   above (shared .auth-cta has a larger default top margin). */
+.auth-cta { margin-top: 4px; }
+
+.auth-success {
+  padding: 14px 18px;
+  background: var(--surface-container-low);
+  border-left: 2px solid var(--secondary);
+  border-radius: 0 3px 3px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.auth-success-text {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14px;
+  color: color-mix(in oklab, var(--foreground) 75%, transparent);
+  line-height: 1.6;
+}
+
+</style>

@@ -1,105 +1,212 @@
 <script setup lang="ts">
-import { useAuthStore } from '../stores/auth'
-import { useThemeStore } from '../stores/theme'
-import ThemeToggle from './ThemeToggle.vue'
-import LanguageSelector from './LanguageSelector.vue'
-import { computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
 
-const authStore = useAuthStore()
-const themeStore = useThemeStore()
-const router = useRouter()
-const route = useRoute()
+import ThemeToggle from './ThemeToggle.vue';
+import LanguageSelector from './LanguageSelector.vue';
 
-const isLoggedIn = computed(() => authStore.user_id !== null)
+const authStore = useAuthStore();
+const router = useRouter();
+const route = useRoute();
 
-const logout = () => {
-  authStore.logout()
-  router.push('/login')
+const isLoggedIn = computed(() => authStore.user_id !== null);
+
+function logout() {
+  authStore.logout();
+  router.push('/login');
 }
 
-// Initialize theme on mount
-onMounted(() => {
-  themeStore.initTheme()
-})
+// Exercise is mounted at "/", so treat any descendant of "/" that isn't
+// another top-level route as the active one.
+function isActive(path: string): boolean {
+  if (path === '/') return route.path === '/';
+  return route.path === path || route.path.startsWith(`${path}/`);
+}
 
-const isActive = (path: string) => route.path === path
+const primaryLinks = [
+  { to: '/', key: 'exercise' },
+  { to: '/news', key: 'news' },
+  { to: '/videos', key: 'videos' },
+  { to: '/chat', key: 'chat' },
+  { to: '/mistakes', key: 'mistakes' },
+  { to: '/statistics', key: 'statistics' },
+] as const;
 </script>
 
 <template>
-  <header
-    class="fixed top-0 z-50 w-full border-b backdrop-blur transition-colors duration-300 border-zinc-200 bg-white/70 dark:border-white/10 dark:bg-zinc-900/50">
-    <nav class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-      <router-link to="/" class="flex items-center gap-2">
-        <img src="/shiori_no_romaji.png" class="h-8 w-auto object-contain" alt="栞" />
+  <header class="top-nav">
+    <nav class="top-nav-inner">
+      <!-- Brand ---------------------------------------------- -->
+      <router-link to="/" class="brand" aria-label="Shiori">
+        <img src="/shiori_no_romaji.png" class="brand-mark" alt="" aria-hidden="true" />
+        <span class="brand-name">Shiori</span>
       </router-link>
-      <div class="flex items-center gap-2">
-        <ul class="flex items-center gap-1 text-sm">
-          <template v-if="isLoggedIn">
-            <li>
-              <router-link to="/" class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
-                  $t('nav.exercise') }}</router-link>
-            </li>
-            <li>
-              <router-link to="/mistakes"
-                class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/mistakes') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
-                  $t('nav.mistakes') }}</router-link>
-            </li>
-            <li>
-              <router-link to="/statistics"
-                class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/statistics') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
-                  $t('nav.statistics') }}</router-link>
-            </li>
-            <li>
-              <router-link to="/news"
-                class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/news') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
-                  $t('nav.news') }}</router-link>
-            </li>
-            <li>
-              <router-link to="/videos"
-                class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/videos') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
-                  $t('nav.videos') }}</router-link>
-            </li>
-            <li>
-              <router-link to="/chat"
-                class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/chat') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
-                  $t('nav.chat') }}</router-link>
-            </li>
-            <li class="ml-1 hidden sm:block">
-              <a href="#" @click.prevent="logout"
-                class="rounded-lg px-3 py-2 text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/7 transition-colors">{{
-                  $t('nav.logout') }}</a>
-            </li>
-          </template>
-          <template v-else>
-            <li class="ml-1 hidden sm:block">
-              <router-link to="/login"
-                class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/login') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
-                  $t('nav.login') }}</router-link>
-            </li>
-            <li class="hidden sm:block">
-              <router-link to="/register"
-                class="rounded-lg px-3 py-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/7"
-                :class="isActive('/register') ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200' : 'text-zinc-600 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white'">{{
-                  $t('nav.register') }}</router-link>
-            </li>
-          </template>
-        </ul>
-        <!-- Theme Toggle -->
-        <div class="ml-2 pl-2 border-l border-zinc-200 dark:border-white/10 flex items-center gap-2">
-          <LanguageSelector />
-          <ThemeToggle />
-        </div>
+
+      <!-- Primary nav ---------------------------------------- -->
+      <ul v-if="isLoggedIn" class="nav-links">
+        <li v-for="link in primaryLinks" :key="link.to">
+          <router-link
+            :to="link.to"
+            class="nav-link"
+            :class="{ 'is-active': isActive(link.to) }"
+          >
+            {{ $t(`nav.${link.key}`) }}
+          </router-link>
+        </li>
+      </ul>
+      <ul v-else class="nav-links">
+        <li>
+          <router-link
+            to="/login"
+            class="nav-link"
+            :class="{ 'is-active': isActive('/login') }"
+          >
+            {{ $t('nav.login') }}
+          </router-link>
+        </li>
+        <li>
+          <router-link
+            to="/register"
+            class="nav-link"
+            :class="{ 'is-active': isActive('/register') }"
+          >
+            {{ $t('nav.register') }}
+          </router-link>
+        </li>
+      </ul>
+
+      <!-- Tail: language + theme + logout -------------------- -->
+      <div class="nav-tail">
+        <LanguageSelector />
+        <ThemeToggle />
+        <button
+          v-if="isLoggedIn"
+          type="button"
+          class="nav-logout"
+          @click="logout"
+        >
+          {{ $t('nav.logout') }}
+        </button>
       </div>
     </nav>
   </header>
 </template>
 
-<style scoped></style>
+<style scoped>
+.top-nav {
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 50;
+  width: 100%;
+  background: var(--background);
+  border-bottom: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+
+.top-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 14px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+@media (max-width: 720px) {
+  .top-nav-inner { padding: 12px 16px; gap: 16px; }
+}
+
+/* Brand --------------------------------------------------- */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--foreground);
+  flex-shrink: 0;
+}
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+.brand-name {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  color: var(--foreground);
+}
+@media (max-width: 720px) {
+  .brand-name { display: none; }
+}
+
+/* Primary nav --------------------------------------------- */
+.nav-links {
+  display: flex;
+  gap: 26px;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.nav-link {
+  font-family: var(--font-serif);
+  font-size: 0.98rem;
+  letter-spacing: 0.01em;
+  color: color-mix(in oklab, var(--foreground) 60%, transparent);
+  padding: 6px 0;
+  border-bottom: 1px solid transparent;
+  transition: color 180ms ease, border-color 180ms ease;
+  text-decoration: none;
+  white-space: nowrap;
+  display: inline-block;
+}
+.nav-link:hover { color: var(--foreground); }
+.nav-link.is-active {
+  color: var(--foreground);
+  border-bottom-color: var(--secondary);
+  font-weight: 500;
+  font-style: italic;
+}
+@media (max-width: 960px) {
+  .nav-links { gap: 18px; }
+  .nav-link { font-size: 0.9rem; }
+}
+@media (max-width: 720px) {
+  .nav-links { gap: 12px; }
+  .nav-link { font-size: 0.82rem; }
+}
+
+/* Tail -------------------------------------------------- */
+.nav-tail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 16px;
+  border-left: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
+  flex-shrink: 0;
+}
+.nav-logout {
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+  background: none;
+  border: none;
+  padding: 8px 2px;
+  margin-left: 4px;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+.nav-logout:hover {
+  color: var(--foreground);
+  border-bottom-color: var(--secondary);
+}
+@media (max-width: 720px) {
+  .nav-logout { display: none; }
+  .nav-tail { padding-left: 10px; gap: 4px; }
+}
+</style>
