@@ -135,12 +135,16 @@ from learner_service import (
     update_learner_settings,
 )
 from video_service import create_video_tables, import_video
+from document_service import create_document_tables
+from practice_service import create_practice_tables
 
 # Initialize Learner Tables
 try:
     with sqlite3.connect(DATABASE_PATH) as conn:
         create_learner_tables(conn)
         create_video_tables(conn)
+        create_document_tables(conn)
+        create_practice_tables(conn)
 except Exception as e:
     print(f"Database init error: {e}")
 
