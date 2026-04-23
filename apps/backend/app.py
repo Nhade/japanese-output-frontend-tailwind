@@ -144,7 +144,13 @@ from document_service import (
     list_documents,
     list_ranges,
 )
-from practice_service import create_practice_tables
+from practice_service import create_practice_tables, reset_stale_jobs
+from extraction_service import (
+    enqueue_extraction,
+    get_job as get_extraction_job,
+    list_jobs_for_doc,
+    start_extraction_background,
+)
 
 # Initialize Learner Tables
 try:
@@ -153,6 +159,9 @@ try:
         create_video_tables(conn)
         create_document_tables(conn)
         create_practice_tables(conn)
+        # Any extraction job stuck in queued/running from a previous
+        # process crash can never resume — mark it failed.
+        reset_stale_jobs(conn)
 except Exception as e:
     print(f"Database init error: {e}")
 
@@ -950,7 +959,8 @@ _ALLOWED_DOC_EXT = {"md", "markdown", "txt"}
 def _read_upload_payload():
     """Accept either multipart (file upload) or JSON body.
 
-    Returns (user_id, title, source_type, content, filename) or raises ValueError.
+    Returns (user_id, title, source_type, content, filename, locale)
+    or raises ValueError.
     """
     if request.files:
         f = request.files.get('file')
@@ -971,6 +981,7 @@ def _read_upload_payload():
             form.get('source_type', 'grammar_notes'),
             content,
             filename,
+            form.get('locale', 'en'),
         )
 
     data = request.get_json() or {}
@@ -983,17 +994,22 @@ def _read_upload_payload():
         data.get('source_type', 'grammar_notes'),
         content,
         data.get('filename'),
+        data.get('locale', 'en'),
     )
 
 
 @app.route('/api/documents/upload', methods=['POST'])
 def upload_document():
-    """Upload a grammar-note / text document. Parses + chunks synchronously.
+    """Upload a grammar-note / text document.
 
-    Extraction of grammar patterns runs as a follow-up step (Phase 2b).
+    Synchronous phase: parse + chunk, write document + chunk rows.
+    Async phase: enqueue a structured-extraction job (LLM pass) and spawn
+    a daemon thread to run it. The response returns immediately with the
+    job_id so the client can poll /api/extraction/jobs/<job_id>.
     """
     try:
-        user_id, title, source_type, content, filename = _read_upload_payload()
+        (user_id, title, source_type, content, filename,
+         locale) = _read_upload_payload()
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
@@ -1004,17 +1020,45 @@ def upload_document():
     try:
         result = ingest_document(conn, user_id, title, source_type,
                                  content, filename)
+        job_id = enqueue_extraction(conn, result["doc_id"], user_id, locale)
+    except ValueError as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        conn.close()
+        print(f"Document upload error: {e}")
+        return jsonify({"error": "Failed to ingest document"}), 500
+    else:
+        conn.close()
+        # Kick off extraction after the row is committed. The background
+        # thread opens its own connection, so we close ours first.
+        start_extraction_background(DATABASE_PATH, job_id)
         return jsonify({
             "doc_id": result["doc_id"],
             "title": title,
             "chunk_count": result["chunk_count"],
-            "status": "chunked",
+            "status": "extraction_queued",
+            "extraction_job_id": job_id,
         })
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        print(f"Document upload error: {e}")
-        return jsonify({"error": "Failed to ingest document"}), 500
+
+
+@app.route('/api/extraction/jobs/<job_id>', methods=['GET'])
+def get_extraction_job_route(job_id):
+    conn = get_db_connection()
+    try:
+        job = get_extraction_job(conn, job_id)
+        if not job:
+            return jsonify({"error": "Job not found"}), 404
+        return jsonify(job)
+    finally:
+        conn.close()
+
+
+@app.route('/api/documents/<doc_id>/extraction-jobs', methods=['GET'])
+def list_doc_extraction_jobs(doc_id):
+    conn = get_db_connection()
+    try:
+        return jsonify(list_jobs_for_doc(conn, doc_id))
     finally:
         conn.close()
 

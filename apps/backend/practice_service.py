@@ -4,10 +4,12 @@ generated against user-selected document ranges.
 
 Public API (in this phase):
   - create_practice_tables(conn)  — ensure practice-related tables exist
+  - reset_stale_jobs(conn)        — mark running jobs failed at startup
 
 Extraction, strategy dispatch, and the HTTP routes arrive in later phases.
 """
 import sqlite3
+from datetime import datetime
 
 
 def create_practice_tables(conn: sqlite3.Connection):
@@ -18,6 +20,7 @@ def create_practice_tables(conn: sqlite3.Connection):
       pattern_examples    — canonical and supporting examples per pattern
       exercises           — typed, polymorphic (cloze / pattern_use / etc.)
       exercise_attempts   — per-submission log with score + structured feedback
+      extraction_jobs     — background extraction progress per uploaded doc
     """
     conn.execute('''
         CREATE TABLE IF NOT EXISTS grammar_patterns (
@@ -77,4 +80,39 @@ def create_practice_tables(conn: sqlite3.Connection):
             answered_timestamp TEXT NOT NULL
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS extraction_jobs (
+            job_id TEXT PRIMARY KEY,
+            doc_id TEXT NOT NULL REFERENCES documents(doc_id),
+            user_id TEXT NOT NULL REFERENCES users(user_id),
+            locale TEXT NOT NULL DEFAULT 'en',
+            status TEXT NOT NULL DEFAULT 'queued',
+            total_chunks INTEGER,
+            processed_chunks INTEGER NOT NULL DEFAULT 0,
+            patterns_extracted INTEGER NOT NULL DEFAULT 0,
+            patterns_published INTEGER NOT NULL DEFAULT 0,
+            patterns_pending INTEGER NOT NULL DEFAULT 0,
+            error TEXT,
+            started_at TEXT,
+            completed_at TEXT,
+            created_timestamp TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+
+
+def reset_stale_jobs(conn: sqlite3.Connection):
+    """Mark any 'running' jobs as failed.
+
+    Call at startup — a job left in 'running' means the worker died
+    mid-extraction (process killed, OOM, deploy) and will never complete
+    on its own.
+    """
+    conn.execute('''
+        UPDATE extraction_jobs
+        SET status = 'failed',
+            error = COALESCE(error, 'interrupted'),
+            completed_at = ?
+        WHERE status IN ('queued', 'running')
+    ''', (datetime.now().isoformat(),))
     conn.commit()
