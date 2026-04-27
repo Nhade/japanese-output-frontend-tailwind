@@ -327,3 +327,197 @@ def get_detailed_feedback(question: str, user_answer: str, correct_answer: str) 
     }
     final_state = _detailed_feedback_graph.invoke(initial_state)
     return final_state["result"]
+
+
+# ---------------------------------------------------------------------------
+# pattern_use evaluator — used by /api/practice/submit
+# ---------------------------------------------------------------------------
+
+import json as _json
+import sqlite3 as _sqlite3
+from typing import Callable as _Callable, Optional as _Optional
+
+from tools.detect_pattern import detect_pattern as _detect_pattern
+
+_PATTERN_USE_LOCALE_LABELS = {
+    "en": "English",
+    "zh-tw": "Traditional Chinese",
+    "zh-TW": "Traditional Chinese",
+    "ja": "Japanese",
+}
+
+_PATTERN_USE_RUBRIC_PROMPT = """You are evaluating a learner's open-form
+Japanese answer.
+
+You will receive:
+  - pattern_name, pattern_meaning_locale
+  - reference_answer (a model answer; do NOT require the learner to
+    match it verbatim)
+  - user_answer
+  - detector_result: a deterministic check for whether the user used
+    the target pattern. detector_result.detected is the source of truth
+    on pattern usage — if false, the learner did not use the pattern.
+
+Score 0.0..1.0 based on:
+  1) used_pattern (40%): detector_result.detected. If false, score
+     CANNOT exceed 0.4.
+  2) correctness (40%): grammar / conjugation / particles. Look for
+     real errors, not stylistic preferences.
+  3) naturalness + situation fit (20%): does it sound natural and
+     match the prompt?
+
+Output JSON:
+{
+  "score": 0.0..1.0,
+  "used_pattern": true|false,
+  "feedback_text": "short, focused feedback in {locale_label}. Cite
+                    specific spans of user_answer when pointing out
+                    errors. Be encouraging.",
+  "issues": ["short_label1", ...]   # optional, e.g. "conjugation",
+                                    # "particle", "register"
+}
+
+Hard rule: if detector_result.detected is false, used_pattern MUST be
+false and score MUST be <= 0.4.
+"""
+
+
+def _default_pattern_use_llm(messages: list[dict]) -> dict:
+    result = query_llm_json(messages, retries=2, temperature=0.0)
+    if result.get("data") is None:
+        raise RuntimeError(result.get("error") or "LLM returned no JSON")
+    return result["data"]
+
+
+def evaluate_pattern_use_submission(
+        db_path: str, exercise_id: str, user_id: str, user_response: str,
+        locale: str = "en",
+        llm_fn: _Optional[_Callable[[list[dict]], dict]] = None) -> dict:
+    """Evaluate an open-form pattern_use exercise.
+
+    Reads the exercise + its target pattern from the DB, runs
+    detect_pattern (deterministic), then asks an LLM rubric judge to
+    score correctness + naturalness, grounded in the detector result.
+    Persists an exercise_attempts row.
+
+    Returns:
+        {
+          "score": float 0..1,
+          "is_correct": bool,
+          "used_pattern": bool,
+          "feedback_text": str,
+          "issues": list[str],
+          "detector": dict,            # raw detect_pattern output
+          "attempt_id": str,
+        }
+    """
+    fn = llm_fn or _default_pattern_use_llm
+    response = (user_response or "").strip()
+    if not response:
+        raise ValueError("user_response must not be empty")
+
+    conn = _sqlite3.connect(db_path)
+    conn.row_factory = _sqlite3.Row
+    try:
+        ex_row = conn.execute(
+            "SELECT exercise_id, type, target_pattern_id, prompt, "
+            "expected_json FROM exercises WHERE exercise_id = ?",
+            (exercise_id,)
+        ).fetchone()
+        if not ex_row:
+            raise ValueError(f"exercise {exercise_id} not found")
+        if ex_row["type"] != "pattern_use":
+            raise ValueError(
+                f"evaluator only handles type=pattern_use, got "
+                f"{ex_row['type']!r}"
+            )
+
+        expected = _json.loads(ex_row["expected_json"] or "{}")
+        target_pattern_id = expected.get("target_pattern_id") \
+            or ex_row["target_pattern_id"]
+
+        pattern_row = conn.execute(
+            "SELECT name, meaning_locale FROM grammar_patterns "
+            "WHERE pattern_id = ?", (target_pattern_id,)
+        ).fetchone()
+        pattern_name = pattern_row["name"] if pattern_row else "?"
+        pattern_meaning = (pattern_row["meaning_locale"]
+                           if pattern_row else "")
+
+        # Deterministic check first.
+        detector = _detect_pattern(conn, response, target_pattern_id)
+
+        # Rubric LLM judge (temp 0).
+        locale_label = _PATTERN_USE_LOCALE_LABELS.get(locale, "English")
+        system_prompt = _PATTERN_USE_RUBRIC_PROMPT.replace(
+            "{locale_label}", locale_label
+        )
+        user_payload = {
+            "pattern_name": pattern_name,
+            "pattern_meaning_locale": pattern_meaning,
+            "reference_answer": expected.get("reference_answer_jp", ""),
+            "user_answer": response,
+            "detector_result": {
+                "detected": bool(detector.get("detected")),
+                "matched": detector.get("matched", []),
+                "reason": detector.get("reason", ""),
+            },
+        }
+
+        try:
+            raw = fn([
+                {"role": "system", "content": system_prompt},
+                {"role": "user",
+                 "content": _json.dumps(user_payload, ensure_ascii=False)},
+            ])
+            score = float(raw.get("score", 0.0))
+            score = max(0.0, min(1.0, score))
+            used_pattern = bool(raw.get("used_pattern", False))
+            feedback_text = (raw.get("feedback_text") or "").strip()
+            issues = raw.get("issues") or []
+            if not isinstance(issues, list):
+                issues = []
+        except (RuntimeError, ValueError, TypeError, KeyError):
+            # LLM failed — fall back to detector-only score.
+            used_pattern = bool(detector.get("detected"))
+            score = 0.4 if used_pattern else 0.0
+            feedback_text = (
+                "Automatic grading unavailable; pattern usage "
+                f"{'detected' if used_pattern else 'not detected'}."
+            )
+            issues = []
+
+        # Enforce the rubric's hard rule defensively.
+        if not detector.get("detected"):
+            used_pattern = False
+            score = min(score, 0.4)
+
+        is_correct = score >= 0.7
+
+        attempt_id = __import__("uuid").uuid4().hex
+        feedback_blob = _json.dumps({
+            "feedback_text": feedback_text,
+            "issues": issues,
+            "detector": detector,
+        }, ensure_ascii=False)
+        conn.execute('''
+            INSERT INTO exercise_attempts
+            (attempt_id, exercise_id, user_id, response, score,
+             is_correct, feedback_json, answered_timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (attempt_id, exercise_id, user_id, response, score,
+              1 if is_correct else 0, feedback_blob,
+              __import__("datetime").datetime.now().isoformat()))
+        conn.commit()
+
+        return {
+            "attempt_id": attempt_id,
+            "score": score,
+            "is_correct": is_correct,
+            "used_pattern": used_pattern,
+            "feedback_text": feedback_text,
+            "issues": issues,
+            "detector": detector,
+        }
+    finally:
+        conn.close()

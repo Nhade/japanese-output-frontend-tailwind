@@ -1042,6 +1042,58 @@ def upload_document():
         })
 
 
+# ---------------------------------------------------------------------------
+# Practice — pattern_use exercises (Phase 4)
+# ---------------------------------------------------------------------------
+
+from graphs.practice_graph import generate_exercise as _generate_practice_exercise
+from graphs.eval_graph import evaluate_pattern_use_submission
+
+
+@app.route('/api/practice/next', methods=['POST'])
+def practice_next():
+    """Generate the next pattern_use exercise for a user + range."""
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    range_id = data.get('range_id')
+    locale = data.get('locale', 'en')
+    if not user_id or not range_id:
+        return jsonify({"error": "user_id and range_id are required"}), 400
+    try:
+        result = _generate_practice_exercise(
+            DATABASE_PATH, user_id, range_id, locale=locale
+        )
+        if "error" in result:
+            return jsonify(result), 422
+        return jsonify(result["exercise"])
+    except Exception as e:
+        print(f"practice/next error: {e}")
+        return jsonify({"error": "Failed to generate exercise"}), 500
+
+
+@app.route('/api/practice/submit', methods=['POST'])
+def practice_submit():
+    """Evaluate an open-form pattern_use submission."""
+    data = request.get_json() or {}
+    exercise_id = data.get('exercise_id')
+    user_id = data.get('user_id')
+    user_response = data.get('user_response')
+    locale = data.get('locale', 'en')
+    if not exercise_id or not user_id or not user_response:
+        return jsonify({
+            "error": "exercise_id, user_id, and user_response are required"
+        }), 400
+    try:
+        return jsonify(evaluate_pattern_use_submission(
+            DATABASE_PATH, exercise_id, user_id, user_response, locale=locale
+        ))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        print(f"practice/submit error: {e}")
+        return jsonify({"error": "Failed to evaluate submission"}), 500
+
+
 @app.route('/api/extraction/jobs/<job_id>', methods=['GET'])
 def get_extraction_job_route(job_id):
     conn = get_db_connection()
