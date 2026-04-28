@@ -274,6 +274,39 @@ class TestEvaluatePatternUse(unittest.TestCase):
         self.assertTrue(result["used_pattern"])
         self.assertGreaterEqual(result["score"], 0.9)
         self.assertTrue(result["detector"]["detected"])
+        # Result carries the morphological diff + register target so the
+        # frontend (and any future audit) can see what the rubric saw.
+        self.assertEqual(result["target_register"], "plain")
+        self.assertIsNotNone(result["morph_diff"])
+        self.assertIn("食べる", result["morph_diff"]["shared_verb_bases"])
+
+    def test_rubric_payload_includes_register_and_diff(self):
+        # Capture what the rubric judge actually receives so the contract
+        # the prompt expects is locked in by tests, not just docs.
+        captured: list[dict] = []
+        def judge(messages):
+            captured.append(json.loads(messages[1]["content"]))
+            return {
+                "score": 0.8, "used_pattern": True,
+                "feedback_text": "ok", "issues": [],
+            }
+        evaluate_pattern_use_submission(
+            self.db_path, self.exercise_id, "u1",
+            "ケーキを食べてしまった",
+            llm_fn=judge,
+        )
+        self.assertEqual(len(captured), 1)
+        payload = captured[0]
+        # Register travels through.
+        self.assertEqual(payload["target_register"], "plain")
+        # Morph diff travels through with the four signal fields the
+        # rubric prompt references.
+        self.assertIn("morph_diff", payload)
+        for key in ("shared_verb_bases", "verb_form_match",
+                    "particle_jaccard", "negation_match"):
+            self.assertIn(key, payload["morph_diff"])
+        # Detector still travels through, unchanged.
+        self.assertTrue(payload["detector_result"]["detected"])
 
     def test_pattern_missing_caps_score(self):
         # User's response doesn't contain てしま → detector says false →

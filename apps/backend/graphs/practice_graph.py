@@ -258,7 +258,8 @@ Construct ONE pattern_use exercise. The learner will write a Japanese
 sentence that uses the target pattern.
 
 You will receive:
-  - pattern: name, formation_rule, meaning_locale, jlpt, examples.
+  - pattern: name, formation_rule, meaning_locale, jlpt, register,
+    examples.
   - difficulty: 1..5 (use simpler vocab and shorter sentences for low
     difficulty).
   - variant_hint: a short situational nudge (English only — for your
@@ -276,6 +277,10 @@ Output JSON exactly:
 Hard rules:
   - reference_answer_jp MUST contain a conjugation of the target pattern.
   - reference_answer_jp MUST be plain Japanese — no romaji, no English.
+  - reference_answer_jp MUST match the pattern's register exactly:
+    - "polite" / "formal" → use です／ます forms.
+    - "plain" / "casual"  → use plain (dictionary / た / ない) forms.
+    - "neutral" → either is acceptable; prefer the form used in examples.
   - Do NOT echo the pattern name into prompt_locale_text more than once.
 """
 
@@ -286,12 +291,17 @@ def execute(state: PracticeState) -> dict:
     examples = state.get("examples", [])
     feedback = state.get("verifier_feedback", [])
 
+    register = pattern.get("register") or "neutral"
     user_payload = {
         "pattern": {
             "name": pattern["name"],
             "formation_rule": pattern.get("formation_rule"),
             "meaning_locale": pattern.get("meaning_locale"),
             "jlpt": pattern.get("jlpt"),
+            # Register travels with the pattern so both the executor's
+            # reference answer and the evaluator's rubric have a fixed
+            # target instead of guessing per call.
+            "register": register,
             "examples": [
                 {"sentence": ex["sentence"],
                  "translation": ex.get("translation")}
@@ -397,6 +407,9 @@ def persist(state: PracticeState) -> dict:
         "reference_answer_jp": draft["reference_answer_jp"],
         "target_pattern_id": pattern["pattern_id"],
         "target_pattern_name": pattern["name"],
+        # Register travels through to the evaluator so the rubric judge
+        # has a fixed target instead of guessing per call.
+        "target_register": pattern.get("register") or "neutral",
     }
     rubric = {
         "must_use_pattern": True,

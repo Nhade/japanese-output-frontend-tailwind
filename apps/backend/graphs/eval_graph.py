@@ -338,6 +338,7 @@ import sqlite3 as _sqlite3
 from typing import Callable as _Callable, Optional as _Optional
 
 from tools.detect_pattern import detect_pattern as _detect_pattern
+from tools.morphological_diff import morphological_diff as _morph_diff
 
 _PATTERN_USE_LOCALE_LABELS = {
     "en": "English",
@@ -346,39 +347,66 @@ _PATTERN_USE_LOCALE_LABELS = {
     "ja": "Japanese",
 }
 
+# The rubric is intentionally explicit. Earlier prompts said "naturalness
+# + situation fit (20%)" and the judge invented criteria each call,
+# producing opposite scores for opposite-meaning sentences. Each check
+# below is a concrete yes/no so the judgement is reproducible.
 _PATTERN_USE_RUBRIC_PROMPT = """You are evaluating a learner's open-form
-Japanese answer.
+Japanese answer. Be reproducible: every score must trace to one of the
+listed checks. Do not invent additional criteria.
 
 You will receive:
   - pattern_name, pattern_meaning_locale
-  - reference_answer (a model answer; do NOT require the learner to
-    match it verbatim)
+  - target_register: one of "polite", "plain", "casual", "formal",
+    "neutral". This is the register the exercise is testing. Do NOT
+    deduct for matching it. "neutral" allows either.
+  - reference_answer: a model answer. Do NOT require the learner to
+    match it verbatim, but use it as an anchor (see check 4).
   - user_answer
-  - detector_result: a deterministic check for whether the user used
-    the target pattern. detector_result.detected is the source of truth
-    on pattern usage — if false, the learner did not use the pattern.
+  - detector_result.detected: deterministic check for pattern usage —
+    source of truth.
+  - morph_diff: deterministic morphological comparison between
+    reference_answer and user_answer. Includes shared verb lemmas,
+    verb_form_match (do shared lemmas use the same form category),
+    particle_jaccard (0..1 over distinct particles), negation_match.
 
-Score 0.0..1.0 based on:
-  1) used_pattern (40%): detector_result.detected. If false, score
-     CANNOT exceed 0.4.
-  2) correctness (40%): grammar / conjugation / particles. Look for
-     real errors, not stylistic preferences.
-  3) naturalness + situation fit (20%): does it sound natural and
-     match the prompt?
+Score = sum of these four signals, each 0.0..0.25:
+
+  1) PATTERN (0.25). detector_result.detected == true → 0.25, else 0.
+  2) PARSEABILITY + CONJUGATION (0.25). Does the sentence parse as a
+     single Japanese sentence (subject + predicate, ends with a verb,
+     adjective, or copula)? Are verb endings well-formed (no truncated
+     conjugations, no kana-mixed errors)? Score 0.25 / 0.15 / 0.05 / 0
+     for clean / minor-typo / one-real-error / unparseable.
+  3) PARTICLES + TOPIC (0.25). Are particles consistent (no を with
+     intransitive verbs, no double topic markers)? Does the sentence
+     refer to the situation in the prompt? Score in 0.05 increments.
+  4) REGISTER + NATURALNESS (0.25). Does the verb-final form match
+     target_register? AND: if morph_diff.verb_form_match is true and
+     morph_diff.particle_jaccard >= 0.5, the user matches the
+     reference's grammatical shape — score this check at >= 0.20
+     unless there is a concrete error you can cite. Otherwise judge
+     on whether a native speaker would write this naturally.
 
 Output JSON:
 {
   "score": 0.0..1.0,
   "used_pattern": true|false,
-  "feedback_text": "short, focused feedback in {locale_label}. Cite
-                    specific spans of user_answer when pointing out
-                    errors. Be encouraging.",
-  "issues": ["short_label1", ...]   # optional, e.g. "conjugation",
-                                    # "particle", "register"
+  "feedback_text": "short, focused feedback in {locale_label}. Cite the
+                    specific span of user_answer (in 「…」) for any
+                    error you note. If the answer is correct, say so
+                    briefly and stop.",
+  "issues": ["pattern", "conjugation", "particle", "register",
+             "topic", "naturalness"]   # zero or more, only those that
+                                       # actually applied
 }
 
-Hard rule: if detector_result.detected is false, used_pattern MUST be
-false and score MUST be <= 0.4.
+Hard rules:
+  - If detector_result.detected is false, used_pattern = false AND
+    score <= 0.4.
+  - Do NOT deduct for the user matching target_register.
+  - Do NOT mark a sentence "unnatural" purely on stylistic preference
+    when morph_diff shows it shares the reference's shape.
 """
 
 
@@ -435,17 +463,27 @@ def evaluate_pattern_use_submission(
         expected = _json.loads(ex_row["expected_json"] or "{}")
         target_pattern_id = expected.get("target_pattern_id") \
             or ex_row["target_pattern_id"]
+        target_register = expected.get("target_register") or "neutral"
+        reference_answer = expected.get("reference_answer_jp", "")
 
         pattern_row = conn.execute(
-            "SELECT name, meaning_locale FROM grammar_patterns "
+            "SELECT name, meaning_locale, register FROM grammar_patterns "
             "WHERE pattern_id = ?", (target_pattern_id,)
         ).fetchone()
         pattern_name = pattern_row["name"] if pattern_row else "?"
         pattern_meaning = (pattern_row["meaning_locale"]
                            if pattern_row else "")
+        # Pattern row's register is authoritative; the exercise's stored
+        # value is fallback for legacy rows that pre-date the field.
+        if pattern_row and pattern_row["register"]:
+            target_register = pattern_row["register"]
 
-        # Deterministic check first.
+        # Deterministic checks: pattern detection + morphological diff.
+        # Both feed the rubric so it has concrete evidence to score
+        # against instead of inventing naturalness criteria.
         detector = _detect_pattern(conn, response, target_pattern_id)
+        morph = _morph_diff(reference_answer, response) if reference_answer \
+            else None
 
         # Rubric LLM judge (temp 0).
         locale_label = _PATTERN_USE_LOCALE_LABELS.get(locale, "English")
@@ -455,13 +493,23 @@ def evaluate_pattern_use_submission(
         user_payload = {
             "pattern_name": pattern_name,
             "pattern_meaning_locale": pattern_meaning,
-            "reference_answer": expected.get("reference_answer_jp", ""),
+            "target_register": target_register,
+            "reference_answer": reference_answer,
             "user_answer": response,
             "detector_result": {
                 "detected": bool(detector.get("detected")),
                 "matched": detector.get("matched", []),
                 "reason": detector.get("reason", ""),
             },
+            "morph_diff": (
+                {
+                    "shared_verb_bases": morph["shared_verb_bases"],
+                    "verb_form_match": morph["verb_form_match"],
+                    "particle_jaccard": morph["particle_jaccard"],
+                    "negation_match": morph["negation_match"],
+                    "summary": morph["summary"],
+                } if morph else None
+            ),
         }
 
         try:
@@ -499,6 +547,8 @@ def evaluate_pattern_use_submission(
             "feedback_text": feedback_text,
             "issues": issues,
             "detector": detector,
+            "morph_diff": morph,
+            "target_register": target_register,
         }, ensure_ascii=False)
         conn.execute('''
             INSERT INTO exercise_attempts
@@ -518,6 +568,8 @@ def evaluate_pattern_use_submission(
             "feedback_text": feedback_text,
             "issues": issues,
             "detector": detector,
+            "morph_diff": morph,
+            "target_register": target_register,
         }
     finally:
         conn.close()
