@@ -393,6 +393,17 @@
         "difficulty": "難易度",
         "pattern_used": "文型を使用",
         "pattern_missing": "文型未使用",
-        "detector_matched": "一致"
+        "detector_matched": "一致",
+        "progress_n_of_m": "この範囲の {n} / {m} 文型目",
+        "progress_covered": "{n} / {m} 文型を練習済み",
+        "session_complete_title": "この範囲は完了しました",
+        "session_complete_body": "この範囲の {m} 文型をすべて練習しました。リセットしてもう一度練習できます。",
+        "session_restart": "リセットして再開",
+        "error_session_complete": "範囲完了 — リセットしてやり直してください。",
+        "error_no_published_patterns_in_range": "この範囲にはまだ公開済みの文型がありません。",
+        "error_plan_invented_pattern_id": "プランナーが想定外の文型を返しました。もう一度お試しください。",
+        "error_plan_failed": "プランナーが失敗しました。もう一度お試しください。",
+        "error_target_pattern_missing": "対象の文型が見つかりません。",
+        "error_no_examples_for_fallback": "フォールバック用の例文がありません。"
     }
 }

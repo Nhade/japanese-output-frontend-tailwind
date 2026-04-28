@@ -1052,16 +1052,25 @@ from graphs.eval_graph import evaluate_pattern_use_submission
 
 @app.route('/api/practice/next', methods=['POST'])
 def practice_next():
-    """Generate the next pattern_use exercise for a user + range."""
+    """Generate the next pattern_use exercise for a user + range.
+
+    Optional body field `exclude_pattern_ids` (list of pattern_id) lets
+    the client track an in-session rotation so the same pattern isn't
+    served twice in a row.
+    """
     data = request.get_json() or {}
     user_id = data.get('user_id')
     range_id = data.get('range_id')
     locale = data.get('locale', 'en')
+    exclude = data.get('exclude_pattern_ids') or []
+    if not isinstance(exclude, list):
+        exclude = []
     if not user_id or not range_id:
         return jsonify({"error": "user_id and range_id are required"}), 400
     try:
         result = _generate_practice_exercise(
-            DATABASE_PATH, user_id, range_id, locale=locale
+            DATABASE_PATH, user_id, range_id,
+            locale=locale, exclude_pattern_ids=exclude,
         )
         if "error" in result:
             return jsonify(result), 422

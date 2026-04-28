@@ -97,6 +97,9 @@ class PracticeState(TypedDict, total=False):
     locale: str
     db_path: str
     llm_fn: Optional[LLMFn]   # injected for tests; None → use ai_core
+    # Pattern IDs already practised this session, to be skipped so the
+    # learner rotates through the range instead of repeating one pattern.
+    exclude_pattern_ids: list[str]
 
     # Intermediate
     weak_points: list[str]
@@ -109,6 +112,10 @@ class PracticeState(TypedDict, total=False):
     retries: int
     used_fallback: bool
     verifier_feedback: list[str]
+    # Progress counters surfaced on the exercise response so the UI can
+    # show "Pattern N of M".
+    total_in_range: int
+    covered_in_session: int
 
     # Output
     error: Optional[str]
@@ -144,26 +151,52 @@ def _open_conn(state: PracticeState) -> sqlite3.Connection:
 # ---------------------------------------------------------------------------
 
 def gather(state: PracticeState) -> dict:
-    """Pull SRS-due patterns and learner weak points from the catalog."""
+    """Pull SRS-due patterns and learner weak points from the catalog.
+
+    Filters out patterns the caller already practised this session so a
+    range with N published patterns produces N distinct exercises before
+    the planner has to repeat. When the exclusion drains the candidate
+    set, return ``session_complete`` so the frontend can offer a reset.
+    """
     conn = _open_conn(state)
     try:
-        candidates = srs_due(conn, state["user_id"], state["range_id"])
+        all_candidates = srs_due(conn, state["user_id"], state["range_id"])
         weak = learner_weak_points(conn, state["user_id"])
     finally:
         conn.close()
+
+    if not all_candidates:
+        return {
+            "candidates": [],
+            "weak_points": weak,
+            "error": "no_published_patterns_in_range",
+            "total_in_range": 0,
+            "covered_in_session": 0,
+        }
+
+    excluded = set(state.get("exclude_pattern_ids") or [])
+    candidate_ids = {c["pattern_id"] for c in all_candidates}
+    covered = len(excluded & candidate_ids)
+    candidates = [c for c in all_candidates
+                  if c["pattern_id"] not in excluded]
 
     if not candidates:
         return {
             "candidates": [],
             "weak_points": weak,
-            "error": "no_published_patterns_in_range",
+            "error": "session_complete",
+            "total_in_range": len(all_candidates),
+            "covered_in_session": covered,
         }
+
     return {
         "candidates": candidates,
         "weak_points": weak,
         "retries": 0,
         "verifier_feedback": [],
         "used_fallback": False,
+        "total_in_range": len(all_candidates),
+        "covered_in_session": covered,
     }
 
 
@@ -434,6 +467,8 @@ def persist(state: PracticeState) -> dict:
     finally:
         conn.close()
 
+    total_in_range = state.get("total_in_range", 0)
+    covered_in_session = state.get("covered_in_session", 0)
     return {
         "exercise": {
             "exercise_id": exercise_id,
@@ -444,6 +479,9 @@ def persist(state: PracticeState) -> dict:
             "prompt": draft["prompt_locale_text"],
             "source": source,
             "retries": state.get("retries", 0),
+            # 1-based — "this is pattern N of M in the range".
+            "pattern_index_in_session": covered_in_session + 1,
+            "pattern_count_in_range": total_in_range,
         }
     }
 
@@ -515,12 +553,20 @@ _practice_graph = _build_practice_graph()
 
 def generate_exercise(db_path: str, user_id: str, range_id: str,
                       locale: str = "en",
-                      llm_fn: Optional[LLMFn] = None) -> dict:
+                      llm_fn: Optional[LLMFn] = None,
+                      exclude_pattern_ids: Optional[list[str]] = None
+                      ) -> dict:
     """Run the practice graph for one exercise.
 
     Returns a dict shaped like:
       {"exercise": {...}}                    — happy path
-      {"error": "<reason>", "stage": ...}    — graph short-circuited
+      {"error": "<reason>", ...}             — graph short-circuited
+
+    `exclude_pattern_ids` lets the caller (typically the frontend
+    tracking a session) filter patterns the learner already practised.
+    When all range patterns are excluded the response carries
+    ``error: 'session_complete'`` along with the progress counters so
+    the UI can offer a reset.
     """
     initial: PracticeState = {
         "user_id": user_id,
@@ -528,6 +574,7 @@ def generate_exercise(db_path: str, user_id: str, range_id: str,
         "locale": locale,
         "db_path": db_path,
         "llm_fn": llm_fn,
+        "exclude_pattern_ids": list(exclude_pattern_ids or []),
     }
     final = _practice_graph.invoke(initial)
     if final.get("exercise"):
@@ -536,4 +583,6 @@ def generate_exercise(db_path: str, user_id: str, range_id: str,
         "error": final.get("error") or "unknown_error",
         "candidates": len(final.get("candidates") or []),
         "retries": final.get("retries", 0),
+        "total_in_range": final.get("total_in_range", 0),
+        "covered_in_session": final.get("covered_in_session", 0),
     }

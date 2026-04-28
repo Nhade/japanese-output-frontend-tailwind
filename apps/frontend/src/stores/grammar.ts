@@ -56,6 +56,16 @@ export interface PracticeExercise {
   prompt: string
   source: 'graph' | 'fallback_canonical'
   retries: number
+  pattern_index_in_session: number
+  pattern_count_in_range: number
+}
+
+export interface SessionState {
+  total_in_range: number
+  covered_in_session: number
+  /** True iff the backend returned `error: 'session_complete'`
+   *  meaning every pattern in the range has been practised. */
+  is_complete: boolean
 }
 
 export interface SubmissionResult {
@@ -66,6 +76,8 @@ export interface SubmissionResult {
   feedback_text: string
   issues: string[]
   detector: { detected: boolean; matched: string[]; reason: string; pattern_name: string }
+  morph_diff: unknown | null
+  target_register: string
 }
 
 interface State {
@@ -74,10 +86,22 @@ interface State {
   rangesByDoc: Record<string, PracticeRange[]>
   jobsById: Record<string, ExtractionJob>
   loading: boolean
-  error: string | null
+  /** Localised error key suitable for i18n lookup, or a plain message. */
+  errorKey: string | null
   currentExercise: PracticeExercise | null
   lastResult: SubmissionResult | null
+  /** Per-range record of pattern_ids practised in the current session.
+   *  Used as exclude_pattern_ids so the planner rotates instead of
+   *  repeating one pattern. */
+  seenPatternIdsByRange: Record<string, string[]>
+  sessionState: SessionState | null
 }
+
+/** Result of a fetch that may carry an `error` key in its JSON body
+ *  (the backend uses this for 422 responses on /practice/next). */
+interface FetchOk<T> { ok: true; data: T }
+interface FetchErr  { ok: false; status: number; body: any }
+type FetchResult<T> = FetchOk<T> | FetchErr
 
 async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -91,6 +115,19 @@ async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T
 }
 
+async function jsonFetchSafe<T>(path: string, init?: RequestInit
+                                ): Promise<FetchResult<T>> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    ...init,
+  })
+  if (res.ok) {
+    return { ok: true, data: (await res.json()) as T }
+  }
+  const body = await res.json().catch(() => ({}))
+  return { ok: false, status: res.status, body }
+}
+
 export const useGrammarStore = defineStore('grammar', {
   state: (): State => ({
     documents: [],
@@ -98,21 +135,23 @@ export const useGrammarStore = defineStore('grammar', {
     rangesByDoc: {},
     jobsById: {},
     loading: false,
-    error: null,
+    errorKey: null,
     currentExercise: null,
     lastResult: null,
+    seenPatternIdsByRange: {},
+    sessionState: null,
   }),
 
   actions: {
     async listDocuments(userId: string) {
       this.loading = true
-      this.error = null
+      this.errorKey = null
       try {
         this.documents = await jsonFetch<DocumentSummary[]>(
           `/documents?user_id=${encodeURIComponent(userId)}`,
         )
       } catch (e: any) {
-        this.error = e?.message ?? String(e)
+        this.errorKey = e?.message ?? String(e)
       } finally {
         this.loading = false
       }
@@ -177,17 +216,65 @@ export const useGrammarStore = defineStore('grammar', {
       })
     },
 
+    /** Frontend-side session memory of which patterns have been
+     *  practised in this range so the planner rotates instead of
+     *  repeating one pattern. */
+    markPatternSeen(rangeId: string, patternId: string) {
+      const list = this.seenPatternIdsByRange[rangeId] || []
+      if (!list.includes(patternId)) {
+        this.seenPatternIdsByRange[rangeId] = [...list, patternId]
+      }
+    },
+
+    resetSession(rangeId: string) {
+      this.seenPatternIdsByRange[rangeId] = []
+      this.sessionState = null
+      this.currentExercise = null
+      this.lastResult = null
+      this.errorKey = null
+    },
+
     async fetchNextExercise(userId: string, rangeId: string, locale: string) {
       this.loading = true
-      this.error = null
+      this.errorKey = null
       this.lastResult = null
       try {
-        this.currentExercise = await jsonFetch<PracticeExercise>(`/practice/next`, {
+        const exclude = this.seenPatternIdsByRange[rangeId] || []
+        const res = await jsonFetchSafe<PracticeExercise>(`/practice/next`, {
           method: 'POST',
-          body: JSON.stringify({ user_id: userId, range_id: rangeId, locale }),
+          body: JSON.stringify({
+            user_id: userId,
+            range_id: rangeId,
+            locale,
+            exclude_pattern_ids: exclude,
+          }),
         })
+        if (res.ok) {
+          this.currentExercise = res.data
+          this.sessionState = {
+            total_in_range: res.data.pattern_count_in_range,
+            covered_in_session: res.data.pattern_index_in_session - 1,
+            is_complete: false,
+          }
+        } else {
+          this.currentExercise = null
+          // The backend returns a structured 422 with an error key like
+          // "session_complete", "no_published_patterns_in_range", or
+          // "plan_invented_pattern_id". Surface that key so the UI can
+          // localise it instead of toasting raw JSON.
+          const body = res.body || {}
+          const errKey = typeof body.error === 'string' ? body.error : 'unknown'
+          this.errorKey = errKey
+          if (errKey === 'session_complete') {
+            this.sessionState = {
+              total_in_range: body.total_in_range || 0,
+              covered_in_session: body.covered_in_session || 0,
+              is_complete: true,
+            }
+          }
+        }
       } catch (e: any) {
-        this.error = e?.message ?? String(e)
+        this.errorKey = e?.message ?? 'network_error'
         this.currentExercise = null
       } finally {
         this.loading = false

@@ -245,6 +245,66 @@ class TestGenerateExercise(unittest.TestCase):
         self.assertEqual(result.get("error"),
                          "no_published_patterns_in_range")
 
+    def test_progress_counters_on_exercise(self):
+        # Range covers two published patterns. First call: index=1 of 2.
+        llm, _ = _make_llm(self.ctx["p1"])
+        first = generate_exercise(
+            self.db_path, "u1", self.ctx["range_id"], llm_fn=llm,
+        )
+        self.assertEqual(first["exercise"]["pattern_count_in_range"], 2)
+        self.assertEqual(first["exercise"]["pattern_index_in_session"], 1)
+
+    def test_exclude_drives_rotation(self):
+        # First exercise targets p1; passing p1 in exclude pushes the
+        # planner to p2.
+        first_llm, _ = _make_llm(self.ctx["p1"])
+        first = generate_exercise(
+            self.db_path, "u1", self.ctx["range_id"], llm_fn=first_llm,
+        )
+        self.assertEqual(first["exercise"]["target_pattern_id"], self.ctx["p1"])
+
+        second_llm, _ = _make_llm(self.ctx["p2"], ref_answer="行けば")
+        second = generate_exercise(
+            self.db_path, "u1", self.ctx["range_id"],
+            llm_fn=second_llm,
+            exclude_pattern_ids=[self.ctx["p1"]],
+        )
+        self.assertEqual(second["exercise"]["target_pattern_id"], self.ctx["p2"])
+        self.assertEqual(second["exercise"]["pattern_count_in_range"], 2)
+        self.assertEqual(second["exercise"]["pattern_index_in_session"], 2)
+
+    def test_session_complete_when_all_excluded(self):
+        result = generate_exercise(
+            self.db_path, "u1", self.ctx["range_id"],
+            llm_fn=lambda *a, **k: (_ for _ in ()).throw(
+                AssertionError("should not be called")),
+            exclude_pattern_ids=[self.ctx["p1"], self.ctx["p2"]],
+        )
+        self.assertEqual(result.get("error"), "session_complete")
+        self.assertEqual(result["total_in_range"], 2)
+        self.assertEqual(result["covered_in_session"], 2)
+
+    def test_planner_invented_id_rejected_after_exclude(self):
+        # Defensive: after excluding p1, the planner is offered only p2.
+        # If it still invents another id we reject — already covered by
+        # test_planner_rejects_invented_id but reverified post-filter.
+        def llm(messages, _t):
+            sys = messages[0]["content"]
+            if "practice planner" in sys:
+                return {
+                    "target_pattern_id": self.ctx["p1"],  # excluded
+                    "strategy": "pattern_use",
+                    "difficulty": 3,
+                    "variant_hint": "x",
+                }
+            return {}
+        result = generate_exercise(
+            self.db_path, "u1", self.ctx["range_id"],
+            llm_fn=llm,
+            exclude_pattern_ids=[self.ctx["p1"]],
+        )
+        self.assertEqual(result.get("error"), "plan_invented_pattern_id")
+
 
 class TestEvaluatePatternUse(unittest.TestCase):
 

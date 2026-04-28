@@ -393,6 +393,17 @@
         "difficulty": "難度",
         "pattern_used": "已使用句型",
         "pattern_missing": "未使用目標句型",
-        "detector_matched": "匹配"
+        "detector_matched": "匹配",
+        "progress_n_of_m": "本範圍第 {n} / {m} 個句型",
+        "progress_covered": "已完成 {n} / {m} 個句型",
+        "session_complete_title": "本範圍已完成",
+        "session_complete_body": "已練習完此範圍的全部 {m} 個句型，可重設後再次練習。",
+        "session_restart": "重設並重新開始",
+        "error_session_complete": "本範圍已完成，請重設後再試。",
+        "error_no_published_patterns_in_range": "此範圍尚無已發布的句型。",
+        "error_plan_invented_pattern_id": "排程器回傳了非預期的句型，請再試一次。",
+        "error_plan_failed": "排程失敗，請再試一次。",
+        "error_target_pattern_missing": "找不到目標句型。",
+        "error_no_examples_for_fallback": "沒有可用的範例可作備援。"
     }
 }

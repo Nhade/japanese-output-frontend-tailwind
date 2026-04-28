@@ -21,13 +21,40 @@ const submitting = ref(false)
 
 const exercise = computed(() => grammar.currentExercise)
 const result = computed(() => grammar.lastResult)
+const session = computed(() => grammar.sessionState)
+
+const ERROR_KEYS = new Set([
+  'session_complete',
+  'no_published_patterns_in_range',
+  'plan_invented_pattern_id',
+  'plan_failed',
+  'target_pattern_missing',
+  'no_examples_for_fallback',
+])
+
+const localizedError = computed<string | null>(() => {
+  if (!grammar.errorKey) return null
+  if (ERROR_KEYS.has(grammar.errorKey)) {
+    return t(`grammar.error_${grammar.errorKey}`)
+  }
+  // Fall through to the raw message — better than a blank toast.
+  return grammar.errorKey
+})
 
 async function loadNext() {
   response.value = ''
   await grammar.fetchNextExercise(userId.value, rangeId.value, locale.value)
-  if (grammar.error) {
-    toast.trigger(grammar.error, 'error')
+  // Mark this pattern seen so the next call rotates to a different one.
+  if (grammar.currentExercise) {
+    grammar.markPatternSeen(rangeId.value, grammar.currentExercise.target_pattern_id)
+  } else if (grammar.errorKey && grammar.errorKey !== 'session_complete') {
+    toast.trigger(localizedError.value || grammar.errorKey, 'error')
   }
+}
+
+function resetAndStart() {
+  grammar.resetSession(rangeId.value)
+  loadNext()
 }
 
 async function submit() {
@@ -47,9 +74,10 @@ async function submit() {
   }
 }
 
-function scoreColor(score: number): string {
-  if (score >= 0.8) return 'positive'
-  if (score >= 0.5) return 'neutral'
+function feedbackTone(r: { score: number; used_pattern: boolean }): string {
+  if (!r.used_pattern) return 'pattern-missing'
+  if (r.score >= 0.8) return 'positive'
+  if (r.score >= 0.5) return 'neutral'
   return 'negative'
 }
 
@@ -69,14 +97,44 @@ onMounted(loadNext)
       <h1>{{ t('grammar.practice_title') }}</h1>
     </header>
 
+    <!-- Progress header -->
+    <p
+      v-if="session && session.total_in_range > 0"
+      class="progress-row"
+    >
+      <span v-if="exercise">
+        {{ t('grammar.progress_n_of_m', {
+            n: exercise.pattern_index_in_session,
+            m: exercise.pattern_count_in_range
+        }) }}
+      </span>
+      <span v-else>
+        {{ t('grammar.progress_covered', {
+            n: session.covered_in_session,
+            m: session.total_in_range
+        }) }}
+      </span>
+    </p>
+
     <!-- Loading state -->
     <section v-if="grammar.loading && !exercise" class="card">
       <p class="muted">{{ t('common.loading') }}</p>
     </section>
 
-    <!-- Error state -->
-    <section v-else-if="grammar.error && !exercise" class="card">
-      <p class="muted">{{ grammar.error }}</p>
+    <!-- Session complete -->
+    <section v-else-if="session?.is_complete" class="card">
+      <h2 class="muted-heading">{{ t('grammar.session_complete_title') }}</h2>
+      <p>{{ t('grammar.session_complete_body', {
+            m: session.total_in_range,
+        }) }}</p>
+      <button class="btn-primary" @click="resetAndStart">
+        {{ t('grammar.session_restart') }}
+      </button>
+    </section>
+
+    <!-- Other error state -->
+    <section v-else-if="localizedError && !exercise" class="card">
+      <p class="muted">{{ localizedError }}</p>
       <button class="btn-secondary" @click="loadNext">{{ t('grammar.retry') }}</button>
     </section>
 
@@ -125,15 +183,22 @@ onMounted(loadNext)
       </div>
 
       <!-- Feedback -->
-      <div v-if="result" class="feedback" :class="scoreColor(result.score)">
+      <div v-if="result" class="feedback" :class="feedbackTone(result)">
         <div class="feedback-head">
-          <span class="score-pill">
-            {{ Math.round(result.score * 100) }}
+          <!-- When the detector says the pattern wasn't used the
+               numeric score was capped at 40 anyway, so we replace
+               the digit with an explicit label so the user isn't
+               left wondering why "40" — they'd think it's a partial
+               score on otherwise valid Japanese. -->
+          <span v-if="!result.used_pattern" class="missing-pill">
+            {{ t('grammar.pattern_missing') }}
           </span>
-          <span class="muted small">
-            <strong v-if="result.used_pattern">{{ t('grammar.pattern_used') }}</strong>
-            <strong v-else>{{ t('grammar.pattern_missing') }}</strong>
-          </span>
+          <template v-else>
+            <span class="score-pill">{{ Math.round(result.score * 100) }}</span>
+            <span class="muted small">
+              <strong>{{ t('grammar.pattern_used') }}</strong>
+            </span>
+          </template>
           <span v-if="result.detector.matched.length" class="muted small">
             · {{ t('grammar.detector_matched') }}: {{ result.detector.matched.join(', ') }}
           </span>
@@ -260,9 +325,36 @@ onMounted(loadNext)
   display: grid;
   gap: 10px;
 }
-.feedback.positive { border-left-color: oklch(0.62 0.13 145); }
-.feedback.neutral  { border-left-color: var(--secondary); }
-.feedback.negative { border-left-color: oklch(0.55 0.15 28); }
+.feedback.positive       { border-left-color: oklch(0.62 0.13 145); }
+.feedback.neutral        { border-left-color: var(--secondary); }
+.feedback.negative       { border-left-color: oklch(0.55 0.15 28); }
+.feedback.pattern-missing { border-left-color: oklch(0.55 0.15 28); }
+
+.missing-pill {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: color-mix(in oklab, oklch(0.55 0.15 28) 22%, transparent);
+  color: oklch(0.4 0.13 28);
+}
+
+.progress-row {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+  margin: -8px 0 0;
+}
+
+.muted-heading {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  margin: 0 0 4px 0;
+}
 
 .feedback-head {
   display: flex;

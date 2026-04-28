@@ -393,6 +393,17 @@
         "difficulty": "Difficulty",
         "pattern_used": "Pattern used",
         "pattern_missing": "Pattern not detected",
-        "detector_matched": "matched"
+        "detector_matched": "matched",
+        "progress_n_of_m": "Pattern {n} of {m} in this range",
+        "progress_covered": "Covered {n} of {m} patterns",
+        "session_complete_title": "Range complete",
+        "session_complete_body": "You've practised all {m} patterns in this range. Reset to go through them again.",
+        "session_restart": "Reset and start over",
+        "error_session_complete": "Range complete — reset to start over.",
+        "error_no_published_patterns_in_range": "This range has no published patterns yet.",
+        "error_plan_invented_pattern_id": "Planner returned an unexpected pattern. Try again.",
+        "error_plan_failed": "Planner failed. Try again.",
+        "error_target_pattern_missing": "The target pattern wasn't found.",
+        "error_no_examples_for_fallback": "No examples available for fallback."
     }
 }
