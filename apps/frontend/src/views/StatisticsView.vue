@@ -133,6 +133,7 @@ import { useAuthStore } from '../stores/auth';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
 import ActivityHeatmap from '../components/ActivityHeatmap.vue';
 import { Bar, Radar, Line } from 'vue-chartjs';
+import { apiUrl } from '../lib/api';
 import {
   Chart as ChartJS,
   Title,
@@ -290,7 +291,7 @@ const heatmapData = computed(() => historyRaw.value);
 onMounted(async () => {
   if (auth.user_id) {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/statistics/${auth.user_id}`);
+      const response = await fetch(`${apiUrl('/api/statistics/')}${auth.user_id}`);
       if (response.ok) {
         const stats = await response.json();
 

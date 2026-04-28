@@ -404,6 +404,7 @@
         "error_plan_invented_pattern_id": "プランナーが想定外の文型を返しました。もう一度お試しください。",
         "error_plan_failed": "プランナーが失敗しました。もう一度お試しください。",
         "error_target_pattern_missing": "対象の文型が見つかりません。",
-        "error_no_examples_for_fallback": "フォールバック用の例文がありません。"
+        "error_no_examples_for_fallback": "フォールバック用の例文がありません。",
+        "extraction_still_running": "バックグラウンドで抽出中です。少し時間をおいて再度ご確認ください。"
     }
 }

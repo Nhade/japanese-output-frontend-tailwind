@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import SettingsModal from '../components/SettingsModal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
+import { apiUrl } from '../lib/api';
 
 interface FeedbackCorrection {
   original: string;
@@ -113,7 +114,7 @@ async function sendMessage(rawText?: string) {
       content: m.content,
     }));
 
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/chat/send`, {
+    const response = await fetch(`${apiUrl('/api/chat/send')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -211,7 +212,7 @@ onMounted(async () => {
 
   if (authStore.user_id) {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/learner/profile/${authStore.user_id}`);
+      const res = await fetch(`${apiUrl('/api/learner/profile/')}${authStore.user_id}`);
       if (res.ok) {
         learnerProfile.value = await res.json();
       }

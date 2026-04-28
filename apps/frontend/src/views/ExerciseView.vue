@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import { apiUrl } from '../lib/api';
 
 interface Exercise {
   exercise_id: string;
@@ -123,7 +124,7 @@ async function fetchNewExercise() {
   showHint.value = false;
 
   try {
-    const url = `${import.meta.env.VITE_API_BASE_URL}/api/exercise/random`
+    const url = `${apiUrl('/api/exercise/random')}`
       + (exerciseMode.value === 'mcq' ? '?mode=mcq' : '');
     const response = await fetch(url, {
       headers: { 'Content-Type': 'application/json' },
@@ -158,7 +159,7 @@ async function handleAnswerSubmit() {
   }
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/submit`, {
+    const response = await fetch(`${apiUrl('/api/exercise/submit')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -200,7 +201,7 @@ async function handleAnswerSubmit() {
       const currentExerciseId = exercise.value.exercise_id;
       isExplaining.value = true;
       try {
-        const explainResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/explain`, {
+        const explainResponse = await fetch(`${apiUrl('/api/exercise/explain')}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ log_id: result.log_id }),
@@ -271,7 +272,7 @@ async function fetchDetailedFeedback() {
   isLoadingDetailed.value = true;
   detailedError.value = null;
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/explain-detailed`, {
+    const response = await fetch(`${apiUrl('/api/exercise/explain-detailed')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ log_id: feedback.value.log_id }),

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import { apiUrl } from '../lib/api';
 
 interface Paragraph {
   text: string;
@@ -101,7 +102,7 @@ async function fetchArticle(id: string) {
   loading.value = true;
   article.value = null;
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/news/${id}`);
+    const res = await fetch(`${apiUrl('/api/news/')}${id}`);
     if (!res.ok) throw new Error('Failed to fetch article');
     article.value = await res.json();
   } catch (e) {
@@ -115,7 +116,7 @@ async function fetchNextArticle(currentId: string) {
   // Use the list endpoint to pick the next article after the current one.
   // Fallback: wrap around to the first article.
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/news`);
+    const res = await fetch(`${apiUrl('/api/news')}`);
     if (!res.ok) return;
     const list: ListEntry[] = await res.json();
     if (!list.length) return;
@@ -146,7 +147,7 @@ async function toggleTranslation(index: number) {
 
   para.loadingTranslation = true;
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/translate`, {
+    const res = await fetch(`${apiUrl('/api/translate')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -202,7 +203,7 @@ async function playAudio(index: number) {
   playingIndex.value = index;
 
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tts`, {
+    const res = await fetch(`${apiUrl('/api/tts')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: para.text }),

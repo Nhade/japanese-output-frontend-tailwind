@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiUrl } from '../lib/api';
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -18,7 +19,6 @@ const { t, locale } = useI18n();
 const router = useRouter();
 const toast = useToastStore();
 
-const API = import.meta.env.VITE_API_BASE_URL;
 
 const videos = ref<Video[]>([]);
 const loading = ref(true);
@@ -92,7 +92,7 @@ async function fetchVideos() {
     const params = new URLSearchParams();
     if (filterCategory.value) params.append('category', filterCategory.value);
     const query = params.toString() ? `?${params.toString()}` : '';
-    const res = await fetch(`${API}/api/videos${query}`);
+    const res = await fetch(`${apiUrl(`/api/videos${query}`)}`);
     videos.value = await res.json();
   } catch (e) {
     console.error(e);
@@ -113,7 +113,7 @@ async function handleImport() {
   isImporting.value = true;
   importError.value = '';
   try {
-    const res = await fetch(`${API}/api/videos/import`, {
+    const res = await fetch(`${apiUrl(`/api/videos/import`)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),

@@ -43,7 +43,10 @@ async function refreshDocs() {
 async function pollJob(jobId: string) {
   // Naive polling — every 2s until terminal status. The graph runs in
   // a daemon thread on the server so we just need to watch the row.
-  for (let i = 0; i < 60; i++) {
+  // Cap iterations and tell the user explicitly when we stop, so the
+  // UI doesn't go silent on a long extraction.
+  const MAX_ITERATIONS = 60
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
     const job = await grammar.pollExtractionJob(jobId)
     activeJob.value = job
     if (job.status === 'complete' || job.status === 'failed') {
@@ -52,6 +55,10 @@ async function pollJob(jobId: string) {
     }
     await new Promise(r => setTimeout(r, 2000))
   }
+  // Timed out without a terminal status — extraction is still running
+  // server-side; surface that explicitly instead of dropping the job.
+  toast.trigger(t('grammar.extraction_still_running'), 'info')
+  await refreshDocs()
   return activeJob.value
 }
 

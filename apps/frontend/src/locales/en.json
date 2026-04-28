@@ -404,6 +404,7 @@
         "error_plan_invented_pattern_id": "Planner returned an unexpected pattern. Try again.",
         "error_plan_failed": "Planner failed. Try again.",
         "error_target_pattern_missing": "The target pattern wasn't found.",
-        "error_no_examples_for_fallback": "No examples available for fallback."
+        "error_no_examples_for_fallback": "No examples available for fallback.",
+        "extraction_still_running": "Still extracting in the background — check back in a minute."
     }
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiUrl } from '../lib/api';
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
@@ -43,7 +44,6 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
-const API = import.meta.env.VITE_API_BASE_URL;
 const videoId = route.params.id as string;
 
 const loading = ref(true);
@@ -121,7 +121,7 @@ function createPlayer() {
 // --------------------------------------------------------------
 async function fetchVideo() {
   try {
-    const res = await fetch(`${API}/api/videos/${videoId}`);
+    const res = await fetch(`${apiUrl(`/api/videos/${videoId}`)}`);
     if (!res.ok) return;
     const data = await res.json();
     // Normalise to { info, transcript } regardless of server shape.
@@ -135,7 +135,7 @@ async function fetchVideo() {
 
 async function fetchExercises() {
   try {
-    const res = await fetch(`${API}/api/videos/${videoId}/exercises`);
+    const res = await fetch(`${apiUrl(`/api/videos/${videoId}/exercises`)}`);
     if (!res.ok) return;
     const data = await res.json();
     exercises.value = (data || []).map((ex: any) => ({
@@ -158,7 +158,7 @@ async function submitCloze(ex: ClozeExercise) {
   if (!ex.userAnswer?.trim() || ex.submitting) return;
   ex.submitting = true;
   try {
-    const res = await fetch(`${API}/api/videos/submit`, {
+    const res = await fetch(`${apiUrl(`/api/videos/submit`)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -191,7 +191,7 @@ function resetCloze(ex: ClozeExercise) {
 async function generateComprehension() {
   isGenerating.value = true;
   try {
-    const res = await fetch(`${API}/api/videos/${videoId}/comprehension`, {
+    const res = await fetch(`${apiUrl(`/api/videos/${videoId}/comprehension`)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ num_questions: 5 }),
@@ -222,7 +222,7 @@ async function checkComprehension(qi: number) {
   if (q.selectedIndex == null) return;
   q.checking = true;
   try {
-    const res = await fetch(`${API}/api/videos/comprehension/check`, {
+    const res = await fetch(`${apiUrl(`/api/videos/comprehension/check`)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

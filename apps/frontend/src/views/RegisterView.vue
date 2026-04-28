@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import AuthLayout from '../components/AuthLayout.vue';
+import { apiUrl } from '../lib/api';
 
 const { t } = useI18n();
 
@@ -40,7 +41,7 @@ async function register() {
   message.value = '';
   isSubmitting.value = true;
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/register`, {
+    const res = await fetch(`${apiUrl('/api/users/register')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: username.value, password: password.value }),

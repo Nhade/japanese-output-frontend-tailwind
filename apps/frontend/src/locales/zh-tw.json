@@ -404,6 +404,7 @@
         "error_plan_invented_pattern_id": "排程器回傳了非預期的句型，請再試一次。",
         "error_plan_failed": "排程失敗，請再試一次。",
         "error_target_pattern_missing": "找不到目標句型。",
-        "error_no_examples_for_fallback": "沒有可用的範例可作備援。"
+        "error_no_examples_for_fallback": "沒有可用的範例可作備援。",
+        "extraction_still_running": "仍在背景萃取中，請稍候一會再回來查看。"
     }
 }

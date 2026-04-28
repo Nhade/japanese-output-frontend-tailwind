@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import MarkdownIt from 'markdown-it';
 
 import { useAuthStore } from '../stores/auth';
+import { apiUrl } from '../lib/api';
 
 interface Mistake {
   log_id: string;
@@ -90,7 +91,7 @@ async function generateReview() {
   dailyReview.value = '';
   simulateAgentThinking();
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/agent/daily_review/${auth.user_id}`);
+    const res = await fetch(`${apiUrl('/api/agent/daily_review/')}${auth.user_id}`);
     const data = await res.json();
     if (res.ok) {
       dailyReview.value = data.review;
@@ -149,7 +150,7 @@ onMounted(async () => {
     return;
   }
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/mistakes/${auth.user_id}`);
+    const res = await fetch(`${apiUrl('/api/mistakes/')}${auth.user_id}`);
     if (res.ok) {
       mistakes.value = await res.json();
     } else {

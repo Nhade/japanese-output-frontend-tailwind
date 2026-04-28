@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
 import { useI18n } from 'vue-i18n';
+import { apiUrl } from '../lib/api';
 
 const props = defineProps<{
   show: boolean;
@@ -31,7 +32,7 @@ const prefOptions: { value: 'gentle' | 'normal' | 'strict'; label: string; desc:
 watch(() => props.show, async (newVal) => {
   if (!newVal || !auth.user_id) return;
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/learner/profile/${auth.user_id}`);
+    const res = await fetch(`${apiUrl('/api/learner/profile/')}${auth.user_id}`);
     if (res.ok) {
       const data = await res.json();
       if (data.level_est) jlptLevel.value = data.level_est;
@@ -46,7 +47,7 @@ async function saveSettings() {
   if (!auth.user_id || isLoading.value) return;
   isLoading.value = true;
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`, {
+    const res = await fetch(`${apiUrl('/api/users/profile')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
-
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || '/api'
+import { apiUrl } from '../lib/api'
 
 export interface DocumentSummary {
   doc_id: string
@@ -28,6 +27,14 @@ export interface PracticeRange {
   chunk_ids: string[]
   chunk_count: number
   created_timestamp: string
+}
+
+/** What POST /api/documents/:id/ranges actually returns — a subset of
+ *  PracticeRange. Fully-shaped rows come back from the GET list. */
+export interface CreatedRange {
+  range_id: string
+  label: string
+  chunk_count: number
 }
 
 export interface ExtractionJob {
@@ -104,7 +111,7 @@ interface FetchErr  { ok: false; status: number; body: any }
 type FetchResult<T> = FetchOk<T> | FetchErr
 
 async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(apiUrl(`/api${path}`), {
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
     ...init,
   })
@@ -117,7 +124,7 @@ async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 async function jsonFetchSafe<T>(path: string, init?: RequestInit
                                 ): Promise<FetchResult<T>> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(apiUrl(`/api${path}`), {
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
     ...init,
   })
@@ -170,7 +177,7 @@ export const useGrammarStore = defineStore('grammar', {
       fd.append('title', args.title)
       fd.append('source_type', args.sourceType || 'grammar_notes')
       fd.append('locale', args.locale)
-      const res = await fetch(`${API_BASE}/documents/upload`, {
+      const res = await fetch(apiUrl('/api/documents/upload'), {
         method: 'POST',
         body: fd,
       })
@@ -205,8 +212,8 @@ export const useGrammarStore = defineStore('grammar', {
       docId: string
       label: string
       chunkIds: string[]
-    }): Promise<PracticeRange> {
-      return jsonFetch<PracticeRange>(`/documents/${args.docId}/ranges`, {
+    }): Promise<CreatedRange> {
+      return jsonFetch<CreatedRange>(`/documents/${args.docId}/ranges`, {
         method: 'POST',
         body: JSON.stringify({
           user_id: args.userId,
