@@ -26,8 +26,47 @@ from typing import Callable, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ai_core import query_llm_json
+from tools.detect_pattern import _derive_stem
 
 CONFIDENCE_AUTO_PUBLISH = 0.8
+
+# Tilde / wave-tilde / fullwidth-tilde all map to the canonical 〜 (U+301C).
+_TILDE_ALIASES = "～~"
+_CANONICAL_TILDE = "〜"  # 〜
+
+
+def normalize_pattern_name(name: str) -> str:
+    """Stable comparison key for a pattern name.
+
+    - Maps any tilde variant to U+301C 〜.
+    - Strips/collapses whitespace.
+    - Removes a leading ordinal like '1. ' that grammar notes
+      sometimes carry.
+    """
+    if not name:
+        return ""
+    s = name.strip()
+    for ch in _TILDE_ALIASES:
+        s = s.replace(ch, _CANONICAL_TILDE)
+    # Collapse internal whitespace.
+    s = " ".join(s.split())
+    # Drop leading ordinals: "1. ～foo" → "～foo"
+    import re as _re
+    s = _re.sub(r"^[0-9０-９]+[.、]\s*", "", s)
+    return s
+
+
+def _compute_default_detector_spec(name: str) -> Optional[dict]:
+    """Best-effort detector spec derived from the pattern name.
+
+    Uses the same stem-derivation rule the runtime fallback uses, but
+    materializes it on the row so a future review UI can edit it. None
+    if the stem ends up empty (e.g. name was just whitespace).
+    """
+    stem = _derive_stem(name)
+    if not stem:
+        return None
+    return {"required_substrings": [stem]}
 
 LOCALE_LABELS = {
     "en": "English",
@@ -77,7 +116,11 @@ that the chunk explicitly teaches. Ignore prose, cultural asides, vocabulary
 lists, and conjugation drills unless they are the main subject.
 
 For each pattern return:
-  - name: the pattern form with tildes for verb/adj slots (e.g. "〜てしまう", "〜ば")
+  - name: the canonical pattern form. Use 〜 (U+301C, the wave-tilde)
+    for verb/adj slots; do NOT use ASCII '~' or fullwidth '～'. Drop any
+    leading numbering like "1." that the source document used.
+    Examples of canonical names: "〜てしまう", "〜ば", "〜とおり",
+    "〜たあとで", "〜ないで".
   - reading: romaji if obvious, else null
   - meaning_locale: meaning explained in the target_language below
   - formation_rule: plain description (e.g. "て-form + しまう")
@@ -94,7 +137,9 @@ Return strict JSON:
 
 If the chunk teaches no pattern, return {"patterns": []}.
 
-Do not invent patterns that are not in the chunk. Do not merge patterns."""
+Do not invent patterns that are not in the chunk. Do not merge unrelated
+patterns. Do not emit the same pattern twice — if a chunk discusses 接續
+/ 説明 / 例文 of one pattern, that's still one pattern entry."""
 
 
 def _build_messages(chunk_text: str, locale: str) -> list[dict]:
@@ -182,41 +227,97 @@ def _fail_job(conn: sqlite3.Connection, job_id: str, error: str):
     conn.commit()
 
 
+def _find_existing_pattern(conn: sqlite3.Connection, doc_id: str,
+                           normalized_name: str) -> Optional[dict]:
+    """Return any prior row in the same doc whose stored name normalizes
+    to the same key. Names are normalised at write time, so a direct
+    equality match on `name` is enough."""
+    row = conn.execute(
+        "SELECT pattern_id, confidence, status FROM grammar_patterns "
+        "WHERE doc_id = ? AND name = ?", (doc_id, normalized_name)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def _example_exists(conn: sqlite3.Connection, pattern_id: str,
+                    sentence: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM pattern_examples "
+        "WHERE pattern_id = ? AND sentence = ? LIMIT 1",
+        (pattern_id, sentence)
+    ).fetchone()
+    return row is not None
+
+
 def _persist_patterns(conn: sqlite3.Connection, doc_id: str, chunk_id: str,
                       response: ExtractionResponse) -> tuple[int, int, int]:
-    """Write extracted patterns + examples. Returns (extracted, published, pending)."""
+    """Write extracted patterns + examples. Returns (extracted, published, pending).
+
+    A pattern whose normalised name already exists for this doc is
+    *merged*: the existing row's confidence is bumped if the new entry
+    is higher, status is upgraded if the new entry crosses the
+    auto-publish threshold, and any unseen examples are appended. This
+    avoids the duplicate explosion that fine-grained chunkers produce
+    when one pattern's 接續 / 説明 / 例文 sit in separate chunks.
+    """
     now = datetime.now().isoformat()
     extracted = published = pending = 0
 
     for p in response.patterns:
-        pattern_id = str(uuid.uuid4())
-        status = ('published' if p.confidence >= CONFIDENCE_AUTO_PUBLISH
-                  else 'pending_review')
-        conn.execute('''
-            INSERT INTO grammar_patterns
-            (pattern_id, doc_id, source_chunk_id, name, reading, meaning_en,
-             meaning_locale, formation_rule, jlpt, register, confidence,
-             status, detector_spec, created_timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (pattern_id, doc_id, chunk_id, p.name, p.reading,
-              None,  # meaning_en populated later if needed
-              p.meaning_locale, p.formation_rule, p.jlpt, p.register_label,
-              p.confidence, status, None, now))
+        normalized = normalize_pattern_name(p.name)
+        if not normalized:
+            continue
 
+        detector_spec = _compute_default_detector_spec(normalized)
+        spec_json = json.dumps(detector_spec) if detector_spec else None
+
+        existing = _find_existing_pattern(conn, doc_id, normalized)
+        if existing:
+            # Merge into the existing row instead of inserting a duplicate.
+            new_conf = max(existing["confidence"], p.confidence)
+            new_status = ('published' if new_conf >= CONFIDENCE_AUTO_PUBLISH
+                          else existing["status"])
+            conn.execute('''
+                UPDATE grammar_patterns
+                SET confidence = ?, status = ?
+                WHERE pattern_id = ?
+            ''', (new_conf, new_status, existing["pattern_id"]))
+            target_pid = existing["pattern_id"]
+            # No counter bump for extracted/published/pending — this
+            # row was already counted on its first insert.
+        else:
+            pattern_id = str(uuid.uuid4())
+            status = ('published' if p.confidence >= CONFIDENCE_AUTO_PUBLISH
+                      else 'pending_review')
+            conn.execute('''
+                INSERT INTO grammar_patterns
+                (pattern_id, doc_id, source_chunk_id, name, reading,
+                 meaning_en, meaning_locale, formation_rule, jlpt,
+                 register, confidence, status, detector_spec,
+                 created_timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (pattern_id, doc_id, chunk_id, normalized, p.reading,
+                  None,
+                  p.meaning_locale, p.formation_rule, p.jlpt,
+                  p.register_label, p.confidence, status, spec_json, now))
+            target_pid = pattern_id
+            extracted += 1
+            if status == 'published':
+                published += 1
+            else:
+                pending += 1
+
+        # Append novel examples (dedup by exact sentence).
         for ex in p.examples:
+            if _example_exists(conn, target_pid, ex.sentence):
+                continue
             conn.execute('''
                 INSERT INTO pattern_examples
                 (example_id, pattern_id, sentence, translation,
                  is_canonical, cloze_mask_hint, created_timestamp)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (str(uuid.uuid4()), pattern_id, ex.sentence, ex.translation,
+            ''', (str(uuid.uuid4()), target_pid, ex.sentence, ex.translation,
                   1 if ex.is_canonical else 0, None, now))
-
-        extracted += 1
-        if status == 'published':
-            published += 1
-        else:
-            pending += 1
 
     return extracted, published, pending
 

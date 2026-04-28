@@ -49,6 +49,20 @@ LOCALE_LABELS = {
     "ja": "Japanese",
 }
 
+# Localized fallback templates. Each takes (pattern_name, translation)
+# via str.format. The pattern name is the only Japanese token in
+# non-Japanese locales.
+_FALLBACK_TEMPLATES = {
+    "en":    ("Translate this sentence into Japanese using the pattern "
+              "「{pattern_name}」.\n\n{translation}"),
+    "zh-tw": ("請使用「{pattern_name}」這個句型，將下面的句子翻譯成日文。"
+              "\n\n{translation}"),
+    "zh-TW": ("請使用「{pattern_name}」這個句型，將下面的句子翻譯成日文。"
+              "\n\n{translation}"),
+    "ja":    ("「{pattern_name}」を使って、次の文を日本語に訳してください。"
+              "\n\n{translation}"),
+}
+
 
 # ---------------------------------------------------------------------------
 # Structured outputs
@@ -224,6 +238,20 @@ def fetch_target(state: PracticeState) -> dict:
 
 def _executor_prompt(locale: str) -> str:
     locale_label = LOCALE_LABELS.get(locale, "English")
+    is_japanese_locale = locale in ("ja",)
+
+    if is_japanese_locale:
+        prompt_rule = (
+            "the prompt the learner sees, written entirely in Japanese."
+        )
+    else:
+        prompt_rule = (
+            f"the prompt the learner sees, in {locale_label}. The target "
+            f"pattern name itself MUST appear (e.g. 「〜てしまう」), but no "
+            f"other Japanese — vocabulary and the situation are described "
+            f"in {locale_label}. Do not include a sample answer."
+        )
+
     return f"""You are a Japanese exercise writer.
 
 Construct ONE pattern_use exercise. The learner will write a Japanese
@@ -233,15 +261,14 @@ You will receive:
   - pattern: name, formation_rule, meaning_locale, jlpt, examples.
   - difficulty: 1..5 (use simpler vocab and shorter sentences for low
     difficulty).
-  - variant_hint: a short situational nudge.
+  - variant_hint: a short situational nudge (English only — for your
+    eyes; do not echo it verbatim).
   - feedback (optional): why a previous attempt failed verification.
     Read it and avoid the same mistake.
 
 Output JSON exactly:
 {{
-  "prompt_locale_text": "the prompt the learner sees, in {locale_label}. "
-                        "It MUST tell them which pattern to use (by name) "
-                        "AND give them the situation. No Japanese.",
+  "prompt_locale_text": "{prompt_rule}",
   "reference_answer_jp": "a single natural Japanese sentence that uses "
                           "the pattern correctly."
 }}
@@ -336,11 +363,17 @@ def fallback(state: PracticeState) -> dict:
         (e for e in examples if e.get("is_canonical")),
         examples[0],
     )
-    locale_label = LOCALE_LABELS.get(state.get("locale", "en"), "English")
-    prompt = (
-        f"Translate the following sentence into Japanese using the "
-        f"pattern {pattern['name']}.\n\n"
-        f"({locale_label}): {canonical.get('translation') or '(no translation)'}\n"
+    locale = state.get("locale", "en")
+    template = _FALLBACK_TEMPLATES.get(locale, _FALLBACK_TEMPLATES["en"])
+    translation = (canonical.get("translation") or "").strip()
+    if not translation:
+        # No translation available — use the canonical sentence itself
+        # as the prompt source so the user still has something concrete.
+        translation = canonical["sentence"]
+
+    prompt = template.format(
+        pattern_name=pattern["name"],
+        translation=translation,
     )
     return {
         "draft": {

@@ -33,6 +33,12 @@ from markdown_it import MarkdownIt
 # Japanese text averages ~2 chars per token, so ~400 tokens.
 _CHUNK_CHAR_CAP = 1200
 
+# Headings at or above this level start a new chunk and update the
+# section label. Deeper headings (e.g. ### 接續, ### 例文) are folded
+# into the parent chunk as inline emphasis so the structural unit
+# matches the pedagogical unit (one grammar pattern per chunk).
+_DEFAULT_MAX_SPLIT_LEVEL = 2
+
 _tokenizer: Optional[Tokenizer] = None
 
 
@@ -118,17 +124,22 @@ def _flush(buf: List[str], seq: int, section_label: Optional[str],
     return seq + 1
 
 
-def parse_markdown(content: str) -> List[Chunk]:
+def parse_markdown(content: str,
+                   max_split_level: int = _DEFAULT_MAX_SPLIT_LEVEL
+                   ) -> List[Chunk]:
     """Split Markdown into chunks by heading.
 
-    Section labels accumulate the heading path (e.g. "Chapter 3 > §2 Volitional")
-    so downstream consumers know where a chunk came from without re-parsing.
+    Headings at or above `max_split_level` start a new chunk and extend
+    the section label. Deeper headings are kept inline as bold markers
+    so a pattern's subsections (接續 / 説明 / 例文) stay grouped with
+    the pattern itself — extraction otherwise produces duplicate
+    pattern entries, one per subsection chunk.
     """
     md = MarkdownIt()
     tokens = md.parse(content)
 
     chunks: List[Chunk] = []
-    heading_stack: List[tuple[int, str]] = []  # (level, text)
+    heading_stack: List[tuple[int, str]] = []  # (level, text) — split-level only
     current_label: Optional[str] = None
     current_level: Optional[int] = None
     buf: List[str] = []
@@ -139,19 +150,22 @@ def parse_markdown(content: str) -> List[Chunk]:
         tok = tokens[i]
 
         if tok.type == "heading_open":
-            # Flush whatever was accumulating under the previous section.
-            seq = _flush(buf, seq, current_label, current_level, chunks)
-
-            level = int(tok.tag[1:])  # e.g. 'h2' -> 2
+            level = int(tok.tag[1:])  # 'h2' -> 2
             inline = tokens[i + 1] if i + 1 < len(tokens) else None
             heading_text = (inline.content if inline else "").strip()
 
-            # Pop stack entries at or below this level; push this heading.
-            while heading_stack and heading_stack[-1][0] >= level:
-                heading_stack.pop()
-            heading_stack.append((level, heading_text))
-            current_label = " > ".join(t for _, t in heading_stack)
-            current_level = level
+            if level <= max_split_level:
+                # Splitting heading: flush prior content, update label.
+                seq = _flush(buf, seq, current_label, current_level, chunks)
+                while heading_stack and heading_stack[-1][0] >= level:
+                    heading_stack.pop()
+                heading_stack.append((level, heading_text))
+                current_label = " > ".join(t for _, t in heading_stack)
+                current_level = level
+            else:
+                # Sub-heading: include in body so the LLM still sees the
+                # subsection marker, but don't split or change the label.
+                buf.append(f"**{heading_text}**\n\n")
 
             # Skip heading_open + inline + heading_close.
             i += 3

@@ -193,6 +193,38 @@ class TestGenerateExercise(unittest.TestCase):
         self.assertEqual(ex["source"], "fallback_canonical")
         self.assertGreaterEqual(ex["retries"], 2)
 
+    def test_fallback_uses_localized_template(self):
+        # zh-tw fallback must use Chinese phrasing, not English.
+        def llm(messages, _t):
+            sys = messages[0]["content"]
+            if "practice planner" in sys:
+                return {
+                    "target_pattern_id": self.ctx["p1"],
+                    "strategy": "pattern_use",
+                    "difficulty": 3,
+                    "variant_hint": "any",
+                }
+            if "exercise writer" in sys:
+                return {
+                    "prompt_locale_text": "x",
+                    "reference_answer_jp": "本を読んだ",  # forces fallback
+                }
+            raise AssertionError(sys[:80])
+
+        result = generate_exercise(
+            self.db_path, "u1", self.ctx["range_id"],
+            locale="zh-tw", llm_fn=llm,
+        )
+        ex = result["exercise"]
+        self.assertEqual(ex["source"], "fallback_canonical")
+        # The template's leading phrase appears, in Chinese.
+        self.assertIn("請使用", ex["prompt"])
+        # The pattern name is bracketed with 「」 in every locale.
+        self.assertIn("「〜てしまう」", ex["prompt"])
+        # No English boilerplate left over.
+        self.assertNotIn("Translate", ex["prompt"])
+        self.assertNotIn("(Traditional Chinese):", ex["prompt"])
+
     def test_empty_range_short_circuits(self):
         # Range with a chunk that has no patterns attached.
         conn = sqlite3.connect(self.db_path)

@@ -3,6 +3,7 @@
 Covers schema parsing, the confidence → status split, per-chunk error
 tolerance, and the full run_extraction lifecycle against an in-memory DB.
 """
+import json
 import os
 import sqlite3
 import tempfile
@@ -11,9 +12,11 @@ import unittest
 from document_service import create_document_tables, ingest_document
 from extraction_service import (
     ExtractionResponse,
+    _compute_default_detector_spec,
     enqueue_extraction,
     extract_from_chunk,
     get_job,
+    normalize_pattern_name,
     run_extraction,
 )
 from practice_service import create_practice_tables, reset_stale_jobs
@@ -27,6 +30,31 @@ def _make_db(path: str) -> sqlite3.Connection:
     create_document_tables(conn)
     create_practice_tables(conn)
     return conn
+
+
+class TestNormalize(unittest.TestCase):
+
+    def test_tilde_aliases_canonicalize(self):
+        self.assertEqual(normalize_pattern_name("～てしまう"), "〜てしまう")
+        self.assertEqual(normalize_pattern_name("~てしまう"),  "〜てしまう")
+        self.assertEqual(normalize_pattern_name("〜てしまう"), "〜てしまう")
+
+    def test_strips_leading_ordinal(self):
+        self.assertEqual(normalize_pattern_name("1. 〜とおり"), "〜とおり")
+        self.assertEqual(normalize_pattern_name("2、〜あとで"), "〜あとで")
+
+    def test_collapses_whitespace(self):
+        self.assertEqual(normalize_pattern_name("  〜  ば  "), "〜 ば")
+
+
+class TestDetectorSpecHelper(unittest.TestCase):
+
+    def test_known_pattern_yields_substring_spec(self):
+        spec = _compute_default_detector_spec("〜てしまう")
+        self.assertEqual(spec, {"required_substrings": ["てしま"]})
+
+    def test_blank_name_returns_none(self):
+        self.assertIsNone(_compute_default_detector_spec(""))
 
 
 class TestExtractFromChunk(unittest.TestCase):
@@ -168,6 +196,78 @@ class TestRunExtraction(unittest.TestCase):
         self.assertEqual(result["patterns_extracted"], 1)
         self.assertIsNotNone(result["error"])
         self.assertIn("chunk 0", result["error"])
+
+    def test_dedups_pattern_across_chunks(self):
+        # Same normalized name appears in two chunk extractions —
+        # second occurrence should merge into the first row, not insert
+        # a duplicate. Examples are deduped by sentence.
+        job_id = enqueue_extraction(self.conn, self.doc_id, "u1", "en")
+
+        first = {"patterns": [{
+            "name": "～てしまう",  # fullwidth tilde — should normalise to 〜
+            "meaning_locale": "completion/regret",
+            "examples": [{"sentence": "食べてしまった",
+                          "translation": "ate it",
+                          "is_canonical": True}],
+            "confidence": 0.7,  # below threshold
+        }]}
+        second = {"patterns": [{
+            "name": "1. 〜てしまう",  # ordinal prefix; same pattern
+            "meaning_locale": "完了/遺憾",
+            "examples": [
+                {"sentence": "食べてしまった",       # duplicate sentence
+                 "translation": "ate", "is_canonical": False},
+                {"sentence": "忘れてしまった",       # new
+                 "translation": "forgot", "is_canonical": False},
+            ],
+            "confidence": 0.95,  # above threshold; should upgrade status
+        }]}
+        result = run_extraction(self.db_path, job_id,
+                                llm_fn=self._stub_llm([first, second]))
+        self.assertEqual(result["status"], "complete")
+
+        rows = self.conn.execute(
+            "SELECT pattern_id, name, confidence, status, detector_spec "
+            "FROM grammar_patterns WHERE doc_id = ?",
+            (self.doc_id,)
+        ).fetchall()
+        # Only one row for the dedup'd pattern.
+        names = [r["name"] for r in rows]
+        self.assertEqual(names.count("〜てしまう"), 1, names)
+        merged = next(r for r in rows if r["name"] == "〜てしまう")
+
+        # Confidence bumped to the higher of the two.
+        self.assertAlmostEqual(merged["confidence"], 0.95)
+        # Status upgraded from pending_review → published.
+        self.assertEqual(merged["status"], "published")
+        # detector_spec materialised from the canonical name.
+        self.assertIsNotNone(merged["detector_spec"])
+
+        # Examples appended without duplicating "食べてしまった".
+        examples = self.conn.execute(
+            "SELECT sentence FROM pattern_examples "
+            "WHERE pattern_id = ?", (merged["pattern_id"],)
+        ).fetchall()
+        sentences = sorted(e["sentence"] for e in examples)
+        self.assertEqual(sentences, ["忘れてしまった", "食べてしまった"])
+
+    def test_detector_spec_populated_on_persist(self):
+        job_id = enqueue_extraction(self.conn, self.doc_id, "u1", "en")
+        stub = self._stub_llm([
+            {"patterns": [{
+                "name": "〜てしまう", "meaning_locale": "x", "examples": [],
+                "confidence": 0.95,
+            }]},
+            {"patterns": []},
+        ])
+        run_extraction(self.db_path, job_id, llm_fn=stub)
+        row = self.conn.execute(
+            "SELECT detector_spec FROM grammar_patterns "
+            "WHERE doc_id = ?", (self.doc_id,)
+        ).fetchone()
+        spec = json.loads(row["detector_spec"])
+        # Stem-derivation drops the trailing 'う' from the canonical form.
+        self.assertEqual(spec, {"required_substrings": ["てしま"]})
 
     def test_reset_stale_jobs_marks_running_failed(self):
         job_id = enqueue_extraction(self.conn, self.doc_id, "u1", "en")
