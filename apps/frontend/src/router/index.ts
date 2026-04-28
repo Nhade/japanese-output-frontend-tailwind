@@ -67,6 +67,24 @@ const router = createRouter({
       name: 'news-reader',
       component: () => import('../views/NewsReaderView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/grammar',
+      name: 'grammar',
+      component: () => import('../views/GrammarHomeView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/grammar/docs/:docId',
+      name: 'grammar-range',
+      component: () => import('../views/GrammarRangeView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/grammar/practice/:rangeId',
+      name: 'grammar-practice',
+      component: () => import('../views/GrammarPracticeView.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })
