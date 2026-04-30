@@ -30,6 +30,47 @@ from typing import Optional
 _CONJ_ENDINGS = set("うくぐすつぬぶむるい")
 
 
+# Common kana ↔ kanji writings for non-verb pattern stems. Without this,
+# a stem like 'とおり' fails on a kanji-form learner answer like 計画通り
+# even though the answer is correct, because the detector only looks
+# for the kana surface. Conservative — only entries where both forms
+# appear regularly in textbooks.
+KANA_KANJI_PAIRS = {
+    "とおり":  "通り",
+    "ところ":  "所",
+    "とき":    "時",
+    "あいだ":  "間",
+    "ほう":    "方",
+    "ため":    "為",
+    "ばあい":  "場合",
+    "あと":    "後",
+    "まえ":    "前",
+    "うち":    "内",
+    "なか":    "中",
+    "うえ":    "上",
+    "した":    "下",
+    "ほか":    "他",
+    "もの":    "物",
+}
+
+
+def kana_kanji_alternates(stem: str) -> list[str]:
+    """Return kanji-form alternates for a kana stem, single-substitution.
+
+    Each pair is applied independently — never combined — so e.g.
+    `あとに` yields `後に` but not unlikely composites.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for kana, kanji in KANA_KANJI_PAIRS.items():
+        if kana in stem:
+            replaced = stem.replace(kana, kanji, 1)
+            if replaced != stem and replaced not in seen:
+                seen.add(replaced)
+                out.append(replaced)
+    return out
+
+
 def _derive_stem(pattern_name: str) -> str:
     """Strip leading wave-tilde and a single trailing conjugating kana.
 
@@ -123,14 +164,21 @@ def detect_pattern(conn: sqlite3.Connection, sentence: str,
         stem_reason_prefix = ""
 
     stem = _derive_stem(name)
-    if stem and stem in sentence:
-        return {
-            "detected": True, "matched": [stem], "stem": stem,
-            "pattern_name": name,
-            "reason": stem_reason_prefix + f"stem {stem!r} found in sentence",
-        }
+    # Try the kana stem first, then kanji alternates so 通り/所/時 etc.
+    # match even when the source pattern name was written in kana.
+    candidates = [stem] + kana_kanji_alternates(stem) if stem else []
+    for candidate in candidates:
+        if candidate and candidate in sentence:
+            return {
+                "detected": True, "matched": [candidate], "stem": stem,
+                "pattern_name": name,
+                "reason": stem_reason_prefix +
+                    f"stem {candidate!r} found in sentence",
+            }
     return {
         "detected": False, "matched": [], "stem": stem,
         "pattern_name": name,
-        "reason": stem_reason_prefix + f"stem {stem!r} not in sentence",
+        "reason": stem_reason_prefix + f"stem {stem!r} not in sentence "
+                  f"(also tried {candidates[1:]})" if len(candidates) > 1 else
+                  stem_reason_prefix + f"stem {stem!r} not in sentence",
     }

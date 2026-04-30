@@ -77,6 +77,22 @@ class TestDetectFallback(unittest.TestCase):
         self.assertFalse(result["detected"])
         self.assertIn("not found", result["reason"])
 
+    def test_kanji_alternate_matches_when_pattern_named_in_kana(self):
+        # Pattern was extracted with kana name 〜とおり; learner writes
+        # the kanji form 計画通り. Without the alias table this misses.
+        conn = _fresh_db()
+        pid = _seed_pattern(conn, "〜とおり")
+        result = detect_pattern(conn, "計画通り、行ってください。", pid)
+        self.assertTrue(result["detected"], result["reason"])
+        self.assertIn("通り", result["matched"])
+
+    def test_kana_form_still_matches_after_alias_added(self):
+        conn = _fresh_db()
+        pid = _seed_pattern(conn, "〜とおり")
+        result = detect_pattern(conn, "計画のとおり進める。", pid)
+        self.assertTrue(result["detected"])
+        self.assertIn("とおり", result["matched"])
+
 
 class TestDetectorSpec(unittest.TestCase):
 

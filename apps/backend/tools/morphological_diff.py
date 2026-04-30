@@ -50,19 +50,37 @@ def _categorise_form(infl_form: str) -> str:
 
 def _features(text: str) -> dict:
     """Extract verb / particle / negation summary from one sentence."""
+    tokens = list(_tok().tokenize(text))
     verbs: list[dict] = []
     particles: list[str] = []
-    aux_negations = 0  # 'ない', 'ぬ', 'ず' as 助動詞
-    explicit_negations = 0  # surface form contains 'ない' / 'ぬ'
+    aux_negations = 0       # 助動詞 with base ない / ぬ / ず
+    surface_negation = False  # ない or ぬ as surface text — rescue path
 
-    for tok in _tok().tokenize(text):
+    for i, tok in enumerate(tokens):
         pos = tok.part_of_speech.split(",")
         head = pos[0]
         if head == "動詞":
+            base_form = _categorise_form(tok.infl_form or "")
+            # Compound form key — distinguishes te-form (連用タ接続 + て)
+            # from past (連用タ接続 + た) and polite (連用形 + ます)
+            # from polite-negative-stem (連用形 + ます with the next ん
+            # tagged separately, see polite_negations below). Without
+            # this both 終わった and 終わって collapse to "ta_stem".
+            tail = ""
+            if i + 1 < len(tokens):
+                nxt = tokens[i + 1]
+                nxt_pos = nxt.part_of_speech.split(",")
+                nxt_head = nxt_pos[0]
+                nxt_sub = nxt_pos[1] if len(nxt_pos) > 1 else ""
+                if nxt_head == "助動詞":
+                    tail = nxt.base_form or nxt.surface
+                elif nxt_head == "助詞" and nxt_sub == "接続助詞":
+                    tail = nxt.base_form or nxt.surface
+            form_key = f"{base_form}+{tail}" if tail else base_form
             verbs.append({
                 "surface": tok.surface,
                 "base": tok.base_form or tok.surface,
-                "form": _categorise_form(tok.infl_form or ""),
+                "form": form_key,
             })
         elif head == "助詞":
             particles.append(tok.surface)
@@ -70,17 +88,25 @@ def _features(text: str) -> dict:
             base = tok.base_form or tok.surface
             if base in ("ない", "ぬ", "ず"):
                 aux_negations += 1
-        if "ない" in tok.surface or "ぬ" == tok.surface:
-            explicit_negations += 1
+        if "ない" in tok.surface or tok.surface == "ぬ":
+            surface_negation = True
+
+    # Polite negation: janome splits ません into ませ (base=ます) + ん
+    # (base=ん, NOT ぬ), so the auxiliary-base scan above misses every
+    # ます-form negation. Surface-detect each ません — count repeats so
+    # double clauses still tally correctly.
+    polite_negations = text.count("ません")
+
+    negation_count = aux_negations + polite_negations
+    if negation_count == 0 and surface_negation:
+        # i-adjective ない / standalone ぬ that wasn't tagged as 助動詞.
+        negation_count = 1
 
     return {
         "verbs": verbs,
         "particles": particles,
         "particle_set": sorted(set(particles)),
-        "negation_count": aux_negations + (
-            # `explicit_negations` rescues e.g. ない as an i-adjective ending.
-            1 if (explicit_negations and aux_negations == 0) else 0
-        ),
+        "negation_count": negation_count,
     }
 
 

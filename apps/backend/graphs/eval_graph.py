@@ -382,11 +382,12 @@ Score = sum of these four signals, each 0.0..0.25:
      intransitive verbs, no double topic markers)? Does the sentence
      refer to the situation in the prompt? Score in 0.05 increments.
   4) REGISTER + NATURALNESS (0.25). Does the verb-final form match
-     target_register? AND: if morph_diff.verb_form_match is true and
-     morph_diff.particle_jaccard >= 0.5, the user matches the
-     reference's grammatical shape — score this check at >= 0.20
-     unless there is a concrete error you can cite. Otherwise judge
-     on whether a native speaker would write this naturally.
+     target_register? AND: if morph_diff.verb_form_match is true,
+     morph_diff.particle_jaccard >= 0.5, AND morph_diff.negation_match
+     is true, the user matches the reference's grammatical shape —
+     score this check at >= 0.20 unless there is a concrete error you
+     can cite. Otherwise judge on whether a native speaker would write
+     this naturally.
 
 Output JSON:
 {

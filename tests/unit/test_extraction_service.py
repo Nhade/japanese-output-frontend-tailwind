@@ -56,6 +56,26 @@ class TestDetectorSpecHelper(unittest.TestCase):
     def test_blank_name_returns_none(self):
         self.assertIsNone(_compute_default_detector_spec(""))
 
+    def test_kana_pattern_with_kanji_alternate(self):
+        # 〜とおり has a common kanji writing 通り — the detector spec
+        # must accept either or kanji-form learner answers (計画通り)
+        # land in the score-cap zone even when correct.
+        spec = _compute_default_detector_spec("〜とおり")
+        self.assertEqual(set(spec["any_of_substrings"]), {"とおり", "通り"})
+
+    def test_compound_kana_pattern_substitutes_segment(self):
+        # 〜あとで → "あとで" stem; the alias table only knows あと→後,
+        # so it produces 後で via a single substitution (not a
+        # combinatorial expansion).
+        spec = _compute_default_detector_spec("〜あとで")
+        self.assertIn("後で", spec["any_of_substrings"])
+        self.assertIn("あとで", spec["any_of_substrings"])
+
+    def test_pattern_without_kanji_alternates_keeps_required_shape(self):
+        # 〜ば has no kanji alias — keep required_substrings shape.
+        spec = _compute_default_detector_spec("〜ば")
+        self.assertEqual(spec, {"required_substrings": ["ば"]})
+
 
 class TestExtractFromChunk(unittest.TestCase):
 

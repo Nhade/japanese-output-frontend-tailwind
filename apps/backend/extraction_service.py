@@ -26,7 +26,7 @@ from typing import Callable, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ai_core import query_llm_json
-from tools.detect_pattern import _derive_stem
+from tools.detect_pattern import _derive_stem, kana_kanji_alternates
 
 CONFIDENCE_AUTO_PUBLISH = 0.8
 
@@ -60,12 +60,17 @@ def _compute_default_detector_spec(name: str) -> Optional[dict]:
     """Best-effort detector spec derived from the pattern name.
 
     Uses the same stem-derivation rule the runtime fallback uses, but
-    materializes it on the row so a future review UI can edit it. None
-    if the stem ends up empty (e.g. name was just whitespace).
+    materializes it on the row so a future review UI can edit it. When
+    the stem has known kana ↔ kanji writings (とおり/通り, あと/後 …),
+    emit them as `any_of_substrings` so kanji-form learner answers
+    match the detector. None if the stem is empty.
     """
     stem = _derive_stem(name)
     if not stem:
         return None
+    alternates = kana_kanji_alternates(stem)
+    if alternates:
+        return {"any_of_substrings": [stem] + alternates}
     return {"required_substrings": [stem]}
 
 LOCALE_LABELS = {
