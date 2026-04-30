@@ -359,14 +359,78 @@ class TestEvaluatePatternUse(unittest.TestCase):
         payload = captured[0]
         # Register travels through.
         self.assertEqual(payload["target_register"], "plain")
-        # Morph diff travels through with the four signal fields the
+        # Morph diff travels through with the five signal fields the
         # rubric prompt references.
         self.assertIn("morph_diff", payload)
         for key in ("shared_verb_bases", "verb_form_match",
-                    "particle_jaccard", "negation_match"):
+                    "particle_jaccard", "negation_match",
+                    "role_swap_detected"):
             self.assertIn(key, payload["morph_diff"])
+        # Prompt travels through so check 3's topic match has something
+        # to evaluate against; without this the rubric was judging a
+        # synthetic "topic" with no anchor.
+        self.assertIn("prompt_locale_text", payload)
         # Detector still travels through, unchanged.
         self.assertTrue(payload["detector_result"]["detected"])
+
+    def test_role_swap_caps_score_at_half(self):
+        # The handoff case: same lemmas, reversed across the comma.
+        # Even if the rubric judge hallucinates a high score, the
+        # deterministic backstop must cap at 0.5 so a wrong-meaning
+        # answer can never read as "is_correct".
+        # First, create an exercise whose reference uses 〜てから and
+        # has a comma split so role-swap detection has something to
+        # work with.
+        db_conn = sqlite3.connect(self.db_path)
+        db_conn.row_factory = sqlite3.Row
+        kara_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+        db_conn.execute('''
+            INSERT INTO grammar_patterns
+            (pattern_id, doc_id, source_chunk_id, name, jlpt, register,
+             meaning_locale, formation_rule, confidence, status,
+             created_timestamp)
+            VALUES (?, ?, NULL, '〜てから', 4, 'polite',
+                    'do A first then B', 'て-form + から', 0.95,
+                    'published', ?)
+        ''', (kara_id, self.ctx["doc_id"], now))
+        ex_id = str(uuid.uuid4())
+        db_conn.execute('''
+            INSERT INTO exercises
+            (exercise_id, user_id, range_id, type, target_pattern_id,
+             difficulty, prompt, expected_json, rubric_json, seed,
+             source, created_timestamp)
+            VALUES (?, 'u1', ?, 'pattern_use', ?, 3,
+                    'Use 〜てから to say: do homework first, then play games.',
+                    ?, '{}', 'seed', 'graph', ?)
+        ''', (ex_id, self.ctx["range_id"], kara_id,
+              json.dumps({
+                  "reference_answer_jp": "宿題をしてから、ゲームをします",
+                  "target_pattern_id": kara_id,
+                  "target_pattern_name": "〜てから",
+                  "target_register": "polite",
+              }), now))
+        db_conn.commit()
+        db_conn.close()
+
+        # Judge hallucinates "great answer!" — the cap must override it.
+        def cheating_judge(_msgs):
+            return {
+                "score": 0.95,
+                "used_pattern": True,
+                "feedback_text": "Looks good!",
+                "issues": [],
+            }
+        result = evaluate_pattern_use_submission(
+            self.db_path, ex_id, "u1",
+            "ゲームをしてから、宿題をします",   # clauses reversed
+            llm_fn=cheating_judge,
+        )
+        self.assertLessEqual(result["score"], 0.5,
+                             f"role_swap should cap; got {result}")
+        self.assertFalse(result["is_correct"])
+        self.assertIn("role_swap", result["issues"])
+        self.assertTrue(result["morph_diff"]["role_swap_detected"])
 
     def test_pattern_missing_caps_score(self):
         # User's response doesn't contain てしま → detector says false →

@@ -110,6 +110,82 @@ def _features(text: str) -> dict:
     }
 
 
+# Content POS heads we treat as "lemmas" for clause-role comparison —
+# verbs and nouns capture the agent + action of each clause. Adjectives
+# included so descriptive clauses also distinguish.
+_CONTENT_HEADS = {"動詞", "名詞", "形容詞", "形容動詞"}
+
+# Nouns that act as structural relative-time / position markers inside
+# common connector patterns (〜たあとで, 〜まえに, 〜あいだに, 〜とおり,
+# 〜ときに, 〜ところで, 〜ためには, 〜ばあいは…). They tokenise as 名詞
+# but they're part of the connector, not the clause content. Excluding
+# them from swap-detection lemma sets stops 〜あとで from looking
+# asymmetric just because 'あと' rides on the pre-comma clause both
+# times. Kanji forms included so kanji-spelt sources behave the same.
+_CONNECTOR_NOUN_STEMS = frozenset({
+    "あと", "まえ", "あいだ", "うち", "とおり",
+    "とき", "ところ", "ため", "ばあい", "ほう",
+    "なか", "うえ", "した", "ほか", "もの",
+    "後", "前", "間", "内", "通り", "時", "所", "為",
+    "場合", "方", "中", "上", "下", "他", "物",
+})
+
+
+def _content_lemmas(text: str) -> set[str]:
+    """Bases of content words in a clause — used for role-swap detection.
+
+    Skips particles, auxiliaries, punctuation, conjunctions, adverbs,
+    and the structural connector-noun stems above.
+    """
+    out: set[str] = set()
+    for tok in _tok().tokenize(text):
+        head = tok.part_of_speech.split(",")[0]
+        if head in _CONTENT_HEADS:
+            base = tok.base_form or tok.surface
+            if base and base != "*" and base not in _CONNECTOR_NOUN_STEMS:
+                out.add(base)
+    return out
+
+
+def _split_at_comma(text: str) -> Optional[tuple[str, str]]:
+    """Split on the first clause-boundary comma. None if no useful split."""
+    for sep in ("、", ","):
+        idx = text.find(sep)
+        if 0 < idx < len(text) - 1:
+            return text[:idx].strip(), text[idx + 1:].strip()
+    return None
+
+
+def _detect_role_swap(reference: str, user: str) -> bool:
+    """True when reference and user have the same two-clause structure
+    but their content sets are reversed across the comma — the
+    canonical "wrong-order" failure mode for connector patterns
+    (〜てから, 〜たあとで, 〜まえに, 〜ば, 〜と, 〜なら, 〜ながら)
+    where the verbs and nouns are right but the order carries the
+    meaning. The check the morph-diff anchor cannot otherwise see.
+    """
+    ref_split = _split_at_comma(reference)
+    user_split = _split_at_comma(user)
+    if not ref_split or not user_split:
+        return False
+
+    ref_pre = _content_lemmas(ref_split[0])
+    ref_post = _content_lemmas(ref_split[1])
+    user_pre = _content_lemmas(user_split[0])
+    user_post = _content_lemmas(user_split[1])
+
+    if not (ref_pre and ref_post and user_pre and user_post):
+        return False
+
+    # Same content per side (no swap) → not a role swap.
+    if ref_pre == user_pre and ref_post == user_post:
+        return False
+
+    # Crossed assignment: reference's pre-set ≡ user's post-set, and
+    # reference's post-set ≡ user's pre-set.
+    return ref_pre == user_post and ref_post == user_pre
+
+
 def _jaccard(a: set, b: set) -> float:
     if not a and not b:
         return 1.0
@@ -163,6 +239,9 @@ def morphological_diff(reference: str, user: str) -> dict:
         f"(ref={ref['particle_set']} user={usr['particle_set']})"
     )
     parts.append(f"negation match: {negation_match}")
+    role_swap = _detect_role_swap(reference, user)
+    if role_swap:
+        parts.append("role_swap: TRUE (clauses reversed across the comma)")
     summary = "; ".join(parts)
 
     return {
@@ -172,5 +251,6 @@ def morphological_diff(reference: str, user: str) -> dict:
         "verb_form_match": verb_form_match,
         "particle_jaccard": round(particle_jaccard, 3),
         "negation_match": negation_match,
+        "role_swap_detected": role_swap,
         "summary": summary,
     }

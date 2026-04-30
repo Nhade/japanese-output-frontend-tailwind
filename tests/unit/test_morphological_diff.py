@@ -101,5 +101,54 @@ class TestRubricAnchorFixes(unittest.TestCase):
         self.assertEqual(d["user"]["negation_count"], 2)
 
 
+class TestRoleSwapDetection(unittest.TestCase):
+    """Connector patterns (〜てから, 〜たあとで, 〜まえに, 〜ば, 〜と,
+    〜なら, 〜ながら) carry meaning in clause order. The morph-diff
+    anchor on its own treats two clause-reversed sentences as a
+    "shape match" because lemmas, particles, and forms are identical
+    — only the order differs. role_swap_detected is the deterministic
+    signal that prevents the anchor from protecting a wrong-meaning
+    answer.
+    """
+
+    def test_te_kara_role_swap_caught(self):
+        # The exact handoff case: same lemmas (宿題, ゲーム, する),
+        # same connector (〜てから), reversed clauses → opposite meaning.
+        d = morphological_diff(
+            "宿題をしてから、ゲームをします",
+            "ゲームをしてから、宿題をします",
+        )
+        self.assertTrue(d["role_swap_detected"], d["summary"])
+
+    def test_identical_two_clause_is_not_role_swap(self):
+        d = morphological_diff(
+            "宿題をしてから、ゲームをします",
+            "宿題をしてから、ゲームをします",
+        )
+        self.assertFalse(d["role_swap_detected"])
+
+    def test_single_clause_returns_false(self):
+        # No comma → no clause split → role_swap_detected stays false.
+        d = morphological_diff("食べてしまった", "食べてしまった")
+        self.assertFalse(d["role_swap_detected"])
+
+    def test_partial_overlap_is_not_role_swap(self):
+        # User changed one of the clauses but didn't reverse — content
+        # sets are not crossed, so no role swap.
+        d = morphological_diff(
+            "宿題をしてから、ゲームをします",
+            "宿題をしてから、本を読みます",
+        )
+        self.assertFalse(d["role_swap_detected"])
+
+    def test_ato_de_role_swap_caught(self):
+        # Reverse the same two action-clauses across あとで.
+        d = morphological_diff(
+            "宿題をしたあとで、ゲームをします",
+            "ゲームをしたあとで、宿題をします",
+        )
+        self.assertTrue(d["role_swap_detected"], d["summary"])
+
+
 if __name__ == "__main__":
     unittest.main()

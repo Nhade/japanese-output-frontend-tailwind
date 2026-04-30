@@ -360,6 +360,9 @@ You will receive:
   - target_register: one of "polite", "plain", "casual", "formal",
     "neutral". This is the register the exercise is testing. Do NOT
     deduct for matching it. "neutral" allows either.
+  - prompt_locale_text: the prompt the learner saw. Their answer must
+    describe the action / order / agent it asks for; check 3 is judged
+    against this, not against the reference.
   - reference_answer: a model answer. Do NOT require the learner to
     match it verbatim, but use it as an anchor (see check 4).
   - user_answer
@@ -368,7 +371,10 @@ You will receive:
   - morph_diff: deterministic morphological comparison between
     reference_answer and user_answer. Includes shared verb lemmas,
     verb_form_match (do shared lemmas use the same form category),
-    particle_jaccard (0..1 over distinct particles), negation_match.
+    particle_jaccard (0..1 over distinct particles), negation_match,
+    and role_swap_detected (true when both sentences split on a comma
+    and the user has reversed the clauses — same content, opposite
+    order, the canonical wrong-meaning failure mode).
 
 Score = sum of these four signals, each 0.0..0.25:
 
@@ -378,9 +384,15 @@ Score = sum of these four signals, each 0.0..0.25:
      adjective, or copula)? Are verb endings well-formed (no truncated
      conjugations, no kana-mixed errors)? Score 0.25 / 0.15 / 0.05 / 0
      for clean / minor-typo / one-real-error / unparseable.
-  3) PARTICLES + TOPIC (0.25). Are particles consistent (no を with
-     intransitive verbs, no double topic markers)? Does the sentence
-     refer to the situation in the prompt? Score in 0.05 increments.
+  3) PARTICLES + TOPIC (0.25). Two sub-checks at 0.125 each:
+       - Particles are consistent (no を with intransitive verbs, no
+         double topic markers, no missing required particles).
+       - The sentence describes the SAME action / order / agent that
+         prompt_locale_text asks for. If the user_answer's literal
+         meaning contradicts the prompt — wrong actor, wrong action,
+         wrong order of events — deduct 0.10..0.20 from this check.
+         The reference is one valid answer; the prompt is the
+         instruction. Judge against the prompt.
   4) REGISTER + NATURALNESS (0.25). Does the verb-final form match
      target_register? AND: if morph_diff.verb_form_match is true,
      morph_diff.particle_jaccard >= 0.5, AND morph_diff.negation_match
@@ -388,6 +400,12 @@ Score = sum of these four signals, each 0.0..0.25:
      score this check at >= 0.20 unless there is a concrete error you
      can cite. Otherwise judge on whether a native speaker would write
      this naturally.
+
+     EXCEPTION: when morph_diff.role_swap_detected is true, the user
+     has the same lemmas and particles but reversed across the
+     comma — the meaning is opposite. The shape-match anchor MUST
+     NOT apply; score check 4 on its own merits and add "role_swap"
+     to issues.
 
 Output JSON:
 {
@@ -495,6 +513,10 @@ def evaluate_pattern_use_submission(
             "pattern_name": pattern_name,
             "pattern_meaning_locale": pattern_meaning,
             "target_register": target_register,
+            # Without the prompt the rubric's "topic match" sub-check
+            # has nothing to judge against — same shape with reversed
+            # meaning would slip through.
+            "prompt_locale_text": ex_row["prompt"],
             "reference_answer": reference_answer,
             "user_answer": response,
             "detector_result": {
@@ -508,6 +530,7 @@ def evaluate_pattern_use_submission(
                     "verb_form_match": morph["verb_form_match"],
                     "particle_jaccard": morph["particle_jaccard"],
                     "negation_match": morph["negation_match"],
+                    "role_swap_detected": morph["role_swap_detected"],
                     "summary": morph["summary"],
                 } if morph else None
             ),
@@ -540,6 +563,16 @@ def evaluate_pattern_use_submission(
         if not detector.get("detected"):
             used_pattern = False
             score = min(score, 0.4)
+
+        # Deterministic backstop for connector-pattern role swap. The
+        # soft "deduct 0.10..0.20" prompt rule is fragile under
+        # temperature-0 drift; cap the score so a same-shape, opposite-
+        # meaning answer can never score above the parse + pattern
+        # ceiling.
+        if morph and morph.get("role_swap_detected"):
+            score = min(score, 0.5)
+            if "role_swap" not in issues:
+                issues = list(issues) + ["role_swap"]
 
         is_correct = score >= 0.7
 
