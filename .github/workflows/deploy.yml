@@ -19,5 +19,5 @@ jobs:
             set -e
             cd /srv/shiori
             git pull --ff-only
-            /srv/shiori/venv/bin/pip install -r requirements.txt --quiet
+            /srv/shiori/venv/bin/pip install -r /srv/shiori/apps/backend/requirements.txt --quiet
             sudo /bin/systemctl restart shiori
