@@ -14,7 +14,7 @@ from translation_service import translate_text
 from tts_service import generate_audio
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app, origins=["https://shiori.nhade.com"])
 
 k = kakasi()
 password_hash = PasswordHash.recommended()
