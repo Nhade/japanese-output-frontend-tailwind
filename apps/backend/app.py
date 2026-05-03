@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import re
 import sqlite3
 import uuid
 from datetime import datetime
@@ -14,7 +15,10 @@ from translation_service import translate_text
 from tts_service import generate_audio
 
 app = Flask(__name__)
-CORS(app, origins=["https://shiori.nhade.com"])
+CORS(app, origins=[
+    "https://shiori.nhade.com",
+    re.compile(r"^https://([a-z0-9-]+\.)?shiori-frontend\.pages\.dev$"),
+])
 
 k = kakasi()
 password_hash = PasswordHash.recommended()
