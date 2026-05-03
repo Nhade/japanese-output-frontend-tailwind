@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "install:backend": "python -m pip install -r apps/backend/requirements.txt",
-    "postinstall": "npm run install:backend",
+    "postinstall": "node -e \"if(!process.env.CI)require('child_process').execSync('npm run install:backend',{stdio:'inherit'})\"",
     "dev:frontend": "npm run dev --prefix apps/frontend",
     "build": "npm run build --prefix apps/frontend",
     "dev:backend": "python apps/backend/app.py",
