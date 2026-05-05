@@ -26,6 +26,7 @@ function isActive(path: string): boolean {
 
 const primaryLinks = [
   { to: '/', key: 'exercise' },
+  { to: '/practice', key: 'practice' },
   { to: '/news', key: 'news' },
   { to: '/videos', key: 'videos' },
   { to: '/chat', key: 'chat' },

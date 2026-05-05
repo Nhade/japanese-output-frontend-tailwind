@@ -1,0 +1,4 @@
+file,row_count,description,key_columns
+L38_vocab.csv,45,第38課單字與補充詞彙；示範搭配與［な］提示不作獨立詞條。,"lesson, source_section, item_no, japanese, kana, word_type, chinese_meaning, source_locator"
+L38_grammar_points.csv,7,第38課文法點與轉換規則摘要，用於標註填空題（の名詞化／のは～です／のが～です／のを忘れました／のを知っていますか／強調分裂句／とき＋助詞）。,"grammar_point_id, grammar_point, target_form, rule_summary"
+L38_fill_blanks.csv,102,文型、例文、會話、練習與問題改寫成填空題；以「の」名詞化系列文法為主要文法點。,"source_section, item_no, grammar_point_id, cue, prompt, answer, full_answer_sentence"

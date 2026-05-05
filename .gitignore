@@ -28,8 +28,9 @@ coverage/
 japanese-output-frontend-deprecated/
 japanese-output-practice-3af0779cb130.json
 
-# Data
-data/
+# Data — root-level only; per-app static data (e.g. apps/frontend/public/data
+# for shipped lesson CSVs) should be tracked.
+/data/
 
 
 # Scratch / Tests

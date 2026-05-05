@@ -1,0 +1,4 @@
+file,row_count,description,key_columns
+L36_vocab.csv,48,第36課單字與補充詞彙；示範搭配與［な］提示不作獨立詞條。,"lesson, source_section, item_no, japanese, kana, word_type, chinese_meaning, source_locator"
+L36_grammar_points.csv,6,第36課文法點與轉換規則摘要，用於標註填空題。,"grammar_point_id, grammar_point, target_form, rule_summary"
+L36_fill_blanks.csv,109,文型、例文、會話、練習與問題改寫成填空題；ように・ようになります・ようにしています・ようにしてください為主要文法點。,"source_section, item_no, grammar_point_id, cue, prompt, answer, full_answer_sentence"

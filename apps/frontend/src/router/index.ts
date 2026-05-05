@@ -67,6 +67,12 @@ const router = createRouter({
       name: 'news-reader',
       component: () => import('../views/NewsReaderView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/practice',
+      name: 'practice',
+      component: () => import('../views/PracticeView.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })
