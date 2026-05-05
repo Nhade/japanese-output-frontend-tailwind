@@ -23,7 +23,38 @@ CORS(app, origins=[
 k = kakasi()
 password_hash = PasswordHash.recommended()
 
-DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'news_corpus.db')
+_DEFAULT_DB_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'news_corpus.db'
+)
+DATABASE_PATH = os.path.abspath(os.environ.get('SHIORI_DATABASE_PATH', _DEFAULT_DB_PATH))
+
+
+def _log_db_writability() -> None:
+    """One-shot startup diagnostic: log whether the DB file and its parent dir
+    are writable by the current process. Helps catch the
+    `sqlite3.OperationalError: attempt to write a readonly database` class of
+    deploy issue at boot rather than on the first POST.
+    """
+    db_dir = os.path.dirname(DATABASE_PATH)
+    file_writable = os.path.exists(DATABASE_PATH) and os.access(DATABASE_PATH, os.W_OK)
+    dir_writable = os.path.isdir(db_dir) and os.access(db_dir, os.W_OK)
+    msg = (
+        f"DATABASE_PATH={DATABASE_PATH} "
+        f"file_writable={file_writable} dir_writable={dir_writable}"
+    )
+    if file_writable and dir_writable:
+        app.logger.info(msg)
+    else:
+        app.logger.warning(
+            f"{msg} — registration / write endpoints will 500 with "
+            f"'attempt to write a readonly database' until the DB file and "
+            f"its directory are writable by the gunicorn user. "
+            f"Override the path with SHIORI_DATABASE_PATH if needed."
+        )
+
+
+_log_db_writability()
+
 
 def get_db_connection():
     """
@@ -372,8 +403,22 @@ def register_user():
         user_id = str(uuid.uuid4())
         hashed_password = password_hash.hash(password)
         created_timestamp = datetime.now().isoformat()
-        conn.execute('INSERT INTO users (user_id, username, password_hash, created_timestamp) VALUES (?, ?, ?, ?)', (user_id, username, hashed_password, created_timestamp))
-        conn.commit()
+        try:
+            conn.execute('INSERT INTO users (user_id, username, password_hash, created_timestamp) VALUES (?, ?, ?, ?)', (user_id, username, hashed_password, created_timestamp))
+            conn.commit()
+        except sqlite3.OperationalError as e:
+            # The most common cause is a read-only DB file or directory on the
+            # production host. Log the actual filesystem state so the operator
+            # has something to act on, and surface a clean error to the client.
+            app.logger.error(
+                f"register_user write failed: {e} "
+                f"(DATABASE_PATH={DATABASE_PATH}, "
+                f"file_writable={os.access(DATABASE_PATH, os.W_OK)}, "
+                f"dir_writable={os.access(os.path.dirname(DATABASE_PATH), os.W_OK)})"
+            )
+            return jsonify({
+                "error": "Registration is temporarily unavailable. Please try again shortly.",
+            }), 503
     finally:
         conn.close()
 
