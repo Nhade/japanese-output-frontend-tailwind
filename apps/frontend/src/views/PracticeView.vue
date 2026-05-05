@@ -325,8 +325,6 @@ const correctVariantReadings = computed<string[]>(() => {
   return correctVariants.value.map(v => kanaifyAnswer(v, item.cue, allVocab.value) ?? '');
 });
 
-const hasReadingHint = computed(() => correctVariantReadings.value.some(Boolean));
-
 const expectedAnswerCount = computed(() => correctVariants.value.length);
 
 const fillBlankFormatHint = computed<string>(() => {

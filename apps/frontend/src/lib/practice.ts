@@ -99,7 +99,11 @@ function parseCSV(text: string): string[][] {
   return rows;
 }
 
-function rowsToObjects<T extends Record<string, string>>(rows: string[][]): T[] {
+// `T` is the row interface (e.g. FillBlankItem). We can't constrain it to
+// `Record<string, string>` because TS interfaces don't auto-acquire an index
+// signature, but the runtime shape is exactly that — a flat string→string
+// map populated from the header row.
+function rowsToObjects<T>(rows: string[][]): T[] {
   if (rows.length < 2) return [];
   const [header, ...body] = rows;
   return body.map(r => {
@@ -107,13 +111,13 @@ function rowsToObjects<T extends Record<string, string>>(rows: string[][]): T[] 
     header.forEach((key, i) => {
       obj[key] = (r[i] ?? '').trim();
     });
-    return obj as T;
+    return obj as unknown as T;
   });
 }
 
 const cache = new Map<string, Promise<unknown>>();
 
-async function fetchCSV<T extends Record<string, string>>(url: string): Promise<T[]> {
+async function fetchCSV<T>(url: string): Promise<T[]> {
   const hit = cache.get(url);
   if (hit) return hit as Promise<T[]>;
   const p = (async () => {
