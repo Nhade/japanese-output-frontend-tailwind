@@ -8,6 +8,8 @@ python-dotenv
 requests
 beautifulsoup4
 openai
+anthropic
+google-genai
 pydantic
 gTTS
 gunicorn

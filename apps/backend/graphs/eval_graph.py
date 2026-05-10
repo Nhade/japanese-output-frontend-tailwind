@@ -215,7 +215,7 @@ def build_feedback_prompt(state: DetailedFeedbackState) -> dict:
 
 def call_llm_feedback(state: DetailedFeedbackState) -> dict:
     try:
-        content = query_llm(state["messages"], json_mode=False, temperature=0.7)
+        content = query_llm(state["messages"])
         return {"result": content}
     except Exception as e:
         print(f"Failed to get detailed feedback. Error: {e}")

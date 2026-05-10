@@ -13,9 +13,31 @@ import ai_core
 
 class TestLLMSwitch(unittest.TestCase):
 
+    # Env vars that, if set in a developer's local .env, would leak into the
+    # ai_core registry and steer the dispatcher away from whichever provider
+    # the test thinks it's exercising. Cleared in setUp for a hermetic env.
+    _AI_CORE_ENV_KEYS = (
+        "LLM_PROVIDER", "MODEL_NAME", "API_BASE_URL", "API_KEY",
+        "QUALITY_PROVIDER", "QUALITY_MODEL", "QUALITY_API_BASE_URL",
+        "QUALITY_API_KEY", "QUALITY_MAX_TOKENS",
+        "BALANCED_PROVIDER", "BALANCED_MODEL", "BALANCED_API_BASE_URL",
+        "BALANCED_API_KEY", "BALANCED_MAX_TOKENS",
+        "FAST_PROVIDER", "FAST_MODEL", "FAST_API_BASE_URL",
+        "FAST_API_KEY", "FAST_MAX_TOKENS",
+        "GROQ_API_KEY", "GROQ_API_BASE_URL",
+    )
+
     def setUp(self):
-        # Save original env
+        # Save original env, then pin every var ai_core looks at to an
+        # empty string. ai_core calls load_dotenv() at module body time, and
+        # with the default override=False it would *re-populate* any var we
+        # left unset from the developer's local .env — quietly steering the
+        # dispatcher to the wrong provider. Setting to "" keeps the keys
+        # present in os.environ so load_dotenv treats them as already set
+        # and skips them.
         self.original_env = dict(os.environ)
+        for key in self._AI_CORE_ENV_KEYS:
+            os.environ[key] = ""
 
     def tearDown(self):
         # Restore env
@@ -57,23 +79,30 @@ class TestLLMSwitch(unittest.TestCase):
         os.environ['GROQ_API_KEY'] = ''
         os.environ['GROQ_API_BASE_URL'] = ''
 
-        # Reload to trigger client init with new env vars
+        # Reload so the module re-imports openai.OpenAI (now mocked) and
+        # rebuilds MODEL_REGISTRY from the test env.
         importlib.reload(ai_core)
 
-        # Access the client instance assigned to the module
-        mock_client = ai_core.openai_client
+        # The module no longer keeps an eagerly-initialized openai_client;
+        # the OpenAI client is created lazily inside _openai_client(cfg) on
+        # first dispatch. Wire up the mock to return a stub client whose
+        # chat.completions.create yields a known response.
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
         mock_completion = MagicMock()
         mock_completion.choices[0].message.content = "OpenAI Reply"
         mock_client.chat.completions.create.return_value = mock_completion
 
-        # Call
+        # Call — default tier (BALANCED) falls back to the legacy env config,
+        # which is openai/gpt-4o with the api_key + base_url set above.
         response = ai_core.query_llm([{"role": "user", "content": "hello"}])
 
         # Verify
         self.assertEqual(response, "OpenAI Reply")
         mock_client.chat.completions.create.assert_called()
 
-        # Check Base URL passed to client constructor (only one OpenAI() call since Groq is cleared)
+        # Check Base URL passed to client constructor (only one OpenAI() call
+        # since Groq is cleared and the per-tier cache deduplicates).
         mock_openai_cls.assert_called_with(api_key='sk-test', base_url='https://api.groq.com/openai/v1')
 
 if __name__ == '__main__':

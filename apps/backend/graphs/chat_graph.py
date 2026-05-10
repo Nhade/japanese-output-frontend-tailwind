@@ -168,7 +168,7 @@ def build_context(state: ChatState) -> dict:
 
 def call_llm(state: ChatState) -> dict:
     try:
-        result = query_llm_json(state["messages"], temperature=0.7)
+        result = query_llm_json(state["messages"])
         retry_count = result["retry_count"]
 
         if result["error"]:
