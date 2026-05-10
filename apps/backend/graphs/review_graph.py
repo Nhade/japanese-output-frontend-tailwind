@@ -13,7 +13,7 @@ from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
 
-from ai_core import query_llm
+from ai_core import Tier, query_llm
 
 # ---------------------------------------------------------------------------
 # State
@@ -87,7 +87,7 @@ def analyze(state: ReviewState) -> dict:
     """
 
     try:
-        analysis = query_llm([{"role": "user", "content": prompt}])
+        analysis = query_llm([{"role": "user", "content": prompt}], tier=Tier.QUALITY)
         return {"analysis_result": analysis}
     except Exception as e:
         print(f"Agent Step 1 Failed: {e}")
@@ -130,7 +130,7 @@ def draft(state: ReviewState) -> dict:
     ]
 
     try:
-        draft_text = query_llm(messages)
+        draft_text = query_llm(messages, tier=Tier.QUALITY)
         return {"draft_result": draft_text}
     except Exception as e:
         print(f"Agent Step 2 Failed: {e}")
@@ -182,7 +182,7 @@ def polish(state: ReviewState) -> dict:
     ]
 
     try:
-        final = query_llm(messages)
+        final = query_llm(messages, tier=Tier.QUALITY)
         return {"result": final}
     except Exception as e:
         print(f"Agent Step 3 Failed: {e}")
