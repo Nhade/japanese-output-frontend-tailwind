@@ -133,20 +133,22 @@ def _gemini_client(cfg: ModelConfig):
 # Provider dispatch
 # ---------------------------------------------------------------------------
 
-def _query_openai(cfg: ModelConfig, messages, json_mode: bool, temperature: float) -> str:
+def _query_openai(cfg: ModelConfig, messages, json_mode: bool, temperature: float | None) -> str:
     client = _openai_client(cfg)
     response_format = {"type": "json_object"} if json_mode else {"type": "text"}
-    completion = client.chat.completions.create(
+    kwargs: dict[str, Any] = dict(
         model=cfg.model,
         messages=messages,
         response_format=response_format,
-        temperature=temperature,
         timeout=AI_TIMEOUT,
     )
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    completion = client.chat.completions.create(**kwargs)
     return completion.choices[0].message.content
 
 
-def _query_anthropic(cfg: ModelConfig, messages, json_mode: bool, temperature: float) -> str:
+def _query_anthropic(cfg: ModelConfig, messages, json_mode: bool, temperature: float | None) -> str:
     # Anthropic takes `system` as a separate top-level field, not a message role.
     system_parts = [m["content"] for m in messages if m.get("role") == "system"]
     rest = [m for m in messages if m.get("role") != "system"]
@@ -157,9 +159,10 @@ def _query_anthropic(cfg: ModelConfig, messages, json_mode: bool, temperature: f
         model=cfg.model,
         max_tokens=cfg.max_tokens,
         messages=rest,
-        temperature=min(temperature, 1.0),
         timeout=AI_TIMEOUT,
     )
+    if temperature is not None:
+        kwargs["temperature"] = min(temperature, 1.0)
     if system:
         kwargs["system"] = system
     response = client.messages.create(**kwargs)
@@ -168,7 +171,7 @@ def _query_anthropic(cfg: ModelConfig, messages, json_mode: bool, temperature: f
     )
 
 
-def _query_gemini(cfg: ModelConfig, messages, json_mode: bool, temperature: float) -> str:
+def _query_gemini(cfg: ModelConfig, messages, json_mode: bool, temperature: float | None) -> str:
     from google.genai import types
 
     # Gemini takes `system_instruction` separately and uses role="model" for
@@ -186,9 +189,10 @@ def _query_gemini(cfg: ModelConfig, messages, json_mode: bool, temperature: floa
     ]
 
     config_kwargs: dict[str, Any] = {
-        "temperature": temperature,
         "max_output_tokens": cfg.max_tokens,
     }
+    if temperature is not None:
+        config_kwargs["temperature"] = temperature
     if system:
         config_kwargs["system_instruction"] = system
     if json_mode:
@@ -203,7 +207,7 @@ def _query_gemini(cfg: ModelConfig, messages, json_mode: bool, temperature: floa
     return response.text or ""
 
 
-def _query_ollama(cfg: ModelConfig, messages, json_mode: bool, temperature: float) -> str:
+def _query_ollama(cfg: ModelConfig, messages, json_mode: bool, temperature: float | None) -> str:
     url = f"{(cfg.base_url or 'http://localhost:11434').rstrip('/')}/api/chat"
     headers = {
         "Authorization": f"Bearer {cfg.api_key}",
@@ -213,8 +217,9 @@ def _query_ollama(cfg: ModelConfig, messages, json_mode: bool, temperature: floa
         "model": cfg.model,
         "messages": messages,
         "stream": False,
-        "options": {"temperature": temperature},
     }
+    if temperature is not None:
+        payload["options"] = {"temperature": temperature}
     if json_mode:
         payload["format"] = "json"
     response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
@@ -282,7 +287,7 @@ def calculate_score(error_type: ErrorType) -> int:
 def query_llm(
     messages: list[dict[str, str]],
     json_mode: bool = False,
-    temperature: float = 0.7,
+    temperature: float | None = None,
     *,
     tier: Tier = Tier.BALANCED,
 ) -> str:
@@ -291,7 +296,10 @@ def query_llm(
     Args:
         messages: chat-format list of {"role", "content"} dicts.
         json_mode: request a JSON object response (provider-dependent).
-        temperature: sampling temperature.
+        temperature: sampling temperature, or None to use the model's default.
+            Newer reasoning models (e.g. GPT-5.x) reject any non-default value
+            and will 400; pass a value only when the call has explicit
+            determinism intent (grading, structured extraction).
         tier: which model tier to use. Defaults to BALANCED for live serving.
     """
     cfg = MODEL_REGISTRY[tier]
@@ -330,7 +338,7 @@ def _parse_json_safe(content: str) -> dict:
 def query_llm_json(
     messages: list[dict[str, str]],
     retries: int = 3,
-    temperature: float = 0.7,
+    temperature: float | None = None,
     *,
     tier: Tier = Tier.BALANCED,
 ) -> dict:
