@@ -169,6 +169,7 @@ from learner_service import (
     update_learner_profile,
     update_learner_settings,
 )
+from embedding_service import ensure_embedding_columns
 from video_service import create_video_tables, import_video
 
 # Initialize Learner Tables
@@ -176,6 +177,7 @@ try:
     with sqlite3.connect(DATABASE_PATH) as conn:
         create_learner_tables(conn)
         create_video_tables(conn)
+        ensure_embedding_columns(conn)
 except Exception as e:
     print(f"Database init error: {e}")
 
