@@ -11,6 +11,8 @@ openai
 anthropic
 google-genai
 pydantic
+numpy
+sentence-transformers
 gTTS
 gunicorn
 langgraph

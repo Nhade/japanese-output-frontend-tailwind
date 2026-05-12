@@ -161,6 +161,7 @@ def get_mistakes(user_id):
 
 from agent_service import generate_daily_review_agent
 from ai_service import chat_with_ai, evaluate_submission, get_detailed_feedback
+from embedding_service import ensure_embedding_columns
 from graphs.video_graph import check_comprehension_answer, generate_comprehension_questions
 from learner_service import (
     backfill_learner_profile,
@@ -176,6 +177,7 @@ try:
     with sqlite3.connect(DATABASE_PATH) as conn:
         create_learner_tables(conn)
         create_video_tables(conn)
+        ensure_embedding_columns(conn)
 except Exception as e:
     print(f"Database init error: {e}")
 
