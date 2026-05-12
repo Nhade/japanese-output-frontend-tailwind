@@ -161,6 +161,7 @@ def get_mistakes(user_id):
 
 from agent_service import generate_daily_review_agent
 from ai_service import chat_with_ai, evaluate_submission, get_detailed_feedback
+from embedding_service import ensure_embedding_columns
 from graphs.video_graph import check_comprehension_answer, generate_comprehension_questions
 from learner_service import (
     backfill_learner_profile,
@@ -169,7 +170,6 @@ from learner_service import (
     update_learner_profile,
     update_learner_settings,
 )
-from embedding_service import ensure_embedding_columns
 from video_service import create_video_tables, import_video
 
 # Initialize Learner Tables

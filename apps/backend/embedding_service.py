@@ -20,7 +20,7 @@ cheap (the SentenceTransformer download is ~400 MB).
 from __future__ import annotations
 
 import sqlite3
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -72,9 +72,9 @@ def format_mistake_card(
     prompt: str,
     reference: str,
     user_answer: str,
-    error_type: Optional[str] = None,
-    feedback: Optional[str] = None,
-    section_label: Optional[str] = None,
+    error_type: str | None = None,
+    feedback: str | None = None,
+    section_label: str | None = None,
 ) -> str:
     """Render a wrong-answer row into the canonical text blob we embed.
 
@@ -131,9 +131,9 @@ def embed_mistake_card(
     prompt: str,
     reference: str,
     user_answer: str,
-    error_type: Optional[str] = None,
-    feedback: Optional[str] = None,
-    section_label: Optional[str] = None,
+    error_type: str | None = None,
+    feedback: str | None = None,
+    section_label: str | None = None,
 ) -> np.ndarray:
     card = format_mistake_card(
         prompt=prompt,
