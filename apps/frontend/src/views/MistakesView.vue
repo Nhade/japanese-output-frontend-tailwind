@@ -5,6 +5,16 @@ import MarkdownIt from 'markdown-it';
 
 import { useAuthStore } from '../stores/auth';
 
+interface SimilarPast {
+  log_id: string;
+  question_sentence: string;
+  user_answer: string;
+  correct_answer: string;
+  error_type?: string | null;
+  answered_timestamp: string;
+  similarity: number;
+}
+
 interface Mistake {
   log_id: string;
   question_sentence: string;
@@ -13,9 +23,51 @@ interface Mistake {
   feedback?: string | null;
   score?: number | null;
   error_type?: string | null;
+  similar_past?: SimilarPast[];
 }
 
 const BLANK_MARKER = '[＿＿＿]';
+
+// Trailing "你已經犯過 N 次類似的錯 — 最近一次 {date}" annotation appended by
+// the backend's personal_rag.annotate_feedback. We strip it back out here so
+// the count can be rendered as an interactive disclosure instead of an
+// inline scolding line.
+const RAG_ANNOTATION_RE = /\n*你已經犯過\s*(\d+)\s*次類似的錯\s*—\s*最近一次\s*([^。\n]+)。?\s*$/;
+
+function splitFeedback(feedback?: string | null): { body: string; ragCount: number; ragLastDate: string } {
+  if (!feedback) return { body: '', ragCount: 0, ragLastDate: '' };
+  const m = feedback.match(RAG_ANNOTATION_RE);
+  if (!m) return { body: feedback, ragCount: 0, ragLastDate: '' };
+  return {
+    body: feedback.slice(0, m.index).trimEnd(),
+    ragCount: parseInt(m[1], 10),
+    ragLastDate: m[2].trim(),
+  };
+}
+
+const expanded = ref<Set<string>>(new Set());
+function toggleExpanded(logId: string) {
+  const next = new Set(expanded.value);
+  if (next.has(logId)) next.delete(logId);
+  else next.add(logId);
+  expanded.value = next;
+}
+function similarPreview(sentence: string, blank: string): string {
+  // Render the cloze sentence with the wrong answer struck through for the
+  // preview — same idea as the main entry, just compact text.
+  const idx = sentence.indexOf(BLANK_MARKER);
+  if (idx === -1) return sentence;
+  return sentence.slice(0, idx) + `「${blank}」` + sentence.slice(idx + BLANK_MARKER.length);
+}
+function formatSimDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+    });
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
 
 const { t } = useI18n();
 const auth = useAuthStore();
@@ -324,7 +376,45 @@ onUnmounted(() => {
                 <span class="score-val">{{ m.score }}</span>
               </span>
             </div>
-            <p class="note-text">{{ m.feedback }}</p>
+            <p class="note-text">{{ splitFeedback(m.feedback).body }}</p>
+
+            <div
+              v-if="splitFeedback(m.feedback).ragCount > 0 && (m.similar_past?.length ?? 0) > 0"
+              class="rag-disclosure"
+            >
+              <button
+                type="button"
+                class="rag-toggle"
+                :aria-expanded="expanded.has(m.log_id)"
+                @click="toggleExpanded(m.log_id)"
+              >
+                <span class="rag-toggle-rule" aria-hidden="true" />
+                <span class="rag-toggle-text">
+                  類似的錯誤 · {{ splitFeedback(m.feedback).ragCount }} 次
+                  <span class="rag-toggle-meta">最近一次 {{ splitFeedback(m.feedback).ragLastDate }}</span>
+                </span>
+                <span class="rag-toggle-chev" aria-hidden="true">
+                  {{ expanded.has(m.log_id) ? '−' : '+' }}
+                </span>
+              </button>
+
+              <transition name="rag-fade">
+                <ol v-if="expanded.has(m.log_id)" class="rag-list">
+                  <li v-for="sp in m.similar_past" :key="sp.log_id" class="rag-item">
+                    <div class="rag-item-head">
+                      <span class="rag-item-eyebrow">{{ localizedErrorType(sp.error_type) }}</span>
+                      <span class="rag-item-date">{{ formatSimDate(sp.answered_timestamp) }}</span>
+                    </div>
+                    <p class="rag-item-sentence" lang="ja">{{ similarPreview(sp.question_sentence, sp.user_answer) }}</p>
+                    <p class="rag-item-fix">
+                      <span class="rag-item-strike" lang="ja">{{ sp.user_answer }}</span>
+                      <span class="rag-item-arrow" aria-hidden="true">→</span>
+                      <span class="rag-item-correct" lang="ja">{{ sp.correct_answer }}</span>
+                    </p>
+                  </li>
+                </ol>
+              </transition>
+            </div>
           </div>
         </article>
       </div>
@@ -654,9 +744,141 @@ onUnmounted(() => {
   color: color-mix(in oklab, var(--foreground) 78%, transparent);
   max-width: 42em;
 }
+
+/* Personal-RAG disclosure ---------------------------------- */
+.rag-disclosure {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+.rag-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 4px 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: color-mix(in oklab, var(--foreground) 70%, transparent);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: left;
+}
+.rag-toggle:hover { color: var(--primary); }
+.rag-toggle:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--primary) 40%, transparent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.rag-toggle-rule {
+  width: 28px;
+  height: 1px;
+  background: color-mix(in oklab, var(--foreground) 35%, transparent);
+  flex: 0 0 28px;
+}
+.rag-toggle-text {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  font-weight: 500;
+}
+.rag-toggle-meta {
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  font-size: 0.78rem;
+  color: color-mix(in oklab, var(--foreground) 50%, transparent);
+}
+.rag-toggle-chev {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  width: 1.4em;
+  text-align: center;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+}
+
+.rag-list {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+  display: grid;
+  gap: 14px;
+}
+.rag-item {
+  padding: 12px 16px 14px;
+  background: color-mix(in oklab, var(--paper-warm) 50%, transparent);
+  border-left: 2px solid color-mix(in oklab, var(--primary) 35%, transparent);
+  border-radius: 0 4px 4px 0;
+}
+.rag-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.rag-item-eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.rag-item-date {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: color-mix(in oklab, var(--foreground) 45%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.rag-item-sentence {
+  margin: 0 0 6px;
+  font-family: var(--font-serif);
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: color-mix(in oklab, var(--foreground) 82%, transparent);
+}
+.rag-item-fix {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rag-item-strike {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklab, var(--primary) 60%, transparent);
+  text-decoration-thickness: 1.5px;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+}
+.rag-item-arrow {
+  color: color-mix(in oklab, var(--foreground) 40%, transparent);
+  font-family: var(--font-sans);
+}
+.rag-item-correct {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.rag-fade-enter-active,
+.rag-fade-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.rag-fade-enter-from,
+.rag-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
 @media (max-width: 640px) {
   .errata-sentence { font-size: 1.1rem; }
   .correction-word { font-size: 1.35rem; }
+  .rag-toggle-text { flex-wrap: wrap; gap: 4px 12px; }
 }
 
 /* Empty ---------------------------------------------------- */

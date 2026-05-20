@@ -11,6 +11,7 @@ from flask_cors import CORS
 from pwdlib import PasswordHash, exceptions
 from pykakasi import kakasi
 
+from personal_rag import annotate_feedback, find_top_similar_mistakes
 from translation_service import translate_text
 from tts_service import generate_audio
 
@@ -147,17 +148,29 @@ def get_mistakes(user_id):
         JSON: A list of mistake objects (question, user_answer, correct_answer, feedback, etc.).
     """
     conn = get_db_connection()
-    mistakes = conn.execute('''
-        SELECT al.log_id, e.question_sentence, al.user_answer, e.correct_answer,
-               al.feedback, al.score, al.error_type
-        FROM answer_log al
-        JOIN exercise e ON al.exercise_id = e.exercise_id
-        WHERE al.user_id = ? AND al.is_correct = 0
-        ORDER BY al.answered_timestamp DESC
-    ''', (user_id,)).fetchall()
-    conn.close()
+    try:
+        mistakes = conn.execute('''
+            SELECT al.log_id, e.question_sentence, al.user_answer, e.correct_answer,
+                   al.feedback, al.score, al.error_type
+            FROM answer_log al
+            JOIN exercise e ON al.exercise_id = e.exercise_id
+            WHERE al.user_id = ? AND al.is_correct = 0
+            ORDER BY al.answered_timestamp DESC
+        ''', (user_id,)).fetchall()
 
-    return jsonify([dict(mistake) for mistake in mistakes])
+        result = []
+        for m in mistakes:
+            row = dict(m)
+            try:
+                row["similar_past"] = find_top_similar_mistakes(conn, m["log_id"], top_k=3)
+            except Exception as e:
+                app.logger.warning(f"similar_past lookup failed for log {m['log_id']}: {e}")
+                row["similar_past"] = []
+            result.append(row)
+    finally:
+        conn.close()
+
+    return jsonify(result)
 
 from agent_service import generate_daily_review_agent
 from ai_service import chat_with_ai, evaluate_submission, get_detailed_feedback
@@ -293,6 +306,15 @@ def explain_answer():
 
         print(f"Calling AI for evaluation (Log ID: {log_id})...")
         ai_result = evaluate_submission(question, user_answer, correct_answer)
+
+        # Personal-RAG annotation: append a "you've made this kind of
+        # mistake N times before" note when the learner's history surfaces
+        # similar past mistakes. Pure SQL + numpy dot product, no extra
+        # LLM call. Reads the embedding column populated on write.
+        try:
+            ai_result['feedback'] = annotate_feedback(conn, log_id, ai_result['feedback'])
+        except Exception as e:
+            app.logger.warning(f"personal_rag annotation failed for log {log_id}: {e}")
 
         # Update record
         conn.execute('''
@@ -1005,4 +1027,4 @@ def update_profile():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=os.getenv("FLASK_DEBUG", "false").lower() == "true")
