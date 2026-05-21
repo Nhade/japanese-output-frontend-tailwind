@@ -6,11 +6,9 @@ from enum import StrEnum
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv()
-
+from config import settings
 
 # ---------------------------------------------------------------------------
 # Tier system
@@ -83,8 +81,6 @@ MODEL_REGISTRY: dict[Tier, ModelConfig] = {
     tier: _load_tier(tier, _legacy) for tier in Tier
 }
 
-AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "120"))
-
 
 # ---------------------------------------------------------------------------
 # Provider clients (lazy, cached)
@@ -140,7 +136,7 @@ def _query_openai(cfg: ModelConfig, messages, json_mode: bool, temperature: floa
         model=cfg.model,
         messages=messages,
         response_format=response_format,
-        timeout=AI_TIMEOUT,
+        timeout=settings.ai_timeout,
     )
     if temperature is not None:
         kwargs["temperature"] = temperature
@@ -159,7 +155,7 @@ def _query_anthropic(cfg: ModelConfig, messages, json_mode: bool, temperature: f
         model=cfg.model,
         max_tokens=cfg.max_tokens,
         messages=rest,
-        timeout=AI_TIMEOUT,
+        timeout=settings.ai_timeout,
     )
     if temperature is not None:
         kwargs["temperature"] = min(temperature, 1.0)
@@ -222,7 +218,7 @@ def _query_ollama(cfg: ModelConfig, messages, json_mode: bool, temperature: floa
         payload["options"] = {"temperature": temperature}
     if json_mode:
         payload["format"] = "json"
-    response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
+    response = requests.post(url, json=payload, headers=headers, timeout=settings.ai_timeout)
     response.raise_for_status()
     data = response.json()
     return data.get("message", {}).get("content", "") or data.get("response", "")

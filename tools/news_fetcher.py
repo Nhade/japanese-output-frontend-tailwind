@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 import sqlite3
 import uuid
 
+from config import settings
+
 # --- Stage 1: Scraping and Parsing Functions (Largely unchanged) ---
 
 def extract_nhk_news_info(html_content):
@@ -37,11 +39,14 @@ def extract_nhk_news_info(html_content):
                 if isinstance(data, list):
                     for item in data:
                         if item.get('@type') == 'NewsArticle':
-                            news_article_data = item; break
+                            news_article_data = item
+                            break
                 elif isinstance(data, dict) and data.get('@type') == 'NewsArticle':
                     news_article_data = data
-                if news_article_data: break
-            except (json.JSONDecodeError, AttributeError): continue
+                if news_article_data:
+                    break
+            except (json.JSONDecodeError, AttributeError):
+                continue
 
     if news_article_data:
         extracted_data["title"] = news_article_data.get('headline')
@@ -52,7 +57,8 @@ def extract_nhk_news_info(html_content):
     # Strategy 2: Fallback to HTML tag parsing if needed
     if not extracted_data["title"]:
         title_tag = soup.find('h1', class_='content--title')
-        if title_tag: extracted_data["title"] = title_tag.get_text(strip=True)
+        if title_tag:
+            extracted_data["title"] = title_tag.get_text(strip=True)
 
     if not extracted_data["timestamp"]:
         time_tag = soup.find('time')
@@ -61,12 +67,14 @@ def extract_nhk_news_info(html_content):
 
     if not extracted_data["category"]:
         category_tag = soup.select_one('.content--date .i-word')
-        if category_tag: extracted_data["category"] = category_tag.get_text(strip=True)
+        if category_tag:
+            extracted_data["category"] = category_tag.get_text(strip=True)
 
     # --- Content Extraction ---
     content_parts = []
     summary_p = soup.find('p', class_='content--summary')
-    if summary_p: content_parts.append(summary_p.get_text(strip=True))
+    if summary_p:
+        content_parts.append(summary_p.get_text(strip=True))
 
     article_body = soup.select_one('.content--detail-more')
     if article_body:
@@ -75,9 +83,11 @@ def extract_nhk_news_info(html_content):
                 content_parts.append(f"\n--- {element.get_text(strip=True)} ---\n")
             elif element.name == 'section' and 'content--body' in element.get('class', []):
                 text_div = element.find('div', class_='body-text')
-                if text_div: content_parts.append(text_div.get_text(separator='\n', strip=True))
+                if text_div:
+                    content_parts.append(text_div.get_text(separator='\n', strip=True))
 
-    if content_parts: extracted_data["content"] = "\n\n".join(content_parts)
+    if content_parts:
+        extracted_data["content"] = "\n\n".join(content_parts)
         
     return extracted_data
 
@@ -100,16 +110,16 @@ def get_urls_from_rss(rss_url):
 
 # --- Stage 2: New Database Function ---
 
-def save_articles_to_db(articles_data, db_name='news_corpus.db'):
+def save_articles_to_db(articles_data, db_name: str | None = None):
     """
     Saves a list of scraped articles into a SQLite database.
     Creates the table if it doesn't exist and ignores duplicates.
 
     Args:
         articles_data (list): A list of dictionaries, where each dictionary is a scraped article.
-        db_name (str): The name of the SQLite database file.
+        db_name (str | None): Override the SQLite DB file. Defaults to settings.database_path.
     """
-    conn = sqlite3.connect(db_name)
+    conn = sqlite3.connect(db_name or str(settings.database_path))
     cursor = conn.cursor()
 
     # Create table with a schema adapted from the pseudo-code

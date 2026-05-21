@@ -16,6 +16,7 @@ py-modules = [
     "ai_core",
     "ai_service",
     "app",
+    "config",
     "db",
     "embedding_service",
     "learner_service",

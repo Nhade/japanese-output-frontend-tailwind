@@ -1,10 +1,11 @@
 import html
 import os
 
-from dotenv import load_dotenv
 from google.cloud import translate_v2 as translate
 
-load_dotenv()
+from config import ensure_dotenv_loaded
+
+ensure_dotenv_loaded()
 
 try:
     os.environ['GOOGLE_APPLICATION_CREDENTIALS']

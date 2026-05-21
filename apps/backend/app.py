@@ -11,6 +11,7 @@ from flask_cors import CORS
 from pwdlib import PasswordHash, exceptions
 from pykakasi import kakasi
 
+from config import settings
 from db import connect_db
 from personal_rag import annotate_feedback, find_top_similar_mistakes
 from translation_service import translate_text
@@ -25,10 +26,7 @@ CORS(app, origins=[
 k = kakasi()
 password_hash = PasswordHash.recommended()
 
-_DEFAULT_DB_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'news_corpus.db'
-)
-DATABASE_PATH = os.path.abspath(os.environ.get('SHIORI_DATABASE_PATH', _DEFAULT_DB_PATH))
+DATABASE_PATH = str(settings.database_path)
 
 
 def _log_db_writability() -> None:
@@ -1018,14 +1016,14 @@ def update_profile():
     """
     data = get_json_body()
     user_id = data.get('user_id')
-    settings = data.get('settings')
+    settings_payload = data.get('settings')
 
-    if not user_id or not settings:
+    if not user_id or not settings_payload:
         return jsonify({"error": "Missing user_id or settings"}), 400
 
     conn = get_db_connection()
     try:
-        updated_profile = update_learner_settings(conn, user_id, settings)
+        updated_profile = update_learner_settings(conn, user_id, settings_payload)
         return jsonify(updated_profile)
     except Exception as e:
         print(f"Error updating profile: {e}")
@@ -1035,4 +1033,4 @@ def update_profile():
 
 
 if __name__ == '__main__':
-    app.run(debug=os.getenv("FLASK_DEBUG", "false").lower() == "true")
+    app.run(debug=settings.flask_debug)

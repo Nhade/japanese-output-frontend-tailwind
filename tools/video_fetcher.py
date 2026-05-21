@@ -6,16 +6,12 @@ Usage:
   python tools/video_fetcher.py --file urls.txt
 """
 import argparse
-import os
 import sys
 
-from dotenv import load_dotenv
+from config import settings
+from video_service import import_video
 
-load_dotenv()
-
-from video_service import import_video  # noqa: E402
-
-DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'news_corpus.db')
+DATABASE_PATH = str(settings.database_path)
 
 
 def main():

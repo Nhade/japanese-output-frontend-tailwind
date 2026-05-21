@@ -6,8 +6,7 @@ from datetime import datetime
 from google.cloud import translate_v2 as translate
 from janome.tokenizer import Tokenizer
 
-from dotenv import load_dotenv
-load_dotenv()
+from config import settings
 
 def translate_to_traditional_chinese(text: str) -> str:
     """
@@ -71,14 +70,14 @@ def load_jlpt_vocab_from_db(cursor) -> dict:
     vocab_map = {row[0]: row[1] for row in cursor.fetchall()}
     return vocab_map
 
-def create_cloze_exercises_from_article(num_exercises: int, db_name: str = 'news_corpus.db'):
+def create_cloze_exercises_from_article(num_exercises: int, db_name: str | None = None):
     """
     Generates multiple cloze deletion (fill-in-the-blank) exercises from one article.
     The hint provided is the translation of the ENTIRE sentence.
     """
     conn = None
     try:
-        conn = sqlite3.connect(db_name)
+        conn = sqlite3.connect(db_name or str(settings.database_path))
         cursor = conn.cursor()
         create_database_tables(cursor)
 

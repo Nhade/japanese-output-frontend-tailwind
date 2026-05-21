@@ -1,7 +1,9 @@
-from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv()
+from config import ensure_dotenv_loaded
+
+ensure_dotenv_loaded()
+
 client = OpenAI()
 
 def generate_audio(text: str) -> bytes:
