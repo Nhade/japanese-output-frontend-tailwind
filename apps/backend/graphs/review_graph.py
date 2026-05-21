@@ -7,13 +7,13 @@ Graph: fetch_mistakes →[no mistakes?]→ END
 Each LLM step has graceful degradation: if a later step fails,
 the best partial output from an earlier step is returned.
 """
-import sqlite3
 from datetime import datetime
 from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
 
 from ai_core import Tier, query_llm
+from db import connect_db
 
 # ---------------------------------------------------------------------------
 # State
@@ -37,8 +37,7 @@ class ReviewState(TypedDict, total=False):
 # ---------------------------------------------------------------------------
 
 def fetch_mistakes(state: ReviewState) -> dict:
-    conn = sqlite3.connect(state["db_path"])
-    conn.row_factory = sqlite3.Row
+    conn = connect_db(state["db_path"])
 
     query = '''
         SELECT e.question_sentence, e.correct_answer, al.user_answer, al.error_type

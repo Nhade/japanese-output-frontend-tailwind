@@ -32,7 +32,6 @@ sys.path.insert(0, BACKEND_DIR)
 
 from embedding_service import (  # noqa: E402
     cosine_search,
-    deserialize,
     embed_text,
     format_mistake_card,
 )

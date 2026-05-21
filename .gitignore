@@ -14,10 +14,9 @@ __pycache__/
 
 # Environment Variables
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+!**/.env.example
 
 # Build Outputs
 dist/
@@ -37,6 +36,9 @@ japanese-output-practice-3af0779cb130.json
 test_openai_tts.py
 *.wav
 *.pem
+claude_conversation.json
+stream_extraction_*.md
+video_extraction_*.md
 
 # Design references (kept locally only)
 shiori-design-system.md

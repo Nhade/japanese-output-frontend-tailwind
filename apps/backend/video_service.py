@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urlparse
 import requests
 from janome.tokenizer import Tokenizer
 
+from db import connect_db
 from translation_service import translate_text
 
 # ---------------------------------------------------------------------------
@@ -366,8 +367,7 @@ def import_video(url: str, db_path: str, use_whisper: bool = False) -> dict:
     """
     video_ext_id = parse_youtube_url(url)
 
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = connect_db(db_path)
     create_video_tables(conn)
 
     # Check if already imported
