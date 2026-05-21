@@ -16,9 +16,9 @@ from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
 import requests
-from janome.tokenizer import Tokenizer
 
 from db import connect_db
+from services.cloze import make_cloze
 from translation_service import translate_text
 
 # ---------------------------------------------------------------------------
@@ -187,8 +187,6 @@ def fetch_youtube_transcript(video_id: str) -> list:
 # Cloze generation from transcript
 # ---------------------------------------------------------------------------
 
-_tokenizer = Tokenizer()
-
 
 def _load_jlpt_vocab(conn: sqlite3.Connection) -> dict:
     """Load JLPT vocab map (expression → {level, meaning}) if the vocabulary table exists."""
@@ -285,6 +283,9 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
         return 0
 
     jlpt_vocab = _load_jlpt_vocab(conn)
+    # Cloze service speaks Mapping[str, int]; the meaning lookup below uses the
+    # full {level, meaning} entries via `cloze.matched_vocab_key`.
+    jlpt_levels = {expr: entry["level"] for expr, entry in jlpt_vocab.items()}
 
     # Shuffle to get varied sentences
     random.shuffle(sentences)
@@ -297,33 +298,21 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
         sentence = sent_info["text"]
         timestamp = sent_info["start"]
 
-        tokens = list(_tokenizer.tokenize(sentence))
-
-        # Find candidates (same logic as exercise_generator.py)
-        candidates = []
-        for i, token in enumerate(tokens):
-            pos = token.part_of_speech.split(",")[0]
-            vocab_entry = jlpt_vocab.get(token.surface) or jlpt_vocab.get(token.base_form)
-
-            if vocab_entry is not None:
-                candidates.append((i, token, vocab_entry["level"], vocab_entry.get("meaning", "")))
-            elif pos in ["助詞", "動詞"] and len(token.surface) > 0:
-                candidates.append((i, token, None, ""))
-
-        if not candidates:
+        cloze = make_cloze(sentence, jlpt_levels)
+        if cloze is None:
             continue
 
-        idx, chosen, jlpt_level, word_meaning = random.choice(candidates)
-        correct_answer = chosen.surface
-        pos = chosen.part_of_speech.split(",")[0]
+        # Use vocabulary meaning as hint if the answer came from the JLPT vocab
+        # table; fall back to sentence translation otherwise. `matched_vocab_key`
+        # is whichever key (surface OR base_form) actually hit the table, so
+        # this preserves the pre-extraction behaviour where conjugated verbs
+        # matched via their lemma still recovered the right meaning.
+        word_meaning = ""
+        if cloze.matched_vocab_key is not None:
+            entry = jlpt_vocab.get(cloze.matched_vocab_key)
+            if entry:
+                word_meaning = entry.get("meaning", "") or ""
 
-        # Build question sentence
-        parts = []
-        for j, token in enumerate(tokens):
-            parts.append("[＿＿＿]" if j == idx else token.surface)
-        question_sentence = "".join(parts)
-
-        # Use vocabulary meaning as hint if available; fall back to sentence translation
         if word_meaning:
             hint_chinese = word_meaning
         else:
@@ -339,15 +328,15 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
              part_of_speech, jlpt_level, hint_chinese, context_timestamp, created_timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            exercise_id, video_id, sentence, question_sentence, correct_answer,
-            pos, jlpt_level, hint_chinese, timestamp, datetime.now().isoformat()
+            exercise_id, video_id, cloze.full_sentence, cloze.question_sentence, cloze.correct_answer,
+            cloze.part_of_speech, cloze.jlpt_level, hint_chinese, timestamp, datetime.now().isoformat()
         ))
 
         exercises_created += 1
         try:
-            print(f"  -> Video exercise {exercises_created}: blanked '{correct_answer}' (POS: {pos}, JLPT: N{jlpt_level or 'A'})")
+            print(f"  -> Video exercise {exercises_created}: blanked '{cloze.correct_answer}' (POS: {cloze.part_of_speech}, JLPT: N{cloze.jlpt_level or 'A'})")
         except UnicodeEncodeError:
-            print(f"  -> Video exercise {exercises_created}: created (POS: {pos}, JLPT: N{jlpt_level or 'A'})")
+            print(f"  -> Video exercise {exercises_created}: created (POS: {cloze.part_of_speech}, JLPT: N{cloze.jlpt_level or 'A'})")
 
     conn.commit()
     print(f"Created {exercises_created} video exercises for video {video_id}")

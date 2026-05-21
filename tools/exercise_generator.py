@@ -4,9 +4,9 @@ import random
 import re
 from datetime import datetime
 from google.cloud import translate_v2 as translate
-from janome.tokenizer import Tokenizer
 
 from config import settings
+from services.cloze import make_cloze
 
 def translate_to_traditional_chinese(text: str) -> str:
     """
@@ -81,7 +81,6 @@ def create_cloze_exercises_from_article(num_exercises: int, db_name: str | None 
         cursor = conn.cursor()
         create_database_tables(cursor)
 
-        t = Tokenizer() # Initialize the Janome tokenizer
         jlpt_vocab_map = load_jlpt_vocab_from_db(cursor)
 
         # 1. Select a random, unprocessed article
@@ -105,41 +104,9 @@ def create_cloze_exercises_from_article(num_exercises: int, db_name: str | None 
             if exercises_created >= num_exercises:
                 break
 
-            tokens = list(t.tokenize(sentence))
-            
-            # Identify potential words to remove (targets: JLPT vocab, particles and verbs)
-            candidates = []
-            for i, token in enumerate(tokens):
-                part_of_speech = token.part_of_speech.split(',')[0]
-                
-                # Look up JLPT level using surface form first, then base form (lemma)
-                jlpt_level = jlpt_vocab_map.get(token.surface)
-                if jlpt_level is None:
-                    jlpt_level = jlpt_vocab_map.get(token.base_form)
-
-                # Prioritize JLPT vocabulary
-                if jlpt_level is not None:
-                    candidates.append((i, token, jlpt_level))
-                elif part_of_speech in ['助詞', '動詞'] and len(token.surface) > 0:
-                    # Add non-JLPT verbs/particles as lower priority candidates
-                    candidates.append((i, token, None))
-
-            if not candidates:
-                continue # Skip if no good candidates are found
-
-            # Randomly choose one candidate to turn into a blank
-            token_index, chosen_token, jlpt_level = random.choice(candidates)
-            correct_answer = chosen_token.surface
-            part_of_speech = chosen_token.part_of_speech.split(',')[0]
-            
-            # Create the question sentence with a blank
-            question_parts = []
-            for i, token in enumerate(tokens):
-                if i == token_index:
-                    question_parts.append("[＿＿＿]")
-                else:
-                    question_parts.append(token.surface)
-            question_sentence = "".join(question_parts)
+            cloze = make_cloze(sentence, jlpt_vocab_map)
+            if cloze is None:
+                continue  # No candidates in this sentence; try the next one.
 
             hint_chinese = translate_to_traditional_chinese(sentence)
 
@@ -153,12 +120,12 @@ def create_cloze_exercises_from_article(num_exercises: int, db_name: str | None 
                     correct_answer, part_of_speech, jlpt_level, hint_chinese, created_timestamp
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                exercise_id, source_article_id, sentence, question_sentence,
-                correct_answer, part_of_speech, jlpt_level, hint_chinese, created_timestamp
+                exercise_id, source_article_id, cloze.full_sentence, cloze.question_sentence,
+                cloze.correct_answer, cloze.part_of_speech, cloze.jlpt_level, hint_chinese, created_timestamp
             ))
-            
+
             exercises_created += 1
-            print(f"  -> Created exercise {exercises_created}/{num_exercises}: Removed '{correct_answer}' (POS: {part_of_speech}, JLPT: N{jlpt_level or '/A'})")
+            print(f"  -> Created exercise {exercises_created}/{num_exercises}: Removed '{cloze.correct_answer}' (POS: {cloze.part_of_speech}, JLPT: N{cloze.jlpt_level or '/A'})")
 
         # Update the article's status
         cursor.execute("UPDATE articles SET status = 'processed' WHERE article_id = ?", (source_article_id,))

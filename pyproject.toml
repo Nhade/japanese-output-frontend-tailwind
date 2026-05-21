@@ -25,4 +25,4 @@ py-modules = [
     "tts_service",
     "video_service",
 ]
-packages = ["graphs"]
+packages = ["graphs", "services"]
