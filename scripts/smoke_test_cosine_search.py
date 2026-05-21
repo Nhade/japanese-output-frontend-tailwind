@@ -26,16 +26,13 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BACKEND_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "apps", "backend"))
-sys.path.insert(0, BACKEND_DIR)
-
-from embedding_service import (  # noqa: E402
+from embedding_service import (
     cosine_search,
     embed_text,
     format_mistake_card,
 )
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DB = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "data", "news_corpus.db"))
 
 

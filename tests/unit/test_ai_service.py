@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from apps.backend.ai_service import evaluate_submission
+from ai_service import evaluate_submission
 
 class TestAIService(unittest.TestCase):
 

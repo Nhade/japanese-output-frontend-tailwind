@@ -17,12 +17,7 @@ import sqlite3
 import sys
 import time
 
-# Ensure apps/backend is importable when invoked from repo root.
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BACKEND_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "apps", "backend"))
-sys.path.insert(0, BACKEND_DIR)
-
-from embedding_service import (  # noqa: E402
+from embedding_service import (
     _MODEL_NAME,
     embed_texts,
     ensure_embedding_columns,
@@ -30,6 +25,7 @@ from embedding_service import (  # noqa: E402
     serialize,
 )
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DB = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "data", "news_corpus.db"))
 
 

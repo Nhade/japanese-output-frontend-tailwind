@@ -9,14 +9,11 @@ import argparse
 import os
 import sys
 
-# Add backend to path so we can import video_service
-BACKEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'apps', 'backend')
-sys.path.insert(0, BACKEND_DIR)
-
 from dotenv import load_dotenv
-load_dotenv(os.path.join(BACKEND_DIR, '.env'))
 
-from video_service import import_video
+load_dotenv()
+
+from video_service import import_video  # noqa: E402
 
 DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'news_corpus.db')
 

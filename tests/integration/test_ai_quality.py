@@ -1,6 +1,6 @@
 import unittest
 import os
-from apps.backend.ai_service import evaluate_submission
+from ai_service import evaluate_submission
 
 # Skip this test if not running explicitly, to save money/time
 @unittest.skipIf(os.environ.get("TEST_AI") != "1", "Skipping AI Quality test")
