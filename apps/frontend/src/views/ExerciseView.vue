@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
-import MarkdownIt from 'markdown-it';
 import { useI18n } from 'vue-i18n';
 
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
@@ -16,6 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
+import { apiJson } from '@/lib/api';
+import { safeMarkdown } from '@/lib/markdown';
 
 interface Exercise {
   exercise_id: string;
@@ -31,20 +32,34 @@ interface Feedback {
   is_correct: boolean;
   correct_answer: string;
   log_id: string;
-  focus_diff?: Record<string, unknown>;
+  focus_diff?: FocusDiff;
   feedback?: string;
   score?: number;
   error_type?: string;
   retry_count?: number;
 }
 
+interface FocusDiff {
+  updated?: boolean;
+  rotated?: boolean;
+  tag?: string;
+  new_tag?: string;
+  progress?: number;
+  target?: number;
+}
+
+interface ExplanationResponse {
+  feedback?: string;
+  result?: {
+    feedback?: string;
+  };
+  reasoning?: string;
+  [key: string]: unknown;
+}
+
 const { t } = useI18n();
 
-const md = new MarkdownIt({
-  html: true,
-  linkify: true,
-  typographer: true,
-});
+const md = safeMarkdown;
 
 // The blank marker the backend embeds in `question_sentence` for fill-in
 // prompts (see tools/backfill_exercises.py and apps/backend/video_service.py).
@@ -123,13 +138,9 @@ async function fetchNewExercise() {
   showHint.value = false;
 
   try {
-    const url = `${import.meta.env.VITE_API_BASE_URL}/api/exercise/random`
-      + (exerciseMode.value === 'mcq' ? '?mode=mcq' : '');
-    const response = await fetch(url, {
-      headers: { 'Content-Type': 'application/json' },
+    const data = await apiJson<Exercise>('/api/exercise/random', {
+      query: { mode: exerciseMode.value === 'mcq' ? 'mcq' : undefined },
     });
-    if (!response.ok) throw new Error('Network response was not ok');
-    const data = await response.json();
     exercise.value = data;
     if (data.choices) choices.value = data.choices;
   } catch (error) {
@@ -158,18 +169,14 @@ async function handleAnswerSubmit() {
   }
 
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/submit`, {
+    const result = await apiJson<Feedback>('/api/exercise/submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         exercise_id: exercise.value.exercise_id,
         user_answer: userAnswer.value.trim(),
-        user_id: auth.user_id,
-      }),
+        user_id: auth.requireUserId(),
+      },
     });
-    if (!response.ok) throw new Error('Submission failed');
-
-    const result = await response.json();
     feedback.value = result;
 
     if (result.focus_diff && result.focus_diff.updated) {
@@ -200,44 +207,27 @@ async function handleAnswerSubmit() {
       const currentExerciseId = exercise.value.exercise_id;
       isExplaining.value = true;
       try {
-        const explainResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/explain`, {
+        const explanation = await apiJson<ExplanationResponse>('/api/exercise/explain', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ log_id: result.log_id }),
+          body: { log_id: result.log_id },
         });
+        if (exercise.value && exercise.value.exercise_id === currentExerciseId) {
+          // Explicitly pick feedback so an unexpected response shape
+          // (e.g. nested under `result`) can't leave us empty silently.
+          const brief =
+            explanation.feedback
+            ?? explanation.result?.feedback
+            ?? explanation.reasoning
+            ?? '';
 
-        if (!explainResponse.ok) {
-          // Surface the failure instead of silently swallowing it.
-          const text = await explainResponse.text().catch(() => '');
-          console.error('AI explain endpoint failed:', explainResponse.status, text);
-          if (exercise.value && exercise.value.exercise_id === currentExerciseId) {
-            feedback.value = {
-              ...(feedback.value as Feedback),
-              feedback: text || t('exercise.network_error'),
-            };
-          }
-        } else {
-          const explanation = await explainResponse.json();
-          // Diagnostic: log raw shape so missing/renamed keys are obvious.
-          console.debug('[explain] response:', explanation);
-          if (exercise.value && exercise.value.exercise_id === currentExerciseId) {
-            // Explicitly pick feedback so an unexpected response shape
-            // (e.g. nested under `result`) can't leave us empty silently.
-            const brief =
-              explanation?.feedback
-              ?? explanation?.result?.feedback
-              ?? explanation?.reasoning
-              ?? '';
+          feedback.value = {
+            ...(feedback.value as Feedback),
+            ...explanation,
+            feedback: brief,
+          };
 
-            feedback.value = {
-              ...(feedback.value as Feedback),
-              ...explanation,
-              feedback: brief,
-            };
-
-            if (brief && typeof brief === 'string' && brief.includes('Safety violation')) {
-              toastStore.trigger(t('chat.safety_violation'), 'error');
-            }
+          if (brief.includes('Safety violation')) {
+            toastStore.trigger(t('chat.safety_violation'), 'error');
           }
         }
       } catch (err) {
@@ -271,27 +261,20 @@ async function fetchDetailedFeedback() {
   isLoadingDetailed.value = true;
   detailedError.value = null;
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/exercise/explain-detailed`, {
+    const data = await apiJson<{ detailed_feedback?: string }>('/api/exercise/explain-detailed', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ log_id: feedback.value.log_id }),
+      body: { log_id: feedback.value.log_id },
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      if (data.detailed_feedback && data.detailed_feedback.includes('Safety violation')) {
-        toastStore.trigger(t('chat.safety_violation'), 'error');
-        return;
-      }
-      detailedFeedback.value = data.detailed_feedback;
-      showDetailModal.value = true;
-    } else {
-      const err = await response.json();
-      detailedError.value = err.error || 'Failed to fetch explanation';
+    if (data.detailed_feedback && data.detailed_feedback.includes('Safety violation')) {
+      toastStore.trigger(t('chat.safety_violation'), 'error');
+      return;
     }
+    detailedFeedback.value = data.detailed_feedback ?? '';
+    showDetailModal.value = true;
   } catch (error) {
     console.error('Failed to fetch detailed feedback:', error);
-    detailedError.value = 'Network error or server unavailable.';
+    detailedError.value = error instanceof Error ? error.message : 'Network error or server unavailable.';
   } finally {
     isLoadingDetailed.value = false;
   }

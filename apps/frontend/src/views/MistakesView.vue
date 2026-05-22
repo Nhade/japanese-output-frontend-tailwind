@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import MarkdownIt from 'markdown-it';
 
 import { useAuthStore } from '../stores/auth';
+import { apiJson } from '../lib/api';
+import { safeMarkdown } from '../lib/markdown';
 
 interface SimilarPast {
   log_id: string;
@@ -72,7 +73,7 @@ function formatSimDate(iso: string): string {
 const { t } = useI18n();
 const auth = useAuthStore();
 
-const md = new MarkdownIt({ html: true, linkify: true, typographer: true });
+const md = safeMarkdown;
 
 const mistakes = ref<Mistake[]>([]);
 const isLoading = ref(true);
@@ -142,14 +143,9 @@ async function generateReview() {
   dailyReview.value = '';
   simulateAgentThinking();
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/agent/daily_review/${auth.user_id}`);
-    const data = await res.json();
-    if (res.ok) {
-      dailyReview.value = data.review;
-      showReviewDialog.value = true;
-    } else {
-      console.error('Agent error:', data.error);
-    }
+    const data = await apiJson<{ review: string }>(`/api/agent/daily_review/${auth.requireUserId()}`);
+    dailyReview.value = data.review;
+    showReviewDialog.value = true;
   } catch (e) {
     console.error(e);
   } finally {
@@ -201,15 +197,9 @@ onMounted(async () => {
     return;
   }
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/mistakes/${auth.user_id}`);
-    if (res.ok) {
-      mistakes.value = await res.json();
-    } else {
-      const data = await res.json();
-      error.value = data.error || t('mistakes.load_error');
-    }
+    mistakes.value = await apiJson<Mistake[]>(`/api/mistakes/${auth.requireUserId()}`);
   } catch (err) {
-    error.value = t('mistakes.load_error');
+    error.value = err instanceof Error ? err.message : t('mistakes.load_error');
   } finally {
     isLoading.value = false;
   }

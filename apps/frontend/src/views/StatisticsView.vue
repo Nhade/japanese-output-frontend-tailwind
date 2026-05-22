@@ -132,6 +132,7 @@ import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
 import LoadingSpinner from '../components/LoadingSpinner.vue';
 import ActivityHeatmap from '../components/ActivityHeatmap.vue';
+import { apiJson } from '../lib/api';
 import { Bar, Radar, Line } from 'vue-chartjs';
 import {
   Chart as ChartJS,
@@ -164,6 +165,21 @@ const { t } = useI18n();
 const auth = useAuthStore();
 const loading = ref(true);
 const hasData = ref(false);
+
+interface StatisticsResponse {
+  summary?: {
+    total_exercises: number;
+    total_correct: number;
+    average_accuracy: number;
+  };
+  pos_accuracy: Record<string, number>;
+  jlpt_level_accuracy: Record<string, number>;
+  history?: Array<{
+    date: string;
+    total: number;
+    accuracy: number;
+  }>;
+}
 
 const summaryData = ref({
   total_exercises: 0,
@@ -288,85 +304,85 @@ const historyRaw = ref<{ date: string; total: number }[]>([]);
 const heatmapData = computed(() => historyRaw.value);
 
 onMounted(async () => {
-  if (auth.user_id) {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/statistics/${auth.user_id}`);
-      if (response.ok) {
-        const stats = await response.json();
+  if (!auth.user_id) {
+    loading.value = false;
+    return;
+  }
 
-        // Check if we have any data to show
-        const hasPos = Object.keys(stats.pos_accuracy).length > 0;
-        const hasJlpt = Object.keys(stats.jlpt_level_accuracy).length > 0;
-        const hasHistory = stats.history && stats.history.length > 0;
+  try {
+    const stats = await apiJson<StatisticsResponse>(`/api/statistics/${auth.requireUserId()}`);
 
-        hasData.value = hasPos || hasJlpt || hasHistory;
+    // Check if we have any data to show
+    const hasPos = Object.keys(stats.pos_accuracy).length > 0;
+    const hasJlpt = Object.keys(stats.jlpt_level_accuracy).length > 0;
+    const hasHistory = !!stats.history && stats.history.length > 0;
 
-        if (stats.summary) {
-          summaryData.value = stats.summary;
-        }
+    hasData.value = hasPos || hasJlpt || hasHistory;
 
-        if (hasData.value) {
-          // 1. PoS Radar Data
-          const posLabels = Object.keys(stats.pos_accuracy);
-          const posValues = Object.values(stats.pos_accuracy);
-
-          posRadarData.value = {
-            labels: posLabels,
-            datasets: [{
-              label: 'Accuracy',
-              data: posValues,
-              backgroundColor: 'rgba(244, 63, 94, 0.2)', // rose-500 with opacity
-              borderColor: '#f43f5e', // rose-500
-              borderWidth: 2,
-              pointBackgroundColor: '#f43f5e',
-              pointBorderColor: '#fff',
-            }]
-          };
-
-          // 2. JLPT Bar Data
-          const jlptLabels = Object.keys(stats.jlpt_level_accuracy);
-          const jlptValues = Object.values(stats.jlpt_level_accuracy);
-
-          jlptAccuracyData.value = {
-            labels: jlptLabels,
-            datasets: [{
-              label: 'Accuracy',
-              data: jlptValues,
-              backgroundColor: '#10b981', // emerald-500
-              borderRadius: 6,
-              barThickness: 30,
-            }]
-          };
-
-          // 3. History Line Data + Heatmap
-          if (stats.history) {
-            historyRaw.value = stats.history.map((h: any) => ({
-              date: h.date,
-              total: h.total,
-            }));
-
-            const historyLabels = stats.history.map((h: any) => h.date);
-            const historyValues = stats.history.map((h: any) => h.accuracy);
-
-            historyChartData.value = {
-              labels: historyLabels,
-              datasets: [{
-                label: 'Daily Accuracy',
-                data: historyValues,
-                borderColor: '#6366f1', // indigo-500
-                backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                borderWidth: 3,
-                fill: true,
-              }]
-            };
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching statistics:', error);
-    } finally {
-      loading.value = false;
+    if (stats.summary) {
+      summaryData.value = stats.summary;
     }
+
+    if (hasData.value) {
+      // 1. PoS Radar Data
+      const posLabels = Object.keys(stats.pos_accuracy);
+      const posValues = Object.values(stats.pos_accuracy);
+
+      posRadarData.value = {
+        labels: posLabels,
+        datasets: [{
+          label: 'Accuracy',
+          data: posValues,
+          backgroundColor: 'rgba(244, 63, 94, 0.2)', // rose-500 with opacity
+          borderColor: '#f43f5e', // rose-500
+          borderWidth: 2,
+          pointBackgroundColor: '#f43f5e',
+          pointBorderColor: '#fff',
+        }]
+      };
+
+      // 2. JLPT Bar Data
+      const jlptLabels = Object.keys(stats.jlpt_level_accuracy);
+      const jlptValues = Object.values(stats.jlpt_level_accuracy);
+
+      jlptAccuracyData.value = {
+        labels: jlptLabels,
+        datasets: [{
+          label: 'Accuracy',
+          data: jlptValues,
+          backgroundColor: '#10b981', // emerald-500
+          borderRadius: 6,
+          barThickness: 30,
+        }]
+      };
+
+      // 3. History Line Data + Heatmap
+      if (stats.history) {
+        historyRaw.value = stats.history.map((h) => ({
+          date: h.date,
+          total: h.total,
+        }));
+
+        const historyLabels = stats.history.map((h) => h.date);
+        const historyValues = stats.history.map((h) => h.accuracy);
+
+        historyChartData.value = {
+          labels: historyLabels,
+          datasets: [{
+            label: 'Daily Accuracy',
+            data: historyValues,
+            borderColor: '#6366f1', // indigo-500
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            borderWidth: 3,
+            fill: true,
+          }]
+        };
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching statistics:', error);
+  } finally {
+    loading.value = false;
   }
 });
 

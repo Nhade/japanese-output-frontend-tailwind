@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { apiJson } from '../lib/api';
 
 interface TranscriptSegment { start: number; text: string }
 
@@ -39,11 +40,14 @@ interface CompQuestion {
   feedback: string;
 }
 
+type VideoPayload = { info?: VideoInfo; transcript?: TranscriptSegment[] } & VideoInfo;
+type ClozeExercisePayload = Omit<ClozeExercise, 'userAnswer' | 'submitting' | 'submitted' | 'isCorrect' | 'showHint'>;
+type CompQuestionPayload = Omit<CompQuestion, 'selectedIndex' | 'answered' | 'isCorrect' | 'checking' | 'feedback'>;
+
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
-const API = import.meta.env.VITE_API_BASE_URL;
 const videoId = route.params.id as string;
 
 const loading = ref(true);
@@ -121,9 +125,7 @@ function createPlayer() {
 // --------------------------------------------------------------
 async function fetchVideo() {
   try {
-    const res = await fetch(`${API}/api/videos/${videoId}`);
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = await apiJson<VideoPayload>(`/api/videos/${videoId}`);
     // Normalise to { info, transcript } regardless of server shape.
     const info: VideoInfo = data.info ?? data;
     video.value = { info };
@@ -135,10 +137,8 @@ async function fetchVideo() {
 
 async function fetchExercises() {
   try {
-    const res = await fetch(`${API}/api/videos/${videoId}/exercises`);
-    if (!res.ok) return;
-    const data = await res.json();
-    exercises.value = (data || []).map((ex: any) => ({
+    const data = await apiJson<ClozeExercisePayload[]>(`/api/videos/${videoId}/exercises`);
+    exercises.value = data.map((ex) => ({
       ...ex,
       userAnswer: '',
       submitting: false,
@@ -158,17 +158,15 @@ async function submitCloze(ex: ClozeExercise) {
   if (!ex.userAnswer?.trim() || ex.submitting) return;
   ex.submitting = true;
   try {
-    const res = await fetch(`${API}/api/videos/submit`, {
+    const data = await apiJson<{ is_correct?: boolean }>('/api/videos/submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         exercise_id: ex.exercise_id,
         video_id: videoId,
         user_answer: ex.userAnswer.trim(),
-        user_id: authStore.user_id,
-      }),
+        user_id: authStore.requireUserId(),
+      },
     });
-    const data = await res.json();
     ex.submitted = true;
     ex.isCorrect = !!data.is_correct;
   } catch (e) {
@@ -191,13 +189,11 @@ function resetCloze(ex: ClozeExercise) {
 async function generateComprehension() {
   isGenerating.value = true;
   try {
-    const res = await fetch(`${API}/api/videos/${videoId}/comprehension`, {
+    const data = await apiJson<{ questions?: CompQuestionPayload[] }>(`/api/videos/${videoId}/comprehension`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ num_questions: 5 }),
+      body: { num_questions: 5 },
     });
-    const data = await res.json();
-    comprehensionQuestions.value = (data.questions || []).map((q: any) => ({
+    comprehensionQuestions.value = (data.questions || []).map((q) => ({
       ...q,
       selectedIndex: null,
       answered: false,
@@ -222,20 +218,18 @@ async function checkComprehension(qi: number) {
   if (q.selectedIndex == null) return;
   q.checking = true;
   try {
-    const res = await fetch(`${API}/api/videos/comprehension/check`, {
+    const data = await apiJson<{ is_correct?: boolean; feedback?: string }>('/api/videos/comprehension/check', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         question: q.question,
         choices: q.choices,
         correct_index: q.correct_index,
         user_answer_index: q.selectedIndex,
         transcript_context: transcript.value.map(s => s.text).join(' ').slice(0, 500),
-        user_id: authStore.user_id,
+        user_id: authStore.requireUserId(),
         video_id: videoId,
-      }),
+      },
     });
-    const data = await res.json();
     q.answered = true;
     q.isCorrect = !!data.is_correct;
     q.feedback = data.feedback || '';

@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
+import { apiJson } from '../lib/api';
 
 import AuthLayout from '../components/AuthLayout.vue';
 
@@ -23,20 +24,14 @@ async function login() {
   error.value = '';
   isSubmitting.value = true;
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/login`, {
+    const data = await apiJson<{ user_id: string }>('/api/users/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username.value, password: password.value }),
+      body: { username: username.value, password: password.value },
     });
-    const data = await res.json();
-    if (res.ok) {
-      auth.login(data.user_id);
-      router.push('/');
-    } else {
-      error.value = data.error || t('auth.error_generic');
-    }
+    auth.login(data.user_id);
+    router.push('/');
   } catch (err) {
-    error.value = t('auth.error_generic');
+    error.value = err instanceof Error && err.message ? err.message : t('auth.error_generic');
   } finally {
     isSubmitting.value = false;
   }

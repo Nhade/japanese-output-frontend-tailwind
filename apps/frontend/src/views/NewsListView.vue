@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import { apiJson } from '../lib/api';
 
 interface Article {
   article_id: string;
@@ -89,12 +90,12 @@ const restArticles = computed<Article[]>(() => filtered.value.slice(1));
 const fetchArticles = async () => {
   loading.value = true;
   try {
-    const params = new URLSearchParams();
-    if (filterDate.value) params.append('date', filterDate.value);
-    if (filterCategory.value) params.append('category', filterCategory.value);
-    const query = params.toString() ? `?${params.toString()}` : '';
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/news${query}`);
-    articles.value = await res.json();
+    articles.value = await apiJson<Article[]>('/api/news', {
+      query: {
+        date: filterDate.value,
+        category: filterCategory.value,
+      },
+    });
   } catch (e) {
     console.error(e);
   } finally {
