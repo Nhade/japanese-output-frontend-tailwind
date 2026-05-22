@@ -1,13 +1,7 @@
+import os
+import importlib
 import unittest
 from unittest.mock import patch, MagicMock
-import os
-import sys
-import importlib
-
-# Add project root to sys.path
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-if PROJECT_ROOT not in sys.path:
-    sys.path.append(PROJECT_ROOT)
 
 import ai_core
 

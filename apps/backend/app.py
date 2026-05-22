@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import random
 import re
@@ -6,14 +7,24 @@ import sqlite3
 import uuid
 from datetime import datetime
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, g, jsonify, request
 from flask_cors import CORS
 from pwdlib import PasswordHash, exceptions
 from pykakasi import kakasi
 
+from config import settings
+from db import connect_db
+from logging_config import clear_request_id, configure_logging, set_request_id
+
+# Configure logging before importing backend modules that may log during
+# import-time client setup.
+configure_logging()
+
 from personal_rag import annotate_feedback, find_top_similar_mistakes
 from translation_service import translate_text
 from tts_service import generate_audio
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -24,10 +35,7 @@ CORS(app, origins=[
 k = kakasi()
 password_hash = PasswordHash.recommended()
 
-_DEFAULT_DB_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'news_corpus.db'
-)
-DATABASE_PATH = os.path.abspath(os.environ.get('SHIORI_DATABASE_PATH', _DEFAULT_DB_PATH))
+DATABASE_PATH = str(settings.database_path)
 
 
 def _log_db_writability() -> None:
@@ -44,9 +52,9 @@ def _log_db_writability() -> None:
         f"file_writable={file_writable} dir_writable={dir_writable}"
     )
     if file_writable and dir_writable:
-        app.logger.info(msg)
+        logger.info(msg)
     else:
-        app.logger.warning(
+        logger.warning(
             f"{msg} — registration / write endpoints will 500 with "
             f"'attempt to write a readonly database' until the DB file and "
             f"its directory are writable by the gunicorn user. "
@@ -57,6 +65,45 @@ def _log_db_writability() -> None:
 _log_db_writability()
 
 
+# --- Request ID middleware --------------------------------------------------
+# Honour a well-formed inbound `X-Request-Id` header if present (so an upstream
+# proxy or the frontend can correlate retries), otherwise mint one. Stash on
+# Flask `g` for handlers that want it and in the logging contextvar so every log
+# record in this request carries the same ID. Cleared on teardown so the next
+# request on the same worker thread starts fresh.
+
+_REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+
+def _generate_request_id() -> str:
+    return uuid.uuid4().hex[:12]
+
+
+def _normalize_request_id(raw_request_id: str | None) -> str:
+    if raw_request_id and _REQUEST_ID_PATTERN.fullmatch(raw_request_id):
+        return raw_request_id
+    return _generate_request_id()
+
+
+@app.before_request
+def _stamp_request_id() -> None:
+    rid = _normalize_request_id(request.headers.get("X-Request-Id"))
+    g.request_id = rid
+    set_request_id(rid)
+
+
+@app.after_request
+def _echo_request_id(response: Response) -> Response:
+    rid = getattr(g, "request_id", None)
+    if rid:
+        response.headers["X-Request-Id"] = rid
+    return response
+
+
+@app.teardown_request
+def _clear_request_id(_exc):  # noqa: ANN001
+    clear_request_id()
+
+
 def get_db_connection():
     """
     Establish a connection to the SQLite database.
@@ -64,9 +111,13 @@ def get_db_connection():
     Returns:
         sqlite3.Connection: Connection object with row_factory set to sqlite3.Row.
     """
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return connect_db(DATABASE_PATH)
+
+
+def get_json_body() -> dict:
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
+
 
 @app.route('/api/exercise/random', methods=['GET'])
 def get_random_exercise():
@@ -164,7 +215,7 @@ def get_mistakes(user_id):
             try:
                 row["similar_past"] = find_top_similar_mistakes(conn, m["log_id"], top_k=3)
             except Exception as e:
-                app.logger.warning(f"similar_past lookup failed for log {m['log_id']}: {e}")
+                logger.warning(f"similar_past lookup failed for log {m['log_id']}: {e}")
                 row["similar_past"] = []
             result.append(row)
     finally:
@@ -187,12 +238,15 @@ from video_service import create_video_tables, import_video
 
 # Initialize Learner Tables
 try:
-    with sqlite3.connect(DATABASE_PATH) as conn:
+    conn = get_db_connection()
+    try:
         create_learner_tables(conn)
         create_video_tables(conn)
         ensure_embedding_columns(conn)
-except Exception as e:
-    print(f"Database init error: {e}")
+    finally:
+        conn.close()
+except Exception:
+    logger.exception("Database init error")
 
 
 @app.route('/api/exercise/submit', methods=['POST'])
@@ -205,7 +259,7 @@ def submit_answer():
     Returns:
         JSON: result containing is_correct, correct_answer, log_id, key focus updates.
     """
-    data = request.get_json()
+    data = get_json_body()
     exercise_id = data.get('exercise_id')
     user_answer = data.get('user_answer', '').strip()
     user_id = data.get('user_id')
@@ -281,7 +335,7 @@ def explain_answer():
     Returns:
         JSON: The AI evaluation result (feedback, score, error_type).
     """
-    data = request.get_json()
+    data = get_json_body()
     log_id = data.get('log_id')
 
     if not log_id:
@@ -304,7 +358,7 @@ def explain_answer():
         user_answer = row['user_answer']
         correct_answer = row['correct_answer']
 
-        print(f"Calling AI for evaluation (Log ID: {log_id})...")
+        logger.info(f"Calling AI for evaluation (Log ID: {log_id})")
         ai_result = evaluate_submission(question, user_answer, correct_answer)
 
         # Personal-RAG annotation: append a "you've made this kind of
@@ -314,7 +368,7 @@ def explain_answer():
         try:
             ai_result['feedback'] = annotate_feedback(conn, log_id, ai_result['feedback'])
         except Exception as e:
-            app.logger.warning(f"personal_rag annotation failed for log {log_id}: {e}")
+            logger.warning(f"personal_rag annotation failed for log {log_id}: {e}")
 
         # Update record
         conn.execute('''
@@ -338,7 +392,7 @@ def explain_answer_detailed():
     Returns:
         JSON: {"detailed_feedback": str}
     """
-    data = request.get_json()
+    data = get_json_body()
     log_id = data.get('log_id')
 
     if not log_id:
@@ -376,7 +430,7 @@ def chat_send():
     Returns:
         JSON: The AI's response and feedback on the user's input.
     """
-    data = request.get_json()
+    data = get_json_body()
     message = data.get('message')
     history = data.get('history', [])
     locale = data.get('locale', 'en') # Default to English if not provided
@@ -397,7 +451,7 @@ def chat_send():
             learner_profile = get_learner_profile(conn, user_id)
             conn.close()
         except Exception as e:
-            print(f"Error fetching profile for chat: {e}")
+            logger.warning(f"Error fetching profile for chat: {e}")
 
     result = chat_with_ai(message, history, locale, learner_profile)
     return jsonify(result)
@@ -410,7 +464,7 @@ def register_user():
     Returns:
         JSON: Success message and new user_id, or error if username exists.
     """
-    data = request.get_json()
+    data = get_json_body()
     username = data.get('username')
     password = data.get('password')
 
@@ -434,7 +488,7 @@ def register_user():
             # The most common cause is a read-only DB file or directory on the
             # production host. Log the actual filesystem state so the operator
             # has something to act on, and surface a clean error to the client.
-            app.logger.error(
+            logger.error(
                 f"register_user write failed: {e} "
                 f"(DATABASE_PATH={DATABASE_PATH}, "
                 f"file_writable={os.access(DATABASE_PATH, os.W_OK)}, "
@@ -456,7 +510,7 @@ def login_user():
     Returns:
         JSON: Success message and user_id if credentials match, else 401 error.
     """
-    data = request.get_json()
+    data = get_json_body()
     username = data.get('username')
     password = data.get('password')
 
@@ -762,7 +816,7 @@ def get_video_exercises(video_id):
 @app.route('/api/videos/import', methods=['POST'])
 def import_video_route():
     """Import a video from a YouTube URL."""
-    data = request.get_json()
+    data = get_json_body()
     url = data.get('url', '').strip()
 
     if not url:
@@ -773,15 +827,15 @@ def import_video_route():
         return jsonify(result)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        print(f"Video import error: {e}")
+    except Exception:
+        logger.exception("Video import error")
         return jsonify({"error": "Failed to import video. Please check the URL and try again."}), 500
 
 
 @app.route('/api/videos/submit', methods=['POST'])
 def submit_video_answer():
     """Submit an answer for a video cloze exercise."""
-    data = request.get_json()
+    data = get_json_body()
     exercise_id = data.get('exercise_id')
     video_id = data.get('video_id')
     user_answer = data.get('user_answer', '').strip()
@@ -852,21 +906,21 @@ def generate_video_comprehension(video_id):
     if not transcript_text:
         return jsonify({"error": "No transcript available"}), 400
 
-    data = request.get_json() or {}
+    data = get_json_body()
     num = data.get('num_questions', 5)
 
     try:
         questions = generate_comprehension_questions(transcript_text, video["title"], num)
         return jsonify({"questions": questions})
-    except Exception as e:
-        print(f"Comprehension generation error: {e}")
+    except Exception:
+        logger.exception("Comprehension generation error")
         return jsonify({"error": "Failed to generate questions"}), 500
 
 
 @app.route('/api/videos/comprehension/check', methods=['POST'])
 def check_video_comprehension():
     """Check a comprehension answer."""
-    data = request.get_json()
+    data = get_json_body()
     question = data.get('question', '')
     choices = data.get('choices', [])
     correct_index = data.get('correct_index', 0)
@@ -896,7 +950,7 @@ def check_video_comprehension():
             conn.commit()
             conn.close()
         except Exception as e:
-            print(f"Failed to log comprehension answer: {e}")
+            logger.warning(f"Failed to log comprehension answer: {e}")
 
     return jsonify(result)
 
@@ -909,7 +963,7 @@ def translate_paragraph():
     Returns:
         JSON: {"translated_text": str}
     """
-    data = request.get_json()
+    data = get_json_body()
     text = data.get('text')
     target = data.get('target', 'zh-TW')  # Default to zh-TW if not provided
 
@@ -927,7 +981,7 @@ def get_tts():
     Returns:
         Response: Audio file (WAV).
     """
-    data = request.get_json()
+    data = get_json_body()
     text = data.get('text')
 
     if not text:
@@ -954,8 +1008,8 @@ def get_daily_review(user_id):
     try:
         review_content = generate_daily_review_agent(user_id, DATABASE_PATH)
         return jsonify({"review": review_content})
-    except Exception as e:
-        print(f"Agent Error: {e}")
+    except Exception:
+        logger.exception("Agent error")
         return jsonify({"error": "Agent 正在忙碌中，請稍後再試"}), 500
 
 @app.route('/api/learner/profile/<user_id>', methods=['GET'])
@@ -1008,23 +1062,23 @@ def update_profile():
     Returns:
         JSON: Updated learner profile object.
     """
-    data = request.json
+    data = get_json_body()
     user_id = data.get('user_id')
-    settings = data.get('settings')
+    settings_payload = data.get('settings')
 
-    if not user_id or not settings:
+    if not user_id or not settings_payload:
         return jsonify({"error": "Missing user_id or settings"}), 400
 
     conn = get_db_connection()
     try:
-        updated_profile = update_learner_settings(conn, user_id, settings)
+        updated_profile = update_learner_settings(conn, user_id, settings_payload)
         return jsonify(updated_profile)
-    except Exception as e:
-        print(f"Error updating profile: {e}")
+    except Exception:
+        logger.exception("Error updating profile")
         return jsonify({"error": "Internal server error"}), 500
     finally:
         conn.close()
 
 
 if __name__ == '__main__':
-    app.run(debug=os.getenv("FLASK_DEBUG", "false").lower() == "true")
+    app.run(debug=settings.flask_debug)

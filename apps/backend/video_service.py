@@ -6,6 +6,7 @@ Public API:
   - import_video(url, db_path)  — full pipeline: fetch metadata + transcript → generate exercises
 """
 import json
+import logging
 import os
 import random
 import re
@@ -16,9 +17,12 @@ from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
 import requests
-from janome.tokenizer import Tokenizer
 
+from db import connect_db
+from services.cloze import make_cloze
 from translation_service import translate_text
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Database
@@ -114,7 +118,7 @@ def fetch_youtube_metadata(video_id: str) -> dict:
             "thumbnail_url": data.get("thumbnail_url", ""),
         }
     except Exception as e:
-        print(f"oEmbed fetch failed: {e}")
+        logger.warning(f"oEmbed fetch failed: {e}")
         return {"title": "Untitled", "channel_name": "", "thumbnail_url": ""}
 
 
@@ -178,15 +182,13 @@ def fetch_youtube_transcript(video_id: str) -> list:
         transcript = api.fetch(video_id, languages=["ja"])
         return transcript.to_raw_data()
     except Exception as e:
-        print(f"Transcript fetch failed for {video_id}: {e}")
+        logger.warning(f"Transcript fetch failed for {video_id}: {e}")
         raise ValueError(f"No Japanese transcript available for video {video_id}")
 
 
 # ---------------------------------------------------------------------------
 # Cloze generation from transcript
 # ---------------------------------------------------------------------------
-
-_tokenizer = Tokenizer()
 
 
 def _load_jlpt_vocab(conn: sqlite3.Connection) -> dict:
@@ -280,10 +282,13 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
     sentences = _merge_transcript_to_sentences(transcript)
 
     if not sentences:
-        print("No sentences extracted from transcript.")
+        logger.warning("No sentences extracted from transcript.")
         return 0
 
     jlpt_vocab = _load_jlpt_vocab(conn)
+    # Cloze service speaks Mapping[str, int]; the meaning lookup below uses the
+    # full {level, meaning} entries via `cloze.matched_vocab_key`.
+    jlpt_levels = {expr: entry["level"] for expr, entry in jlpt_vocab.items()}
 
     # Shuffle to get varied sentences
     random.shuffle(sentences)
@@ -296,33 +301,21 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
         sentence = sent_info["text"]
         timestamp = sent_info["start"]
 
-        tokens = list(_tokenizer.tokenize(sentence))
-
-        # Find candidates (same logic as exercise_generator.py)
-        candidates = []
-        for i, token in enumerate(tokens):
-            pos = token.part_of_speech.split(",")[0]
-            vocab_entry = jlpt_vocab.get(token.surface) or jlpt_vocab.get(token.base_form)
-
-            if vocab_entry is not None:
-                candidates.append((i, token, vocab_entry["level"], vocab_entry.get("meaning", "")))
-            elif pos in ["助詞", "動詞"] and len(token.surface) > 0:
-                candidates.append((i, token, None, ""))
-
-        if not candidates:
+        cloze = make_cloze(sentence, jlpt_levels)
+        if cloze is None:
             continue
 
-        idx, chosen, jlpt_level, word_meaning = random.choice(candidates)
-        correct_answer = chosen.surface
-        pos = chosen.part_of_speech.split(",")[0]
+        # Use vocabulary meaning as hint if the answer came from the JLPT vocab
+        # table; fall back to sentence translation otherwise. `matched_vocab_key`
+        # is whichever key (surface OR base_form) actually hit the table, so
+        # this preserves the pre-extraction behaviour where conjugated verbs
+        # matched via their lemma still recovered the right meaning.
+        word_meaning = ""
+        if cloze.matched_vocab_key is not None:
+            entry = jlpt_vocab.get(cloze.matched_vocab_key)
+            if entry:
+                word_meaning = entry.get("meaning", "") or ""
 
-        # Build question sentence
-        parts = []
-        for j, token in enumerate(tokens):
-            parts.append("[＿＿＿]" if j == idx else token.surface)
-        question_sentence = "".join(parts)
-
-        # Use vocabulary meaning as hint if available; fall back to sentence translation
         if word_meaning:
             hint_chinese = word_meaning
         else:
@@ -338,18 +331,18 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
              part_of_speech, jlpt_level, hint_chinese, context_timestamp, created_timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            exercise_id, video_id, sentence, question_sentence, correct_answer,
-            pos, jlpt_level, hint_chinese, timestamp, datetime.now().isoformat()
+            exercise_id, video_id, cloze.full_sentence, cloze.question_sentence, cloze.correct_answer,
+            cloze.part_of_speech, cloze.jlpt_level, hint_chinese, timestamp, datetime.now().isoformat()
         ))
 
         exercises_created += 1
         try:
-            print(f"  -> Video exercise {exercises_created}: blanked '{correct_answer}' (POS: {pos}, JLPT: N{jlpt_level or 'A'})")
+            logger.info(f"Video exercise {exercises_created}: blanked '{cloze.correct_answer}' (POS: {cloze.part_of_speech}, JLPT: N{cloze.jlpt_level or 'A'})")
         except UnicodeEncodeError:
-            print(f"  -> Video exercise {exercises_created}: created (POS: {pos}, JLPT: N{jlpt_level or 'A'})")
+            logger.info(f"Video exercise {exercises_created}: created (POS: {cloze.part_of_speech}, JLPT: N{cloze.jlpt_level or 'A'})")
 
     conn.commit()
-    print(f"Created {exercises_created} video exercises for video {video_id}")
+    logger.info(f"Created {exercises_created} video exercises for video {video_id}")
     return exercises_created
 
 
@@ -366,8 +359,7 @@ def import_video(url: str, db_path: str, use_whisper: bool = False) -> dict:
     """
     video_ext_id = parse_youtube_url(url)
 
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = connect_db(db_path)
     create_video_tables(conn)
 
     # Check if already imported
@@ -382,11 +374,11 @@ def import_video(url: str, db_path: str, use_whisper: bool = False) -> dict:
     # Fetch transcript
     if use_whisper:
         try:
-            print("  Transcribing with Whisper (this may take a minute)...")
+            logger.info("Transcribing with Whisper (this may take a minute)")
             transcript = transcribe_with_whisper(video_ext_id)
-            print(f"  Whisper: {len(transcript)} segments")
+            logger.info(f"Whisper: {len(transcript)} segments")
         except Exception as e:
-            print(f"  Whisper failed ({e}), falling back to YouTube captions")
+            logger.warning(f"Whisper failed ({e}), falling back to YouTube captions")
             transcript = fetch_youtube_transcript(video_ext_id)
     else:
         transcript = fetch_youtube_transcript(video_ext_id)
@@ -417,8 +409,8 @@ def import_video(url: str, db_path: str, use_whisper: bool = False) -> dict:
     # Generate cloze exercises — mark processed regardless so the video is visible
     try:
         generate_video_exercises(video_id, transcript_json, conn)
-    except Exception as e:
-        print(f"Exercise generation failed (video still saved): {e}")
+    except Exception:
+        logger.exception("Exercise generation failed (video still saved)")
 
     conn.execute("UPDATE videos SET status = 'processed' WHERE video_id = ?", (video_id,))
     conn.commit()

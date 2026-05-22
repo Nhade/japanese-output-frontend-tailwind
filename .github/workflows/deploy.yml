@@ -20,4 +20,5 @@ jobs:
             cd /srv/shiori
             git pull --ff-only
             /srv/shiori/venv/bin/pip install -r /srv/shiori/apps/backend/requirements.txt --quiet
+            /srv/shiori/venv/bin/python /srv/shiori/scripts/migrate_db.py
             sudo /bin/systemctl restart shiori

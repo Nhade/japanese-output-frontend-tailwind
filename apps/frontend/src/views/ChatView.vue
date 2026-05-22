@@ -41,6 +41,11 @@ const authStore = useAuthStore();
 const toastStore = useToastStore();
 
 const LOCAL_STORAGE_KEY = 'japanese_agent_chat_history';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+
+function apiUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
+}
 
 const messages = ref<Message[]>([]);
 const inputMessage = ref('');
@@ -113,7 +118,7 @@ async function sendMessage(rawText?: string) {
       content: m.content,
     }));
 
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/chat/send`, {
+    const response = await fetch(apiUrl('/api/chat/send'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -211,7 +216,7 @@ onMounted(async () => {
 
   if (authStore.user_id) {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/learner/profile/${authStore.user_id}`);
+      const res = await fetch(apiUrl(`/api/learner/profile/${authStore.user_id}`));
       if (res.ok) {
         learnerProfile.value = await res.json();
       }

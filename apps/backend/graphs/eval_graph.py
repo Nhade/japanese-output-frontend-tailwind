@@ -5,6 +5,7 @@ Two graphs:
   - eval_graph: evaluate_submission() — classify errors and score
   - detailed_feedback_graph: get_detailed_feedback() — grammatical explanation
 """
+import logging
 from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -16,6 +17,8 @@ from ai_core import (
     query_llm,
     query_llm_json,
 )
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # State definitions
@@ -61,7 +64,7 @@ def eval_safety_check(state: EvalState) -> dict:
     }
 
     if is_violation:
-        print(f"Safety Violation in Submission: {safety_result.get('rationale')}")
+        logger.warning(f"Safety violation in submission: {safety_result.get('rationale')}")
         update["result"] = {
             "is_correct": False,
             "score": 0,
@@ -118,7 +121,7 @@ def call_llm_and_score(state: EvalState) -> dict:
         retry_count = result["retry_count"]
 
         if result["error"]:
-            print(f"Failed to evaluate submission after retries. Error: {result['error']}")
+            logger.error(f"Failed to evaluate submission after retries. Error: {result['error']}")
             return {
                 "result": {
                     "is_correct": False,
@@ -153,8 +156,8 @@ def call_llm_and_score(state: EvalState) -> dict:
             }
         }
 
-    except Exception as e:
-        print(f"Unexpected error in evaluate_submission: {e}")
+    except Exception:
+        logger.exception("Unexpected error in evaluate_submission")
         return {
             "result": {
                 "is_correct": False,
@@ -217,8 +220,8 @@ def call_llm_feedback(state: DetailedFeedbackState) -> dict:
     try:
         content = query_llm(state["messages"])
         return {"result": content}
-    except Exception as e:
-        print(f"Failed to get detailed feedback. Error: {e}")
+    except Exception:
+        logger.exception("Failed to get detailed feedback")
         return {"result": "抱歉，目前無法取得詳細解說。"}
 
 

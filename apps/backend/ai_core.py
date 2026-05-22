@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -6,11 +7,11 @@ from enum import StrEnum
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv()
+from config import settings
 
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Tier system
@@ -83,8 +84,6 @@ MODEL_REGISTRY: dict[Tier, ModelConfig] = {
     tier: _load_tier(tier, _legacy) for tier in Tier
 }
 
-AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "120"))
-
 
 # ---------------------------------------------------------------------------
 # Provider clients (lazy, cached)
@@ -140,7 +139,7 @@ def _query_openai(cfg: ModelConfig, messages, json_mode: bool, temperature: floa
         model=cfg.model,
         messages=messages,
         response_format=response_format,
-        timeout=AI_TIMEOUT,
+        timeout=settings.ai_timeout,
     )
     if temperature is not None:
         kwargs["temperature"] = temperature
@@ -159,7 +158,7 @@ def _query_anthropic(cfg: ModelConfig, messages, json_mode: bool, temperature: f
         model=cfg.model,
         max_tokens=cfg.max_tokens,
         messages=rest,
-        timeout=AI_TIMEOUT,
+        timeout=settings.ai_timeout,
     )
     if temperature is not None:
         kwargs["temperature"] = min(temperature, 1.0)
@@ -222,7 +221,7 @@ def _query_ollama(cfg: ModelConfig, messages, json_mode: bool, temperature: floa
         payload["options"] = {"temperature": temperature}
     if json_mode:
         payload["format"] = "json"
-    response = requests.post(url, json=payload, headers=headers, timeout=AI_TIMEOUT)
+    response = requests.post(url, json=payload, headers=headers, timeout=settings.ai_timeout)
     response.raise_for_status()
     data = response.json()
     return data.get("message", {}).get("content", "") or data.get("response", "")
@@ -249,8 +248,8 @@ safeguard_client = None
 if GROQ_API_KEY and GROQ_API_BASE_URL:
     try:
         safeguard_client = OpenAI(api_key=GROQ_API_KEY, base_url=GROQ_API_BASE_URL)
-    except Exception as e:
-        print(f"Failed to initialize Safeguard Client: {e}")
+    except Exception:
+        logger.exception("Failed to initialize Safeguard Client")
 
 
 # ---------------------------------------------------------------------------
@@ -305,8 +304,8 @@ def query_llm(
     cfg = MODEL_REGISTRY[tier]
     try:
         return _DISPATCH[cfg.provider](cfg, messages, json_mode, temperature)
-    except Exception as e:
-        print(f"LLM call failed (tier={tier}, provider={cfg.provider}, model={cfg.model}): {e}")
+    except Exception:
+        logger.exception(f"LLM call failed (tier={tier}, provider={cfg.provider}, model={cfg.model})")
         raise
 
 
@@ -362,7 +361,7 @@ def query_llm_json(
             return {"data": data, "retry_count": retry_count, "error": None}
         except (ValueError, json.JSONDecodeError) as e:
             last_error = str(e)
-            print(f"JSON parsing failed (attempt {retry_count + 1}/{retries + 1}): {e}")
+            logger.warning(f"JSON parsing failed (attempt {retry_count + 1}/{retries + 1}): {e}")
             retry_count += 1
 
     return {"data": None, "retry_count": retries, "error": last_error}
@@ -436,7 +435,7 @@ def check_safety(text: str) -> dict:
         return {"violation": 0, "rationale": "Safety check disabled via environment variable."}
 
     if not safeguard_client:
-        print("Safety check skipped: Safeguard client not initialized.")
+        logger.debug("Safety check skipped: Safeguard client not initialized.")
         return {"violation": 0, "rationale": "Safeguard skipped"}
 
     try:
@@ -451,5 +450,5 @@ def check_safety(text: str) -> dict:
         content = completion.choices[0].message.content
         return _parse_json_safe(content)
     except Exception as e:
-        print(f"Safety check failed: {e}")
+        logger.warning(f"Safety check failed: {e}")
         return {"violation": 0, "rationale": f"Check failed: {e}"}

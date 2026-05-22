@@ -1,6 +1,7 @@
 import unittest
-from unittest.mock import patch, MagicMock
-from apps.backend.ai_service import evaluate_submission
+from unittest.mock import patch
+
+from ai_service import evaluate_submission
 
 class TestAIService(unittest.TestCase):
 

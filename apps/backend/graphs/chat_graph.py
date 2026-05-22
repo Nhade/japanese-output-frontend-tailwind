@@ -4,6 +4,7 @@ Chat workflow as a LangGraph StateGraph.
 Graph: safety_check → build_context → call_llm → END
        (violation shortcircuits to END)
 """
+import logging
 from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -13,6 +14,8 @@ from ai_core import (
     check_safety,
     query_llm_json,
 )
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # State
@@ -48,7 +51,7 @@ def safety_check(state: ChatState) -> dict:
     }
 
     if is_violation:
-        print(f"Safety Violation Detected: {safety_result.get('rationale')}")
+        logger.warning(f"Safety violation detected: {safety_result.get('rationale')}")
         update["result"] = {
             "response": "申し訳ありませんが、そのリクエストにはお答えできません。（日本語学習に関連しない、またはポリシー違反の可能性があります）",
             "feedback": {
@@ -199,7 +202,7 @@ def call_llm(state: ChatState) -> dict:
         return {"result": result_json}
 
     except Exception as e:
-        print(f"Chat error: {e}")
+        logger.exception("Chat error")
         return {
             "result": {
                 "response": "すみません、エラーが発生しました。",

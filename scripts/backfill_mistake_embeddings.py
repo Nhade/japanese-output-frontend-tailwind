@@ -17,12 +17,8 @@ import sqlite3
 import sys
 import time
 
-# Ensure apps/backend is importable when invoked from repo root.
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BACKEND_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "apps", "backend"))
-sys.path.insert(0, BACKEND_DIR)
-
-from embedding_service import (  # noqa: E402
+from config import settings
+from embedding_service import (
     _MODEL_NAME,
     embed_texts,
     ensure_embedding_columns,
@@ -30,7 +26,7 @@ from embedding_service import (  # noqa: E402
     serialize,
 )
 
-DEFAULT_DB = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "data", "news_corpus.db"))
+DEFAULT_DB = str(settings.database_path)
 
 
 def fetch_pending(conn: sqlite3.Connection, *, reembed: bool, limit: int | None) -> list[sqlite3.Row]:
@@ -103,7 +99,7 @@ def backfill(db_path: str, *, batch_size: int = 32, reembed: bool = False, limit
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--db", default=os.environ.get("SHIORI_DATABASE_PATH", DEFAULT_DB))
+    parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--limit", type=int, default=None, help="cap rows processed (debug)")
     parser.add_argument("--reembed", action="store_true", help="re-embed rows that already have an embedding")

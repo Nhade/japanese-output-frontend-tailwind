@@ -1,11 +1,5 @@
 import requests
 import json
-import sys
-import os
-
-# Add parent directory to path to allow importing if needed, 
-# though this script uses HTTP requests so it doesn't strictly need app context.
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 BASE_URL = "http://localhost:5000/api"
 

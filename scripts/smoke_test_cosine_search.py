@@ -17,7 +17,6 @@ proper integration coverage with mocked vectors is a separate follow-up.
 from __future__ import annotations
 
 import argparse
-import os
 import sqlite3
 import sys
 
@@ -26,23 +25,19 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BACKEND_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "apps", "backend"))
-sys.path.insert(0, BACKEND_DIR)
-
-from embedding_service import (  # noqa: E402
+from config import settings
+from embedding_service import (
     cosine_search,
-    deserialize,
     embed_text,
     format_mistake_card,
 )
 
-DEFAULT_DB = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "data", "news_corpus.db"))
+DEFAULT_DB = str(settings.database_path)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--db", default=os.environ.get("SHIORI_DATABASE_PATH", DEFAULT_DB))
+    parser.add_argument("--db", default=DEFAULT_DB)
     parser.add_argument("--top-k", type=int, default=3)
     args = parser.parse_args()
 

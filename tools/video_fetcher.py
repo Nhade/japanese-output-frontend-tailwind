@@ -6,22 +6,21 @@ Usage:
   python tools/video_fetcher.py --file urls.txt
 """
 import argparse
-import os
 import sys
 
-# Add backend to path so we can import video_service
-BACKEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'apps', 'backend')
-sys.path.insert(0, BACKEND_DIR)
+from config import settings
+from logging_config import configure_logging
 
-from dotenv import load_dotenv
-load_dotenv(os.path.join(BACKEND_DIR, '.env'))
+# Backend modules log via the `logging` module. Configure before importing
+# video_service because its dependency graph may log during client setup.
+configure_logging()
 
-from video_service import import_video
-
-DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'news_corpus.db')
+DATABASE_PATH = str(settings.database_path)
 
 
 def main():
+    from video_service import import_video
+
     parser = argparse.ArgumentParser(description="Import YouTube videos for Japanese learning exercises")
     parser.add_argument("urls", nargs="*", help="YouTube URLs to import")
     parser.add_argument("--file", "-f", help="Path to a text file with one URL per line")

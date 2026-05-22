@@ -12,7 +12,7 @@ import unittest
 
 import numpy as np
 
-from apps.backend.personal_rag import (
+from personal_rag import (
     SIMILARITY_THRESHOLD,
     _format_date,
     annotate_feedback,

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shiori-backend"
+version = "0.1.0"
+description = "Backend services and scripts for the Shiori Japanese learning app"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.setuptools]
+package-dir = {"" = "apps/backend"}
+py-modules = [
+    "agent_service",
+    "ai_core",
+    "ai_service",
+    "app",
+    "config",
+    "db",
+    "embedding_service",
+    "learner_service",
+    "logging_config",
+    "personal_rag",
+    "translation_service",
+    "tts_service",
+    "video_service",
+]
+packages = ["graphs", "services"]
