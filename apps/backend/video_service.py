@@ -6,6 +6,7 @@ Public API:
   - import_video(url, db_path)  — full pipeline: fetch metadata + transcript → generate exercises
 """
 import json
+import logging
 import os
 import random
 import re
@@ -20,6 +21,8 @@ import requests
 from db import connect_db
 from services.cloze import make_cloze
 from translation_service import translate_text
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Database
@@ -115,7 +118,7 @@ def fetch_youtube_metadata(video_id: str) -> dict:
             "thumbnail_url": data.get("thumbnail_url", ""),
         }
     except Exception as e:
-        print(f"oEmbed fetch failed: {e}")
+        logger.warning(f"oEmbed fetch failed: {e}")
         return {"title": "Untitled", "channel_name": "", "thumbnail_url": ""}
 
 
@@ -179,7 +182,7 @@ def fetch_youtube_transcript(video_id: str) -> list:
         transcript = api.fetch(video_id, languages=["ja"])
         return transcript.to_raw_data()
     except Exception as e:
-        print(f"Transcript fetch failed for {video_id}: {e}")
+        logger.warning(f"Transcript fetch failed for {video_id}: {e}")
         raise ValueError(f"No Japanese transcript available for video {video_id}")
 
 
@@ -279,7 +282,7 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
     sentences = _merge_transcript_to_sentences(transcript)
 
     if not sentences:
-        print("No sentences extracted from transcript.")
+        logger.warning("No sentences extracted from transcript.")
         return 0
 
     jlpt_vocab = _load_jlpt_vocab(conn)
@@ -334,12 +337,12 @@ def generate_video_exercises(video_id: str, transcript_json: str, conn: sqlite3.
 
         exercises_created += 1
         try:
-            print(f"  -> Video exercise {exercises_created}: blanked '{cloze.correct_answer}' (POS: {cloze.part_of_speech}, JLPT: N{cloze.jlpt_level or 'A'})")
+            logger.info(f"Video exercise {exercises_created}: blanked '{cloze.correct_answer}' (POS: {cloze.part_of_speech}, JLPT: N{cloze.jlpt_level or 'A'})")
         except UnicodeEncodeError:
-            print(f"  -> Video exercise {exercises_created}: created (POS: {cloze.part_of_speech}, JLPT: N{cloze.jlpt_level or 'A'})")
+            logger.info(f"Video exercise {exercises_created}: created (POS: {cloze.part_of_speech}, JLPT: N{cloze.jlpt_level or 'A'})")
 
     conn.commit()
-    print(f"Created {exercises_created} video exercises for video {video_id}")
+    logger.info(f"Created {exercises_created} video exercises for video {video_id}")
     return exercises_created
 
 
@@ -371,11 +374,11 @@ def import_video(url: str, db_path: str, use_whisper: bool = False) -> dict:
     # Fetch transcript
     if use_whisper:
         try:
-            print("  Transcribing with Whisper (this may take a minute)...")
+            logger.info("Transcribing with Whisper (this may take a minute)")
             transcript = transcribe_with_whisper(video_ext_id)
-            print(f"  Whisper: {len(transcript)} segments")
+            logger.info(f"Whisper: {len(transcript)} segments")
         except Exception as e:
-            print(f"  Whisper failed ({e}), falling back to YouTube captions")
+            logger.warning(f"Whisper failed ({e}), falling back to YouTube captions")
             transcript = fetch_youtube_transcript(video_ext_id)
     else:
         transcript = fetch_youtube_transcript(video_ext_id)
@@ -406,8 +409,8 @@ def import_video(url: str, db_path: str, use_whisper: bool = False) -> dict:
     # Generate cloze exercises — mark processed regardless so the video is visible
     try:
         generate_video_exercises(video_id, transcript_json, conn)
-    except Exception as e:
-        print(f"Exercise generation failed (video still saved): {e}")
+    except Exception:
+        logger.exception("Exercise generation failed (video still saved)")
 
     conn.execute("UPDATE videos SET status = 'processed' WHERE video_id = ?", (video_id,))
     conn.commit()

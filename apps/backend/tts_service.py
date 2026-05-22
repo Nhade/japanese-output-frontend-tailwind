@@ -1,9 +1,12 @@
+import logging
+
 from openai import OpenAI
 
 from config import ensure_dotenv_loaded
 
 ensure_dotenv_loaded()
 
+logger = logging.getLogger(__name__)
 client = OpenAI()
 
 def generate_audio(text: str) -> bytes:
@@ -23,7 +26,7 @@ def generate_audio(text: str) -> bytes:
         # response.content contains the bytes of the audio file
         return response.content
 
-    except Exception as e:
-        print(f"OpenAI TTS Error: {e}")
+    except Exception:
+        logger.exception("OpenAI TTS error")
         return None
 

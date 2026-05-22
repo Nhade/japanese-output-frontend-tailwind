@@ -5,11 +5,14 @@ Two graphs:
   - comprehension_gen_graph: generate MCQ comprehension questions from transcript
   - comprehension_check_graph: evaluate a user's comprehension answer
 """
+import logging
 from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
 
 from ai_core import query_llm, query_llm_json
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # State definitions
@@ -77,8 +80,8 @@ def generate_questions_node(state: ComprehensionGenState) -> dict:
         if result["data"] and "questions" in result["data"]:
             return {"result": result["data"]["questions"]}
         return {"result": []}
-    except Exception as e:
-        print(f"Comprehension generation failed: {e}")
+    except Exception:
+        logger.exception("Comprehension generation failed")
         return {"result": []}
 
 

@@ -9,12 +9,18 @@ import argparse
 import sys
 
 from config import settings
-from video_service import import_video
+from logging_config import configure_logging
+
+# Backend modules log via the `logging` module. Configure before importing
+# video_service because its dependency graph may log during client setup.
+configure_logging()
 
 DATABASE_PATH = str(settings.database_path)
 
 
 def main():
+    from video_service import import_video
+
     parser = argparse.ArgumentParser(description="Import YouTube videos for Japanese learning exercises")
     parser.add_argument("urls", nargs="*", help="YouTube URLs to import")
     parser.add_argument("--file", "-f", help="Path to a text file with one URL per line")

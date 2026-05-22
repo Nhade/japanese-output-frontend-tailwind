@@ -7,6 +7,7 @@ Graph: fetch_mistakes →[no mistakes?]→ END
 Each LLM step has graceful degradation: if a later step fails,
 the best partial output from an earlier step is returned.
 """
+import logging
 from datetime import datetime
 from typing import TypedDict
 
@@ -14,6 +15,8 @@ from langgraph.graph import END, StateGraph
 
 from ai_core import Tier, query_llm
 from db import connect_db
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # State
@@ -48,7 +51,7 @@ def fetch_mistakes(state: ReviewState) -> dict:
           AND date(al.answered_timestamp) = date('now', 'localtime')
     '''
 
-    print(f"Querying mistakes for user {state['user_id']} on {datetime.now().date()}")
+    logger.info(f"Querying mistakes for user {state['user_id']} on {datetime.now().date()}")
 
     mistakes = conn.execute(query, (state["user_id"],)).fetchall()
     conn.close()
@@ -74,7 +77,7 @@ def fetch_mistakes(state: ReviewState) -> dict:
 
 
 def analyze(state: ReviewState) -> dict:
-    print("Agent Step 1: Analyzing patterns...")
+    logger.info("Agent step 1: analyzing patterns")
 
     prompt = f"""
     你是日文教學專家。請分析以下學生的今日錯題，找出 2-3 個主要的弱點模式（例如：特定助詞搞混、動詞變化不熟、還是單純粗心？）。
@@ -88,8 +91,8 @@ def analyze(state: ReviewState) -> dict:
     try:
         analysis = query_llm([{"role": "user", "content": prompt}], tier=Tier.QUALITY)
         return {"analysis_result": analysis}
-    except Exception as e:
-        print(f"Agent Step 1 Failed: {e}")
+    except Exception:
+        logger.exception("Agent step 1 failed")
         return {"analysis_result": "", "result": "無法進行分析。"}
 
 
@@ -98,7 +101,7 @@ def draft(state: ReviewState) -> dict:
     if state.get("result") and not state.get("analysis_result"):
         return {}
 
-    print("Agent Step 2: Drafting review...")
+    logger.info("Agent step 2: drafting review")
 
     prompt_analysis = f"""
     你是日文教學專家。請分析以下學生的今日錯題，找出 2-3 個主要的弱點模式（例如：特定助詞搞混、動詞變化不熟、還是單純粗心？）。
@@ -131,8 +134,8 @@ def draft(state: ReviewState) -> dict:
     try:
         draft_text = query_llm(messages, tier=Tier.QUALITY)
         return {"draft_result": draft_text}
-    except Exception as e:
-        print(f"Agent Step 2 Failed: {e}")
+    except Exception:
+        logger.exception("Agent step 2 failed")
         return {"result": state.get("analysis_result") or "無法產生回顧。"}
 
 
@@ -141,7 +144,7 @@ def polish(state: ReviewState) -> dict:
     if state.get("result") and not state.get("draft_result"):
         return {}
 
-    print("Agent Step 3: Polishing...")
+    logger.info("Agent step 3: polishing")
 
     prompt_analysis = f"""
     你是日文教學專家。請分析以下學生的今日錯題，找出 2-3 個主要的弱點模式（例如：特定助詞搞混、動詞變化不熟、還是單純粗心？）。
@@ -183,8 +186,8 @@ def polish(state: ReviewState) -> dict:
     try:
         final = query_llm(messages, tier=Tier.QUALITY)
         return {"result": final}
-    except Exception as e:
-        print(f"Agent Step 3 Failed: {e}")
+    except Exception:
+        logger.exception("Agent step 3 failed")
         return {"result": state.get("draft_result") or "無法優化草稿。"}
 
 

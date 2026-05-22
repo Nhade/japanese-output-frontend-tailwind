@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -9,6 +10,8 @@ import requests
 from openai import OpenAI
 
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Tier system
@@ -245,8 +248,8 @@ safeguard_client = None
 if GROQ_API_KEY and GROQ_API_BASE_URL:
     try:
         safeguard_client = OpenAI(api_key=GROQ_API_KEY, base_url=GROQ_API_BASE_URL)
-    except Exception as e:
-        print(f"Failed to initialize Safeguard Client: {e}")
+    except Exception:
+        logger.exception("Failed to initialize Safeguard Client")
 
 
 # ---------------------------------------------------------------------------
@@ -301,8 +304,8 @@ def query_llm(
     cfg = MODEL_REGISTRY[tier]
     try:
         return _DISPATCH[cfg.provider](cfg, messages, json_mode, temperature)
-    except Exception as e:
-        print(f"LLM call failed (tier={tier}, provider={cfg.provider}, model={cfg.model}): {e}")
+    except Exception:
+        logger.exception(f"LLM call failed (tier={tier}, provider={cfg.provider}, model={cfg.model})")
         raise
 
 
@@ -358,7 +361,7 @@ def query_llm_json(
             return {"data": data, "retry_count": retry_count, "error": None}
         except (ValueError, json.JSONDecodeError) as e:
             last_error = str(e)
-            print(f"JSON parsing failed (attempt {retry_count + 1}/{retries + 1}): {e}")
+            logger.warning(f"JSON parsing failed (attempt {retry_count + 1}/{retries + 1}): {e}")
             retry_count += 1
 
     return {"data": None, "retry_count": retries, "error": last_error}
@@ -432,7 +435,7 @@ def check_safety(text: str) -> dict:
         return {"violation": 0, "rationale": "Safety check disabled via environment variable."}
 
     if not safeguard_client:
-        print("Safety check skipped: Safeguard client not initialized.")
+        logger.debug("Safety check skipped: Safeguard client not initialized.")
         return {"violation": 0, "rationale": "Safeguard skipped"}
 
     try:
@@ -447,5 +450,5 @@ def check_safety(text: str) -> dict:
         content = completion.choices[0].message.content
         return _parse_json_safe(content)
     except Exception as e:
-        print(f"Safety check failed: {e}")
+        logger.warning(f"Safety check failed: {e}")
         return {"violation": 0, "rationale": f"Check failed: {e}"}

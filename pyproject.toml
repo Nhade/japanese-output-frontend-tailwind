@@ -20,6 +20,7 @@ py-modules = [
     "db",
     "embedding_service",
     "learner_service",
+    "logging_config",
     "personal_rag",
     "translation_service",
     "tts_service",

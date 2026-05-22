@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import random
 import re
@@ -6,16 +7,24 @@ import sqlite3
 import uuid
 from datetime import datetime
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, g, jsonify, request
 from flask_cors import CORS
 from pwdlib import PasswordHash, exceptions
 from pykakasi import kakasi
 
 from config import settings
 from db import connect_db
+from logging_config import clear_request_id, configure_logging, set_request_id
+
+# Configure logging before importing backend modules that may log during
+# import-time client setup.
+configure_logging()
+
 from personal_rag import annotate_feedback, find_top_similar_mistakes
 from translation_service import translate_text
 from tts_service import generate_audio
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -43,9 +52,9 @@ def _log_db_writability() -> None:
         f"file_writable={file_writable} dir_writable={dir_writable}"
     )
     if file_writable and dir_writable:
-        app.logger.info(msg)
+        logger.info(msg)
     else:
-        app.logger.warning(
+        logger.warning(
             f"{msg} — registration / write endpoints will 500 with "
             f"'attempt to write a readonly database' until the DB file and "
             f"its directory are writable by the gunicorn user. "
@@ -54,6 +63,45 @@ def _log_db_writability() -> None:
 
 
 _log_db_writability()
+
+
+# --- Request ID middleware --------------------------------------------------
+# Honour a well-formed inbound `X-Request-Id` header if present (so an upstream
+# proxy or the frontend can correlate retries), otherwise mint one. Stash on
+# Flask `g` for handlers that want it and in the logging contextvar so every log
+# record in this request carries the same ID. Cleared on teardown so the next
+# request on the same worker thread starts fresh.
+
+_REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+
+def _generate_request_id() -> str:
+    return uuid.uuid4().hex[:12]
+
+
+def _normalize_request_id(raw_request_id: str | None) -> str:
+    if raw_request_id and _REQUEST_ID_PATTERN.fullmatch(raw_request_id):
+        return raw_request_id
+    return _generate_request_id()
+
+
+@app.before_request
+def _stamp_request_id() -> None:
+    rid = _normalize_request_id(request.headers.get("X-Request-Id"))
+    g.request_id = rid
+    set_request_id(rid)
+
+
+@app.after_request
+def _echo_request_id(response: Response) -> Response:
+    rid = getattr(g, "request_id", None)
+    if rid:
+        response.headers["X-Request-Id"] = rid
+    return response
+
+
+@app.teardown_request
+def _clear_request_id(_exc):  # noqa: ANN001
+    clear_request_id()
 
 
 def get_db_connection():
@@ -167,7 +215,7 @@ def get_mistakes(user_id):
             try:
                 row["similar_past"] = find_top_similar_mistakes(conn, m["log_id"], top_k=3)
             except Exception as e:
-                app.logger.warning(f"similar_past lookup failed for log {m['log_id']}: {e}")
+                logger.warning(f"similar_past lookup failed for log {m['log_id']}: {e}")
                 row["similar_past"] = []
             result.append(row)
     finally:
@@ -197,8 +245,8 @@ try:
         ensure_embedding_columns(conn)
     finally:
         conn.close()
-except Exception as e:
-    print(f"Database init error: {e}")
+except Exception:
+    logger.exception("Database init error")
 
 
 @app.route('/api/exercise/submit', methods=['POST'])
@@ -310,7 +358,7 @@ def explain_answer():
         user_answer = row['user_answer']
         correct_answer = row['correct_answer']
 
-        print(f"Calling AI for evaluation (Log ID: {log_id})...")
+        logger.info(f"Calling AI for evaluation (Log ID: {log_id})")
         ai_result = evaluate_submission(question, user_answer, correct_answer)
 
         # Personal-RAG annotation: append a "you've made this kind of
@@ -320,7 +368,7 @@ def explain_answer():
         try:
             ai_result['feedback'] = annotate_feedback(conn, log_id, ai_result['feedback'])
         except Exception as e:
-            app.logger.warning(f"personal_rag annotation failed for log {log_id}: {e}")
+            logger.warning(f"personal_rag annotation failed for log {log_id}: {e}")
 
         # Update record
         conn.execute('''
@@ -403,7 +451,7 @@ def chat_send():
             learner_profile = get_learner_profile(conn, user_id)
             conn.close()
         except Exception as e:
-            print(f"Error fetching profile for chat: {e}")
+            logger.warning(f"Error fetching profile for chat: {e}")
 
     result = chat_with_ai(message, history, locale, learner_profile)
     return jsonify(result)
@@ -440,7 +488,7 @@ def register_user():
             # The most common cause is a read-only DB file or directory on the
             # production host. Log the actual filesystem state so the operator
             # has something to act on, and surface a clean error to the client.
-            app.logger.error(
+            logger.error(
                 f"register_user write failed: {e} "
                 f"(DATABASE_PATH={DATABASE_PATH}, "
                 f"file_writable={os.access(DATABASE_PATH, os.W_OK)}, "
@@ -779,8 +827,8 @@ def import_video_route():
         return jsonify(result)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        print(f"Video import error: {e}")
+    except Exception:
+        logger.exception("Video import error")
         return jsonify({"error": "Failed to import video. Please check the URL and try again."}), 500
 
 
@@ -864,8 +912,8 @@ def generate_video_comprehension(video_id):
     try:
         questions = generate_comprehension_questions(transcript_text, video["title"], num)
         return jsonify({"questions": questions})
-    except Exception as e:
-        print(f"Comprehension generation error: {e}")
+    except Exception:
+        logger.exception("Comprehension generation error")
         return jsonify({"error": "Failed to generate questions"}), 500
 
 
@@ -902,7 +950,7 @@ def check_video_comprehension():
             conn.commit()
             conn.close()
         except Exception as e:
-            print(f"Failed to log comprehension answer: {e}")
+            logger.warning(f"Failed to log comprehension answer: {e}")
 
     return jsonify(result)
 
@@ -960,8 +1008,8 @@ def get_daily_review(user_id):
     try:
         review_content = generate_daily_review_agent(user_id, DATABASE_PATH)
         return jsonify({"review": review_content})
-    except Exception as e:
-        print(f"Agent Error: {e}")
+    except Exception:
+        logger.exception("Agent error")
         return jsonify({"error": "Agent 正在忙碌中，請稍後再試"}), 500
 
 @app.route('/api/learner/profile/<user_id>', methods=['GET'])
@@ -1025,8 +1073,8 @@ def update_profile():
     try:
         updated_profile = update_learner_settings(conn, user_id, settings_payload)
         return jsonify(updated_profile)
-    except Exception as e:
-        print(f"Error updating profile: {e}")
+    except Exception:
+        logger.exception("Error updating profile")
         return jsonify({"error": "Internal server error"}), 500
     finally:
         conn.close()
