@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
 import { useI18n } from 'vue-i18n';
+import { apiJson } from '../lib/api';
 
 const props = defineProps<{
   show: boolean;
@@ -31,12 +32,11 @@ const prefOptions: { value: 'gentle' | 'normal' | 'strict'; label: string; desc:
 watch(() => props.show, async (newVal) => {
   if (!newVal || !auth.user_id) return;
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/learner/profile/${auth.user_id}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.level_est) jlptLevel.value = data.level_est;
-      if (data.feedback_preference) feedbackPref.value = data.feedback_preference;
-    }
+    const data = await apiJson<{ level_est?: string; feedback_preference?: 'gentle' | 'normal' | 'strict' }>(
+      `/api/learner/profile/${auth.requireUserId()}`,
+    );
+    if (data.level_est) jlptLevel.value = data.level_est;
+    if (data.feedback_preference) feedbackPref.value = data.feedback_preference;
   } catch (e) {
     console.error(e);
   }
@@ -46,24 +46,19 @@ async function saveSettings() {
   if (!auth.user_id || isLoading.value) return;
   isLoading.value = true;
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/profile`, {
+    await apiJson('/api/users/profile', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: auth.user_id,
+      body: {
+        user_id: auth.requireUserId(),
         settings: {
           level_est: jlptLevel.value,
           feedback_preference: feedbackPref.value,
         },
-      }),
+      },
     });
-    if (res.ok) {
-      toast.trigger(t('settings.saved_success'), 'success');
-      emit('updated');
-      emit('close');
-    } else {
-      toast.trigger(t('auth.error_generic'), 'error');
-    }
+    toast.trigger(t('settings.saved_success'), 'success');
+    emit('updated');
+    emit('close');
   } catch (e) {
     toast.trigger(t('exercise.network_error'), 'error');
   } finally {

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import { apiBlob, apiJson } from '../lib/api';
 
 interface Paragraph {
   text: string;
@@ -101,9 +102,7 @@ async function fetchArticle(id: string) {
   loading.value = true;
   article.value = null;
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/news/${id}`);
-    if (!res.ok) throw new Error('Failed to fetch article');
-    article.value = await res.json();
+    article.value = await apiJson<Article>(`/api/news/${id}`);
   } catch (e) {
     console.error(e);
   } finally {
@@ -115,9 +114,7 @@ async function fetchNextArticle(currentId: string) {
   // Use the list endpoint to pick the next article after the current one.
   // Fallback: wrap around to the first article.
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/news`);
-    if (!res.ok) return;
-    const list: ListEntry[] = await res.json();
+    const list = await apiJson<ListEntry[]>('/api/news');
     if (!list.length) return;
     const idx = list.findIndex(a => a.article_id === currentId);
     if (idx < 0) {
@@ -146,15 +143,13 @@ async function toggleTranslation(index: number) {
 
   para.loadingTranslation = true;
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/translate`, {
+    const data = await apiJson<{ translated_text: string }>('/api/translate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         text: para.text,
         target: locale.value === 'ja' ? 'zh-Hant' : locale.value,
-      }),
+      },
     });
-    const data = await res.json();
     para.translation = data.translated_text;
   } catch (e) {
     console.error(e);
@@ -202,13 +197,10 @@ async function playAudio(index: number) {
   playingIndex.value = index;
 
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/tts`, {
+    const blob = await apiBlob('/api/tts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: para.text }),
+      body: { text: para.text },
     });
-    if (!res.ok) throw new Error('TTS failed');
-    const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
     currentAudio.value = audio;

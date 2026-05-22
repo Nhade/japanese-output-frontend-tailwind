@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useToastStore } from '../stores/toast';
+import { apiJson } from '../lib/api';
 
 interface Video {
   video_id: string;
@@ -17,8 +18,6 @@ interface Video {
 const { t, locale } = useI18n();
 const router = useRouter();
 const toast = useToastStore();
-
-const API = import.meta.env.VITE_API_BASE_URL;
 
 const videos = ref<Video[]>([]);
 const loading = ref(true);
@@ -89,11 +88,9 @@ function formatRelativeDate(iso?: string): string {
 async function fetchVideos() {
   loading.value = true;
   try {
-    const params = new URLSearchParams();
-    if (filterCategory.value) params.append('category', filterCategory.value);
-    const query = params.toString() ? `?${params.toString()}` : '';
-    const res = await fetch(`${API}/api/videos${query}`);
-    videos.value = await res.json();
+    videos.value = await apiJson<Video[]>('/api/videos', {
+      query: { category: filterCategory.value },
+    });
   } catch (e) {
     console.error(e);
   } finally {
@@ -113,16 +110,10 @@ async function handleImport() {
   isImporting.value = true;
   importError.value = '';
   try {
-    const res = await fetch(`${API}/api/videos/import`, {
+    const data = await apiJson<{ already_exists?: boolean; video_id: string }>('/api/videos/import', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
+      body: { url },
     });
-    const data = await res.json();
-    if (!res.ok) {
-      importError.value = data.error || 'Import failed';
-      return;
-    }
     toast.trigger(
       data.already_exists ? 'Video already imported' : 'Video imported successfully!',
       'success',
@@ -130,7 +121,7 @@ async function handleImport() {
     importUrl.value = '';
     router.push(`/videos/${data.video_id}`);
   } catch (e) {
-    importError.value = 'Network error. Please try again.';
+    importError.value = e instanceof Error ? e.message : 'Network error. Please try again.';
   } finally {
     isImporting.value = false;
   }

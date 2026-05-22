@@ -10,7 +10,7 @@ const authStore = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 
-const isLoggedIn = computed(() => authStore.user_id !== null);
+const isLoggedIn = computed(() => authStore.isAuthenticated);
 
 function logout() {
   authStore.logout();

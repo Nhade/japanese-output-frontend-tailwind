@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { apiJson } from '../lib/api';
 
 import AuthLayout from '../components/AuthLayout.vue';
 
@@ -40,19 +41,13 @@ async function register() {
   message.value = '';
   isSubmitting.value = true;
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/register`, {
+    const data = await apiJson<{ message: string }>('/api/users/register', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username.value, password: password.value }),
+      body: { username: username.value, password: password.value },
     });
-    const data = await res.json();
-    if (res.ok) {
-      message.value = data.message;
-    } else {
-      error.value = data.error || t('auth.error_generic');
-    }
+    message.value = data.message;
   } catch (err) {
-    error.value = t('auth.error_generic');
+    error.value = err instanceof Error && err.message ? err.message : t('auth.error_generic');
   } finally {
     isSubmitting.value = false;
   }

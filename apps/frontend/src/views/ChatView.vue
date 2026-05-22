@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import SettingsModal from '../components/SettingsModal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
+import { apiJson } from '../lib/api';
 
 interface FeedbackCorrection {
   original: string;
@@ -41,11 +42,7 @@ const authStore = useAuthStore();
 const toastStore = useToastStore();
 
 const LOCAL_STORAGE_KEY = 'japanese_agent_chat_history';
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-
-function apiUrl(path: string): string {
-  return `${API_BASE_URL}${path}`;
-}
+const chatStorageKey = computed(() => authStore.scopedStorageKey(LOCAL_STORAGE_KEY));
 
 const messages = ref<Message[]>([]);
 const inputMessage = ref('');
@@ -118,20 +115,15 @@ async function sendMessage(rawText?: string) {
       content: m.content,
     }));
 
-    const response = await fetch(apiUrl('/api/chat/send'), {
+    const data = await apiJson<{ response?: string; feedback?: Feedback }>('/api/chat/send', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         message: text,
         history: historyPayload,
         locale: locale.value,
-        user_id: authStore.user_id,
-      }),
+        user_id: authStore.requireUserId(),
+      },
     });
-
-    if (!response.ok) throw new Error('Network response was not ok');
-
-    const data = await response.json();
 
     if (data.feedback?.overall?.includes?.('Safety violation')) {
       toastStore.trigger(t('chat.safety_violation'), 'error');
@@ -180,7 +172,7 @@ function toggleFeedback(index: number) {
 }
 
 onMounted(async () => {
-  const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+  const saved = localStorage.getItem(chatStorageKey.value) ?? localStorage.getItem(LOCAL_STORAGE_KEY);
   if (saved) {
     try {
       const parsed = JSON.parse(saved) as Message[];
@@ -216,10 +208,7 @@ onMounted(async () => {
 
   if (authStore.user_id) {
     try {
-      const res = await fetch(apiUrl(`/api/learner/profile/${authStore.user_id}`));
-      if (res.ok) {
-        learnerProfile.value = await res.json();
-      }
+      learnerProfile.value = await apiJson<LearnerProfile>(`/api/learner/profile/${authStore.requireUserId()}`);
     } catch (e) {
       console.error('Failed to fetch learner profile', e);
     }
@@ -227,7 +216,7 @@ onMounted(async () => {
 });
 
 watch(messages, (val) => {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(val));
+  localStorage.setItem(chatStorageKey.value, JSON.stringify(val));
 }, { deep: true });
 </script>
 
