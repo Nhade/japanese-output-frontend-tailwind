@@ -18,6 +18,9 @@ export class ApiError extends Error {
 }
 
 const API_BASE_URL = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '').replace(/\/+$/, '');
+export const SESSION_TOKEN_STORAGE_KEY = 'shiori-session-token';
+export const SESSION_USER_ID_STORAGE_KEY = 'shiori-user-id';
+export const UNAUTHORIZED_EVENT = 'shiori:unauthorized';
 
 function normalizePath(path: string): string {
   return path.startsWith('/') ? path : `/${path}`;
@@ -38,6 +41,24 @@ function appendQuery(path: string, query?: Record<string, QueryValue>): string {
 
 export function apiUrl(path: string, query?: Record<string, QueryValue>): string {
   return `${API_BASE_URL}${appendQuery(normalizePath(path), query)}`;
+}
+
+export function getSessionToken(): string | null {
+  return localStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+}
+
+export function setSessionToken(token: string | null): void {
+  if (token) {
+    localStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
+  } else {
+    localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+  }
+}
+
+function clearPersistedSession(): void {
+  setSessionToken(null);
+  localStorage.removeItem(SESSION_USER_ID_STORAGE_KEY);
+  window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
 }
 
 async function parseResponse(response: Response): Promise<unknown> {
@@ -68,6 +89,10 @@ function errorMessage(data: unknown, fallback: string): string {
 export async function apiFetch(path: string, options: ApiRequestOptions = {}): Promise<Response> {
   const { body, query, headers, ...init } = options;
   const requestHeaders = new Headers(headers);
+  const token = getSessionToken();
+  if (token && !requestHeaders.has('Authorization')) {
+    requestHeaders.set('Authorization', `Bearer ${token}`);
+  }
   let requestBody: BodyInit | null | undefined;
 
   if (body === undefined || body === null) {
@@ -85,7 +110,6 @@ export async function apiFetch(path: string, options: ApiRequestOptions = {}): P
   }
 
   const response = await fetch(apiUrl(path, query), {
-    credentials: 'include',
     ...init,
     headers: requestHeaders,
     body: requestBody,
@@ -93,6 +117,9 @@ export async function apiFetch(path: string, options: ApiRequestOptions = {}): P
 
   if (!response.ok) {
     const data = await parseResponse(response);
+    if (response.status === 401 && token) {
+      clearPersistedSession();
+    }
     throw new ApiError(errorMessage(data, `Request failed with ${response.status}`), response.status, data);
   }
 

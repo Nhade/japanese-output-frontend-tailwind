@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from config import settings
+from dotenv import load_dotenv
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DB_PATH = REPO_ROOT / "data" / "news_corpus.db"
+
+load_dotenv(REPO_ROOT / ".env")
 
 
 @dataclass(frozen=True)
@@ -120,14 +126,15 @@ def migrate_connection(conn: sqlite3.Connection) -> list[Migration]:
 
 
 def resolve_db_path(raw_path: str | None = None) -> Path:
-    """Resolve the DB path, preferring an explicit CLI arg over settings.
+    """Resolve the DB path, preferring an explicit CLI arg over env config.
 
-    `settings.database_path` already honours SHIORI_DATABASE_PATH and the
-    repo-relative default, so we only need to layer the CLI argument on top.
+    Keep this script independent from backend `config` so deployment migrations
+    do not depend on app import paths or unrelated session-secret settings.
     """
     if raw_path:
         return Path(raw_path).expanduser().resolve()
-    return settings.database_path
+    raw_env_path = os.getenv("SHIORI_DATABASE_PATH")
+    return (Path(raw_env_path) if raw_env_path else DEFAULT_DB_PATH).expanduser().resolve()
 
 
 def migrate_db(db_path: str | None = None) -> list[Migration]:

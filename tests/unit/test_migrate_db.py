@@ -1,7 +1,9 @@
+import os
 import sqlite3
 import unittest
+from unittest.mock import patch
 
-from scripts.migrate_db import MIGRATIONS, migrate_connection
+from scripts.migrate_db import MIGRATIONS, migrate_connection, resolve_db_path
 
 
 def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
@@ -18,6 +20,12 @@ def _indexes(conn: sqlite3.Connection) -> set[str]:
 
 
 class TestMigrateConnection(unittest.TestCase):
+    def test_resolve_db_path_does_not_require_session_secret(self):
+        with patch.dict(os.environ, {}, clear=True):
+            resolved = resolve_db_path()
+
+        self.assertEqual(resolved.name, "news_corpus.db")
+
     def test_adds_missing_columns_indexes_and_user_version(self):
         conn = sqlite3.connect(":memory:")
         conn.execute(

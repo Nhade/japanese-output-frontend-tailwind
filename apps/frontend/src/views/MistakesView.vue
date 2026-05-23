@@ -143,7 +143,7 @@ async function generateReview() {
   dailyReview.value = '';
   simulateAgentThinking();
   try {
-    const data = await apiJson<{ review: string }>(`/api/agent/daily_review/${auth.requireUserId()}`);
+    const data = await apiJson<{ review: string }>('/api/agent/daily_review/me');
     dailyReview.value = data.review;
     showReviewDialog.value = true;
   } catch (e) {
@@ -197,7 +197,7 @@ onMounted(async () => {
     return;
   }
   try {
-    mistakes.value = await apiJson<Mistake[]>(`/api/mistakes/${auth.requireUserId()}`);
+    mistakes.value = await apiJson<Mistake[]>('/api/mistakes/me');
   } catch (err) {
     error.value = err instanceof Error ? err.message : t('mistakes.load_error');
   } finally {

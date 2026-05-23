@@ -13,7 +13,6 @@ import ChoiceFootnote from '@/components/exercise/ChoiceFootnote.vue';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import { apiJson } from '@/lib/api';
 import { safeMarkdown } from '@/lib/markdown';
@@ -75,7 +74,6 @@ const showDetailModal = ref(false);
 const detailedError = ref<string | null>(null);
 const isLoading = ref(true);
 const isLoadingDetailed = ref(false);
-const auth = useAuthStore();
 const toastStore = useToastStore();
 const userAnswer = ref('');
 const showHint = ref(false);
@@ -174,7 +172,6 @@ async function handleAnswerSubmit() {
       body: {
         exercise_id: exercise.value.exercise_id,
         user_answer: userAnswer.value.trim(),
-        user_id: auth.requireUserId(),
       },
     });
     feedback.value = result;

@@ -55,6 +55,18 @@ def _resolve_db_path() -> Path:
     return candidate.expanduser().resolve()
 
 
+def _resolve_session_secret(flask_debug: bool) -> str:
+    secret = os.getenv("SHIORI_SESSION_SECRET") or os.getenv("SECRET_KEY")
+    if secret:
+        return secret
+    if flask_debug or _bool_env("SHIORI_ALLOW_INSECURE_SESSION_SECRET", False):
+        return "dev-insecure-session-secret-change-me"
+    raise RuntimeError(
+        "SHIORI_SESSION_SECRET must be set unless FLASK_DEBUG=true or "
+        "SHIORI_ALLOW_INSECURE_SESSION_SECRET=true is explicitly configured."
+    )
+
+
 @dataclass(frozen=True)
 class Settings:
     """Operational config loaded once from the environment."""
@@ -62,13 +74,18 @@ class Settings:
     database_path: Path
     ai_timeout: int
     flask_debug: bool
+    session_secret: str
+    session_max_age_seconds: int
 
     @classmethod
     def from_env(cls) -> Settings:
+        flask_debug = _bool_env("FLASK_DEBUG", False)
         return cls(
             database_path=_resolve_db_path(),
             ai_timeout=int(os.getenv("AI_TIMEOUT", "120")),
-            flask_debug=_bool_env("FLASK_DEBUG", False),
+            flask_debug=flask_debug,
+            session_secret=_resolve_session_secret(flask_debug),
+            session_max_age_seconds=int(os.getenv("SHIORI_SESSION_MAX_AGE_SECONDS", str(60 * 60 * 24 * 30))),
         )
 
 

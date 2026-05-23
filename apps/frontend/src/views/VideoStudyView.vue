@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
 import { apiJson } from '../lib/api';
 
 interface TranscriptSegment { start: number; text: string }
@@ -46,7 +45,6 @@ type CompQuestionPayload = Omit<CompQuestion, 'selectedIndex' | 'answered' | 'is
 
 const route = useRoute();
 const router = useRouter();
-const authStore = useAuthStore();
 
 const videoId = route.params.id as string;
 
@@ -164,7 +162,6 @@ async function submitCloze(ex: ClozeExercise) {
         exercise_id: ex.exercise_id,
         video_id: videoId,
         user_answer: ex.userAnswer.trim(),
-        user_id: authStore.requireUserId(),
       },
     });
     ex.submitted = true;
@@ -226,7 +223,6 @@ async function checkComprehension(qi: number) {
         correct_index: q.correct_index,
         user_answer_index: q.selectedIndex,
         transcript_context: transcript.value.map(s => s.text).join(' ').slice(0, 500),
-        user_id: authStore.requireUserId(),
         video_id: videoId,
       },
     });

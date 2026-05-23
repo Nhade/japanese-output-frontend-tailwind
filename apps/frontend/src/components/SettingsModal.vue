@@ -33,7 +33,7 @@ watch(() => props.show, async (newVal) => {
   if (!newVal || !auth.user_id) return;
   try {
     const data = await apiJson<{ level_est?: string; feedback_preference?: 'gentle' | 'normal' | 'strict' }>(
-      `/api/learner/profile/${auth.requireUserId()}`,
+      '/api/learner/profile/me',
     );
     if (data.level_est) jlptLevel.value = data.level_est;
     if (data.feedback_preference) feedbackPref.value = data.feedback_preference;
@@ -49,7 +49,6 @@ async function saveSettings() {
     await apiJson('/api/users/profile', {
       method: 'POST',
       body: {
-        user_id: auth.requireUserId(),
         settings: {
           level_est: jlptLevel.value,
           feedback_preference: feedbackPref.value,

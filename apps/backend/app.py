@@ -6,9 +6,11 @@ import re
 import sqlite3
 import uuid
 from datetime import datetime
+from functools import wraps
 
 from flask import Flask, Response, g, jsonify, request
 from flask_cors import CORS
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from pwdlib import PasswordHash, exceptions
 from pykakasi import kakasi
 
@@ -34,8 +36,12 @@ CORS(app, origins=[
 
 k = kakasi()
 password_hash = PasswordHash.recommended()
+session_serializer = URLSafeTimedSerializer(settings.session_secret, salt="shiori-session-v1")
 
 DATABASE_PATH = str(settings.database_path)
+
+if settings.session_secret == "dev-insecure-session-secret-change-me":
+    logger.warning("SHIORI_SESSION_SECRET is not set; using an insecure development session secret.")
 
 
 def _log_db_writability() -> None:
@@ -119,6 +125,85 @@ def get_json_body() -> dict:
     return data if isinstance(data, dict) else {}
 
 
+class AuthError(Exception):
+    def __init__(self, message: str = "Authentication required", status_code: int = 401):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+
+
+def _auth_error_response(error: AuthError):
+    return jsonify({"error": error.message}), error.status_code
+
+
+def issue_session_token(user_id: str) -> str:
+    return session_serializer.dumps({"user_id": user_id})
+
+
+def _bearer_token() -> str | None:
+    header = request.headers.get("Authorization", "")
+    scheme, _, token = header.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+    return token.strip()
+
+
+def require_current_user_id() -> str:
+    cached = getattr(g, "current_user_id", None)
+    if cached:
+        return cached
+
+    token = _bearer_token()
+    if not token:
+        raise AuthError()
+
+    try:
+        payload = session_serializer.loads(token, max_age=settings.session_max_age_seconds)
+    except SignatureExpired as exc:
+        raise AuthError("Session expired") from exc
+    except BadSignature as exc:
+        raise AuthError("Invalid session") from exc
+
+    user_id = payload.get("user_id") if isinstance(payload, dict) else None
+    if not isinstance(user_id, str) or not user_id:
+        raise AuthError("Invalid session")
+
+    conn = get_db_connection()
+    try:
+        user = conn.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,)).fetchone()
+    finally:
+        conn.close()
+    if user is None:
+        raise AuthError("Invalid session")
+
+    g.current_user_id = user_id
+    return user_id
+
+
+def require_route_user(user_id: str) -> str:
+    current_user_id = require_current_user_id()
+    if current_user_id != user_id:
+        raise AuthError("Forbidden", 403)
+    return current_user_id
+
+
+def auth_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            require_current_user_id()
+        except AuthError as exc:
+            return _auth_error_response(exc)
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+@app.errorhandler(AuthError)
+def _handle_auth_error(error: AuthError):
+    return _auth_error_response(error)
+
+
 @app.route('/api/exercise/random', methods=['GET'])
 def get_random_exercise():
     """
@@ -187,8 +272,9 @@ def get_random_exercise():
         conn.close()
 
 
+@app.route('/api/mistakes/me', methods=['GET'])
 @app.route('/api/mistakes/<user_id>', methods=['GET'])
-def get_mistakes(user_id):
+def get_mistakes(user_id=None):
     """
     Retrieve the list of mistakes (incorrect answers) for a specific user.
 
@@ -198,6 +284,7 @@ def get_mistakes(user_id):
     Returns:
         JSON: A list of mistake objects (question, user_answer, correct_answer, feedback, etc.).
     """
+    user_id = require_current_user_id() if user_id is None else require_route_user(user_id)
     conn = get_db_connection()
     try:
         mistakes = conn.execute('''
@@ -250,6 +337,7 @@ except Exception:
 
 
 @app.route('/api/exercise/submit', methods=['POST'])
+@auth_required
 def submit_answer():
     """
     Submit an answer for an exercise.
@@ -262,10 +350,10 @@ def submit_answer():
     data = get_json_body()
     exercise_id = data.get('exercise_id')
     user_answer = data.get('user_answer', '').strip()
-    user_id = data.get('user_id')
+    user_id = require_current_user_id()
 
-    if not exercise_id or not user_id:
-        return jsonify({"error": "exercise_id and user_id are required"}), 400
+    if not exercise_id:
+        return jsonify({"error": "exercise_id is required"}), 400
 
     conn = get_db_connection()
     try:
@@ -327,6 +415,7 @@ def submit_answer():
     })
 
 @app.route('/api/exercise/explain', methods=['POST'])
+@auth_required
 def explain_answer():
     """
     Request AI evaluation for a specific submission log.
@@ -337,6 +426,7 @@ def explain_answer():
     """
     data = get_json_body()
     log_id = data.get('log_id')
+    user_id = require_current_user_id()
 
     if not log_id:
         return jsonify({"error": "log_id is required"}), 400
@@ -345,7 +435,7 @@ def explain_answer():
     try:
         # Fetch details to ensure data integrity
         row = conn.execute('''
-            SELECT al.user_answer, e.question_sentence, e.correct_answer
+            SELECT al.user_id, al.user_answer, e.question_sentence, e.correct_answer
             FROM answer_log al
             JOIN exercise e ON al.exercise_id = e.exercise_id
             WHERE al.log_id = ?
@@ -353,6 +443,8 @@ def explain_answer():
 
         if not row:
             return jsonify({"error": "Log entry not found"}), 404
+        if row["user_id"] != user_id:
+            return jsonify({"error": "Forbidden"}), 403
 
         question = row['question_sentence']
         user_answer = row['user_answer']
@@ -384,6 +476,7 @@ def explain_answer():
         conn.close()
 
 @app.route('/api/exercise/explain-detailed', methods=['POST'])
+@auth_required
 def explain_answer_detailed():
     """
     Request detailed grammatical explanation for a submission.
@@ -394,6 +487,7 @@ def explain_answer_detailed():
     """
     data = get_json_body()
     log_id = data.get('log_id')
+    user_id = require_current_user_id()
 
     if not log_id:
         return jsonify({"error": "log_id is required"}), 400
@@ -401,7 +495,7 @@ def explain_answer_detailed():
     conn = get_db_connection()
     try:
         row = conn.execute('''
-            SELECT al.user_answer, e.question_sentence, e.correct_answer
+            SELECT al.user_id, al.user_answer, e.question_sentence, e.correct_answer
             FROM answer_log al
             JOIN exercise e ON al.exercise_id = e.exercise_id
             WHERE al.log_id = ?
@@ -409,6 +503,8 @@ def explain_answer_detailed():
 
         if not row:
             return jsonify({"error": "Log entry not found"}), 404
+        if row["user_id"] != user_id:
+            return jsonify({"error": "Forbidden"}), 403
 
         question = row['question_sentence']
         user_answer = row['user_answer']
@@ -422,6 +518,7 @@ def explain_answer_detailed():
         conn.close()
 
 @app.route('/api/chat/send', methods=['POST'])
+@auth_required
 def chat_send():
     """
     Send a message to the AI chat interface.
@@ -434,6 +531,7 @@ def chat_send():
     message = data.get('message')
     history = data.get('history', [])
     locale = data.get('locale', 'en') # Default to English if not provided
+    user_id = require_current_user_id()
 
     if not message:
         return jsonify({"error": "Message is required"}), 400
@@ -442,16 +540,15 @@ def chat_send():
     if not isinstance(history, list):
         return jsonify({"error": "History must be a list"}), 400
 
-    # Fetch Learner Profile if user_id is provided
-    user_id = data.get('user_id')
     learner_profile = None
-    if user_id:
+    try:
+        conn = get_db_connection()
         try:
-            conn = get_db_connection()
             learner_profile = get_learner_profile(conn, user_id)
+        finally:
             conn.close()
-        except Exception as e:
-            logger.warning(f"Error fetching profile for chat: {e}")
+    except Exception as e:
+        logger.warning(f"Error fetching profile for chat: {e}")
 
     result = chat_with_ai(message, history, locale, learner_profile)
     return jsonify(result)
@@ -514,6 +611,9 @@ def login_user():
     username = data.get('username')
     password = data.get('password')
 
+    if not username or not password:
+        return jsonify({"error": "Username and password are required"}), 400
+
     conn = get_db_connection()
     user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
 
@@ -536,11 +636,24 @@ def login_user():
         conn.execute('UPDATE users SET password_hash = ? WHERE username = ?', (updated_hash, username))
         conn.commit()
 
+    user_id = user['user_id']
     conn.close()
-    return jsonify({"message": "Login successful", "user_id": user['user_id']}), 200
+    return jsonify({
+        "message": "Login successful",
+        "user_id": user_id,
+        "token": issue_session_token(user_id),
+    }), 200
 
+
+@app.route('/api/users/me', methods=['GET'])
+@auth_required
+def get_current_user():
+    return jsonify({"user_id": require_current_user_id()})
+
+
+@app.route('/api/statistics/me', methods=['GET'])
 @app.route('/api/statistics/<user_id>', methods=['GET'])
-def get_user_statistics(user_id):
+def get_user_statistics(user_id=None):
     """
     Calculate and return comprehensive statistics for a user.
     Includes accuracy by Part of Speech, JLPT level, overall summary, and daily history.
@@ -551,6 +664,7 @@ def get_user_statistics(user_id):
     Returns:
         JSON: Structured statistics object.
     """
+    user_id = require_current_user_id() if user_id is None else require_route_user(user_id)
     conn = get_db_connection()
     # query to get statistics for a user
     query = """
@@ -814,6 +928,7 @@ def get_video_exercises(video_id):
 
 
 @app.route('/api/videos/import', methods=['POST'])
+@auth_required
 def import_video_route():
     """Import a video from a YouTube URL."""
     data = get_json_body()
@@ -833,16 +948,17 @@ def import_video_route():
 
 
 @app.route('/api/videos/submit', methods=['POST'])
+@auth_required
 def submit_video_answer():
     """Submit an answer for a video cloze exercise."""
     data = get_json_body()
     exercise_id = data.get('exercise_id')
     video_id = data.get('video_id')
     user_answer = data.get('user_answer', '').strip()
-    user_id = data.get('user_id')
+    user_id = require_current_user_id()
 
-    if not all([exercise_id, video_id, user_id]):
-        return jsonify({"error": "exercise_id, video_id, and user_id are required"}), 400
+    if not all([exercise_id, video_id]):
+        return jsonify({"error": "exercise_id and video_id are required"}), 400
 
     conn = get_db_connection()
     try:
@@ -886,6 +1002,7 @@ def submit_video_answer():
 
 
 @app.route('/api/videos/<video_id>/comprehension', methods=['POST'])
+@auth_required
 def generate_video_comprehension(video_id):
     """Generate AI comprehension questions for a video."""
     conn = get_db_connection()
@@ -918,6 +1035,7 @@ def generate_video_comprehension(video_id):
 
 
 @app.route('/api/videos/comprehension/check', methods=['POST'])
+@auth_required
 def check_video_comprehension():
     """Check a comprehension answer."""
     data = get_json_body()
@@ -926,13 +1044,13 @@ def check_video_comprehension():
     correct_index = data.get('correct_index', 0)
     user_answer_index = data.get('user_answer_index', 0)
     context = data.get('transcript_context', '')
-    user_id = data.get('user_id')
+    user_id = require_current_user_id()
     video_id = data.get('video_id')
 
     result = check_comprehension_answer(question, choices, correct_index, user_answer_index, context)
 
-    # Log the answer if user_id and video_id provided
-    if user_id and video_id:
+    # Log the answer if the client provides video context.
+    if video_id:
         try:
             conn = get_db_connection()
             log_id = str(uuid.uuid4())
@@ -956,6 +1074,7 @@ def check_video_comprehension():
 
 
 @app.route('/api/translate', methods=['POST'])
+@auth_required
 def translate_paragraph():
     """
     Translate a specific text segment.
@@ -974,6 +1093,7 @@ def translate_paragraph():
     return jsonify({"translated_text": translated})
 
 @app.route('/api/tts', methods=['POST'])
+@auth_required
 def get_tts():
     """
     Generate Text-to-Speech audio for a given text.
@@ -994,8 +1114,9 @@ def get_tts():
 
     return Response(audio_content, mimetype="audio/wav")
 
+@app.route('/api/agent/daily_review/me', methods=['GET'])
 @app.route('/api/agent/daily_review/<user_id>', methods=['GET'])
-def get_daily_review(user_id):
+def get_daily_review(user_id=None):
     """
     Trigger the Daily Review Agent to generate a personalized review using the Agent Service.
 
@@ -1005,6 +1126,7 @@ def get_daily_review(user_id):
     Returns:
         JSON: {"review": markdown_string}
     """
+    user_id = require_current_user_id() if user_id is None else require_route_user(user_id)
     try:
         review_content = generate_daily_review_agent(user_id, DATABASE_PATH)
         return jsonify({"review": review_content})
@@ -1012,8 +1134,9 @@ def get_daily_review(user_id):
         logger.exception("Agent error")
         return jsonify({"error": "Agent 正在忙碌中，請稍後再試"}), 500
 
+@app.route('/api/learner/profile/me', methods=['GET'])
 @app.route('/api/learner/profile/<user_id>', methods=['GET'])
-def get_learner_profile_route(user_id):
+def get_learner_profile_route(user_id=None):
     """
     Get the learner profile for a specific user.
 
@@ -1023,6 +1146,7 @@ def get_learner_profile_route(user_id):
     Returns:
         JSON: Learner profile object.
     """
+    user_id = require_current_user_id() if user_id is None else require_route_user(user_id)
     conn = get_db_connection()
     try:
         profile = get_learner_profile(conn, user_id)
@@ -1030,8 +1154,9 @@ def get_learner_profile_route(user_id):
     finally:
         conn.close()
 
+@app.route('/api/learner/recalculate/me', methods=['POST'])
 @app.route('/api/learner/recalculate/<user_id>', methods=['POST'])
-def recalculate_learner_profile_route(user_id):
+def recalculate_learner_profile_route(user_id=None):
     """
     Force a recalculation (backfill) of the learner profile based on all logs.
 
@@ -1041,6 +1166,7 @@ def recalculate_learner_profile_route(user_id):
     Returns:
         JSON: Updated learner profile object.
     """
+    user_id = require_current_user_id() if user_id is None else require_route_user(user_id)
     conn = get_db_connection()
     try:
         # Check if user exists first (optional but good)
@@ -1055,6 +1181,7 @@ def recalculate_learner_profile_route(user_id):
 
 
 @app.route('/api/users/profile', methods=['POST'])
+@auth_required
 def update_profile():
     """
     Update specific settings in the learner profile (like level estimate or feedback preference).
@@ -1063,11 +1190,11 @@ def update_profile():
         JSON: Updated learner profile object.
     """
     data = get_json_body()
-    user_id = data.get('user_id')
+    user_id = require_current_user_id()
     settings_payload = data.get('settings')
 
-    if not user_id or not settings_payload:
-        return jsonify({"error": "Missing user_id or settings"}), 400
+    if not settings_payload:
+        return jsonify({"error": "Missing settings"}), 400
 
     conn = get_db_connection()
     try:
