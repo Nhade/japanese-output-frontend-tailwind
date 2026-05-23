@@ -121,7 +121,6 @@ async function sendMessage(rawText?: string) {
         message: text,
         history: historyPayload,
         locale: locale.value,
-        user_id: authStore.requireUserId(),
       },
     });
 
@@ -208,7 +207,7 @@ onMounted(async () => {
 
   if (authStore.user_id) {
     try {
-      learnerProfile.value = await apiJson<LearnerProfile>(`/api/learner/profile/${authStore.requireUserId()}`);
+      learnerProfile.value = await apiJson<LearnerProfile>('/api/learner/profile/me');
     } catch (e) {
       console.error('Failed to fetch learner profile', e);
     }

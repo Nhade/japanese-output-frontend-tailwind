@@ -310,7 +310,7 @@ onMounted(async () => {
   }
 
   try {
-    const stats = await apiJson<StatisticsResponse>(`/api/statistics/${auth.requireUserId()}`);
+    const stats = await apiJson<StatisticsResponse>('/api/statistics/me');
 
     // Check if we have any data to show
     const hasPos = Object.keys(stats.pos_accuracy).length > 0;

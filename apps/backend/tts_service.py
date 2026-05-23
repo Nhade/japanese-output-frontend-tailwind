@@ -7,15 +7,27 @@ from config import ensure_dotenv_loaded
 ensure_dotenv_loaded()
 
 logger = logging.getLogger(__name__)
-client = OpenAI()
+
+# Constructed lazily on first call. Older revisions instantiated `OpenAI()` at
+# module body, which fails on import in environments without `OPENAI_API_KEY`
+# set (CI test runners, dev shells without `.env`) because newer SDK versions
+# raise immediately when no credentials are available.
+_client: OpenAI | None = None
+
+
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        _client = OpenAI()
+    return _client
+
 
 def generate_audio(text: str) -> bytes:
     """
     Generates WAV audio bytes from Japanese text using OpenAI TTS.
     """
     try:
-        # Instructions for natural Japanese conversation
-        response = client.audio.speech.create(
+        response = _get_client().audio.speech.create(
             model="gpt-4o-mini-tts",  # Or "tts-1" / "tts-1-hd" depending on availability/preference, but using user reference
             voice="alloy",
             input=text,

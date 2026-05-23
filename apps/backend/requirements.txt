@@ -1,5 +1,6 @@
 Flask
 Flask-Cors
+itsdangerous
 pwdlib[argon2]
 pykakasi
 google-cloud-translate

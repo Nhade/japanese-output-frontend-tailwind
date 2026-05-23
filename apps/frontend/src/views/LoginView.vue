@@ -24,11 +24,11 @@ async function login() {
   error.value = '';
   isSubmitting.value = true;
   try {
-    const data = await apiJson<{ user_id: string }>('/api/users/login', {
+    const data = await apiJson<{ user_id: string; token: string }>('/api/users/login', {
       method: 'POST',
       body: { username: username.value, password: password.value },
     });
-    auth.login(data.user_id);
+    auth.login(data.user_id, data.token);
     router.push('/');
   } catch (err) {
     error.value = err instanceof Error && err.message ? err.message : t('auth.error_generic');
