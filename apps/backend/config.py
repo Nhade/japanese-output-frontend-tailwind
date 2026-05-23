@@ -26,20 +26,19 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 _DOTENV_LOADED = False
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DEFAULT_DB_PATH = _REPO_ROOT / "data" / "news_corpus.db"
 
 
 def ensure_dotenv_loaded() -> None:
     """Load `.env` once before SDKs read environment variables."""
     global _DOTENV_LOADED
     if not _DOTENV_LOADED:
-        load_dotenv()
+        load_dotenv(_REPO_ROOT / ".env")
         _DOTENV_LOADED = True
 
 
 ensure_dotenv_loaded()
-
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-_DEFAULT_DB_PATH = _REPO_ROOT / "data" / "news_corpus.db"
 
 
 def _bool_env(name: str, default: bool) -> bool:

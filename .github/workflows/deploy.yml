@@ -20,5 +20,26 @@ jobs:
             cd /srv/shiori
             git pull --ff-only
             /srv/shiori/venv/bin/pip install -r /srv/shiori/apps/backend/requirements.txt --quiet
+            /srv/shiori/venv/bin/python - <<'PY'
+            from pathlib import Path
+            import secrets
+
+            env_path = Path(".env")
+            if not env_path.exists() and Path(".env.example").exists():
+                env_path.write_text(Path(".env.example").read_text(encoding="utf-8"), encoding="utf-8")
+
+            lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
+            for index, line in enumerate(lines):
+                if line.startswith("SHIORI_SESSION_SECRET="):
+                    if line.split("=", 1)[1].strip():
+                        break
+                    lines[index] = f"SHIORI_SESSION_SECRET={secrets.token_urlsafe(48)}"
+                    break
+            else:
+                lines.append(f"SHIORI_SESSION_SECRET={secrets.token_urlsafe(48)}")
+
+            env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            env_path.chmod(0o600)
+            PY
             /srv/shiori/venv/bin/python /srv/shiori/scripts/migrate_db.py
             sudo /bin/systemctl restart shiori
