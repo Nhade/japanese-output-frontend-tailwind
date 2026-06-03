@@ -65,6 +65,7 @@ watch(locale, (newLocale) => {
 }
 .main-content.has-chrome {
   padding-top: var(--topnav-h);
+  padding-bottom: var(--bottomnav-h);
 }
 
 .page-enter-active,

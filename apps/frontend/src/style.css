@@ -59,7 +59,18 @@
      TheFooter uses an exact --footer-h so calc() is reliable. */
   --topnav-h: 4rem;
   --footer-h: 3.5rem;
-  --app-chrome-h: calc(var(--topnav-h) + var(--footer-h));
+  --bottomnav-h: 0rem;
+  --app-chrome-h: calc(var(--topnav-h) + var(--footer-h) + var(--bottomnav-h));
+}
+
+@media (max-width: 980px) {
+  :root {
+    --bottomnav-h: 4.25rem;
+    /* The footer is hidden at this breakpoint (replaced by the bottom tab
+       bar), so drop --footer-h from the chrome budget — otherwise views
+       reserve space for a footer that isn't shown. */
+    --app-chrome-h: calc(var(--topnav-h) + var(--bottomnav-h));
+  }
 }
 
 @theme inline {

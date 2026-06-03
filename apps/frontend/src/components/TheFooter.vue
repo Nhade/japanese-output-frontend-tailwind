@@ -68,6 +68,12 @@ const currentYear = computed(() => new Date().getFullYear());
   font-style: normal;
   color: var(--primary);
 }
+/* At <=980px the fixed mobile tab bar owns the bottom of the screen, so
+   the footer would render underneath it. Hide it; --app-chrome-h drops
+   --footer-h at the same breakpoint to keep the layout budget in sync. */
+@media (max-width: 980px) {
+  .site-footer { display: none; }
+}
 @media (max-width: 720px) {
   .site-footer-inner { padding: 14px 16px; gap: 10px; }
   .colophon-text { font-size: 0.78rem; }

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import ExerciseView from '../views/ExerciseView.vue'
+import TodayView from '../views/TodayView.vue'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import MistakesView from '../views/MistakesView.vue'
@@ -10,6 +11,13 @@ const router = createRouter({
   routes: [
     {
       path: '/',
+      name: 'today',
+      component: TodayView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/study/exercise',
+      alias: '/exercise',
       name: 'exercise',
       component: ExerciseView,
       meta: { requiresAuth: true }
@@ -28,12 +36,14 @@ const router = createRouter({
     },
     {
       path: '/mistakes',
+      alias: '/progress/mistakes',
       name: 'mistakes',
       component: MistakesView,
       meta: { requiresAuth: true }
     },
     {
       path: '/statistics',
+      alias: '/progress/statistics',
       name: 'statistics',
       component: () => import('../views/StatisticsView.vue'),
       meta: { requiresAuth: true }
@@ -70,6 +80,7 @@ const router = createRouter({
     },
     {
       path: '/practice',
+      alias: '/study/practice',
       name: 'practice',
       component: () => import('../views/PracticeView.vue'),
       meta: { requiresAuth: true }
