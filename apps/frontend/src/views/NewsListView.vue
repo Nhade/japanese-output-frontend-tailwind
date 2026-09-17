@@ -11,7 +11,7 @@ interface Article {
   publish_timestamp: string | null;
 }
 
-const { t, locale } = useI18n();
+const { locale } = useI18n();
 const router = useRouter();
 
 const articles = ref<Article[]>([]);
@@ -22,34 +22,18 @@ const filterCategory = ref('');
 // Categories encountered in the backend (mirrors NewsListView's prior list).
 const categories = ['国際', '社会', '気象・災害', '科学・文化', '政治', '経済', '暮らし'];
 
-// Issue number = number of distinct calendar days this user has opened the
-// news view. Persists across sessions in localStorage.
-const EDITION_KEY = 'shiori-news-edition';
-const issueNumber = ref<number>(1);
-
-function bumpIssueNumber(): number {
-  const today = new Date().toISOString().slice(0, 10);
-  try {
-    const raw = localStorage.getItem(EDITION_KEY);
-    let state: { count: number; last: string } | null = raw ? JSON.parse(raw) : null;
-    if (!state || typeof state.count !== 'number') {
-      state = { count: 1, last: today };
-    } else if (state.last !== today) {
-      state.count += 1;
-      state.last = today;
-    }
-    localStorage.setItem(EDITION_KEY, JSON.stringify(state));
-    return state.count;
-  } catch {
-    return 1;
+// Ingestion is paused, so the list is a fixed archive rather than a daily
+// edition. The masthead shows the newest article's date instead of today's
+// so it never claims freshness the content doesn't have.
+const newestDate = computed<Date | null>(() => {
+  let newest: Date | null = null;
+  for (const a of articles.value) {
+    if (!a.publish_timestamp) continue;
+    const d = new Date(a.publish_timestamp);
+    if (Number.isNaN(d.getTime())) continue;
+    if (!newest || d > newest) newest = d;
   }
-}
-
-const editionLabel = computed(() => {
-  const h = new Date().getHours();
-  if (h < 12) return t('news.morning_edition');
-  if (h < 17) return t('news.afternoon_edition');
-  return t('news.evening_edition');
+  return newest;
 });
 
 function intlLocale(): string {
@@ -64,17 +48,13 @@ function formatLongDate(d: Date): string {
   }).format(d);
 }
 
-function formatTime(ts: string | null): string {
+// Archive items are months apart, so the full date matters more than the
+// time of day the old masthead used to print.
+function formatArchiveDate(ts: string | null): string {
   if (!ts) return '';
-  const d = new Date(ts);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
-}
-
-function formatShortDate(ts: string | null): string {
-  if (!ts) return '';
-  return new Intl.DateTimeFormat(intlLocale(), { month: 'short', day: 'numeric' }).format(new Date(ts));
+  return new Intl.DateTimeFormat(intlLocale(), {
+    year: 'numeric', month: 'short', day: 'numeric',
+  }).format(new Date(ts));
 }
 
 const filtered = computed(() => {
@@ -121,7 +101,6 @@ function openArticle(a: Article) {
 }
 
 onMounted(() => {
-  issueNumber.value = bumpIssueNumber();
   fetchArticles();
 });
 </script>
@@ -133,13 +112,14 @@ onMounted(() => {
       <header class="masthead">
         <h1 class="masthead-title">{{ $t('nav.news') }}</h1>
         <div class="masthead-meta">
-          <span class="issue">
-            {{ $t('news.issue_no', { n: issueNumber }) }} · {{ editionLabel }}
+          <span class="issue">{{ $t('news.archive_edition') }}</span>
+          <span v-if="newestDate" class="date">
+            {{ $t('news.newest_article', { date: formatLongDate(newestDate) }) }}
           </span>
-          <span class="date">{{ formatLongDate(new Date()) }}</span>
         </div>
       </header>
       <div class="masthead-rule" aria-hidden="true" />
+      <p class="archive-note">{{ $t('news.archive_note') }}</p>
 
       <!-- Filter bar --------------------------------------------- -->
       <div class="filter-bar">
@@ -209,9 +189,7 @@ onMounted(() => {
               {{ leadArticle.title }}
             </h2>
             <div v-if="leadArticle.publish_timestamp" class="lead-meta-row">
-              <span class="lead-date">{{ formatShortDate(leadArticle.publish_timestamp) }}</span>
-              <span class="lead-meta-dot" aria-hidden="true" />
-              <span>{{ formatTime(leadArticle.publish_timestamp) }}</span>
+              <span class="lead-date">{{ formatArchiveDate(leadArticle.publish_timestamp) }}</span>
             </div>
           </div>
         </section>
@@ -219,7 +197,7 @@ onMounted(() => {
         <!-- Today's Edition grid ------------------------------ -->
         <template v-if="restArticles.length">
           <div class="section-title-row">
-            <h3 class="section-title">{{ $t('news.todays_edition') }}</h3>
+            <h3 class="section-title">{{ $t('news.archive_section') }}</h3>
             <span class="section-count">
               {{ $t('news.articles_count', { n: filtered.length }) }}
             </span>
@@ -236,7 +214,7 @@ onMounted(() => {
               <div class="article-meta">
                 <span v-if="a.category" class="article-category" lang="ja">{{ a.category }}</span>
                 <span v-if="a.publish_timestamp" class="article-date">
-                  {{ formatTime(a.publish_timestamp) }}
+                  {{ formatArchiveDate(a.publish_timestamp) }}
                 </span>
               </div>
               <h4 class="article-headline" lang="ja">{{ a.title }}</h4>
@@ -314,7 +292,16 @@ onMounted(() => {
 .masthead-rule {
   height: 1px;
   background: var(--foreground);
-  margin-bottom: 40px;
+  margin-bottom: 18px;
+}
+.archive-note {
+  margin: 0 0 32px;
+  max-width: 62ch;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: color-mix(in oklab, var(--foreground) 62%, transparent);
 }
 @media (max-width: 620px) {
   .masthead { grid-template-columns: 1fr; align-items: start; }

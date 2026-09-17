@@ -29,17 +29,36 @@ jobs:
                 env_path.write_text(Path(".env.example").read_text(encoding="utf-8"), encoding="utf-8")
 
             lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
-            for index, line in enumerate(lines):
-                if line.startswith("SHIORI_SESSION_SECRET="):
-                    if line.split("=", 1)[1].strip():
-                        break
-                    lines[index] = f"SHIORI_SESSION_SECRET={secrets.token_urlsafe(48)}"
-                    break
-            else:
-                lines.append(f"SHIORI_SESSION_SECRET={secrets.token_urlsafe(48)}")
+
+            def ensure(key, make_value):
+                """Fill `key` when it is missing or empty; never overwrite a set value."""
+                for index, line in enumerate(lines):
+                    if line.startswith(f"{key}="):
+                        if line.split("=", 1)[1].strip():
+                            return
+                        lines[index] = f"{key}={make_value()}"
+                        return
+                lines.append(f"{key}={make_value()}")
+
+            ensure("SHIORI_SESSION_SECRET", lambda: secrets.token_urlsafe(48))
+            # gunicorn reads GUNICORN_CMD_ARGS from the systemd EnvironmentFile.
+            # Threaded workers stop one slow LLM call from blocking the whole API,
+            # and the timeout must exceed the daily-review agent's runtime
+            # (measured ~21s for a single mistake; gunicorn's default is 30s).
+            ensure("GUNICORN_CMD_ARGS", lambda: '"-k gthread --threads 4 --timeout 90 --graceful-timeout 30"')
 
             env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
             env_path.chmod(0o600)
             PY
             /srv/shiori/venv/bin/python /srv/shiori/scripts/migrate_db.py
             sudo /bin/systemctl restart shiori
+            # Fail the deploy loudly if the API does not come back within a minute.
+            for attempt in $(seq 1 12); do
+              if curl -sf -o /dev/null http://127.0.0.1:5000/api/news; then
+                echo "API healthy after restart (attempt $attempt)"
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "API did not come back after restart" >&2
+            exit 1

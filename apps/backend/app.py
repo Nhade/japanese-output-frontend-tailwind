@@ -23,7 +23,7 @@ from logging_config import clear_request_id, configure_logging, set_request_id
 configure_logging()
 
 from personal_rag import annotate_feedback, find_top_similar_mistakes
-from translation_service import translate_text
+from translation_service import TranslationError, translate_text
 from tts_service import generate_audio
 
 logger = logging.getLogger(__name__)
@@ -1089,7 +1089,10 @@ def translate_paragraph():
     if not text:
         return jsonify({"error": "Text is required"}), 400
 
-    translated = translate_text(text, target)
+    try:
+        translated = translate_text(text, target)
+    except TranslationError:
+        return jsonify({"error": "Translation is temporarily unavailable. Please try again shortly."}), 503
     return jsonify({"translated_text": translated})
 
 @app.route('/api/tts', methods=['POST'])
