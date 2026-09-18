@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { apiJson } from '../lib/api';
+import { waitUntil } from '../lib/tour';
+import { useTourStore } from '../stores/tour';
 
 interface Article {
   article_id: string;
@@ -100,8 +102,19 @@ function openArticle(a: Article) {
   router.push(`/news/${a.article_id}`);
 }
 
+// Guided tour: open the lead article once the list has loaded.
+const tour = useTourStore();
+tour.registerHandler('news:open-lead', async () => {
+  await waitUntil(() => !loading.value, 10000);
+  if (leadArticle.value) openArticle(leadArticle.value);
+});
+
 onMounted(() => {
   fetchArticles();
+});
+
+onUnmounted(() => {
+  tour.unregisterHandler('news:open-lead');
 });
 </script>
 
@@ -176,7 +189,7 @@ onMounted(() => {
 
       <template v-else>
         <!-- Lead article -------------------------------------- -->
-        <section v-if="leadArticle" class="lead-article" @click="openArticle(leadArticle)">
+        <section v-if="leadArticle" class="lead-article" data-tour="news-lead" @click="openArticle(leadArticle)">
           <div class="lead-headline-wrap">
             <div class="lead-eyebrow">
               <span class="lead-lead">{{ $t('news.top_story') }}</span>

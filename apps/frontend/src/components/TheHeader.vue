@@ -5,13 +5,16 @@ import {
   BarChart3,
   BookOpen,
   Clapperboard,
+  Compass,
   Home,
+  Info,
   Menu,
   MessageCircle,
   PenLine,
   RotateCcw,
   Sparkles,
 } from 'lucide-vue-next';
+import { startTour } from '../lib/tour';
 import { useAuthStore } from '../stores/auth';
 
 import LanguageSelector from './LanguageSelector.vue';
@@ -146,6 +149,12 @@ const mobileMoreItems: NavChild[] = [
     activeNames: ['video-list', 'video-study'],
   },
   ...progressChildren,
+  {
+    to: '/about',
+    key: 'about',
+    icon: Info,
+    activeNames: ['about'],
+  },
 ];
 
 function routeName(): string {
@@ -172,6 +181,11 @@ function onNavFocusOut(event: FocusEvent, id: string) {
 function closeMenus() {
   openTopMenu.value = null;
   mobileMoreOpen.value = false;
+}
+
+function openTour() {
+  closeMenus();
+  startTour();
 }
 
 watch(() => route.fullPath, closeMenus);
@@ -271,6 +285,13 @@ watch(() => route.fullPath, closeMenus);
       </ul>
 
       <div class="nav-tail">
+        <router-link to="/about" class="nav-about" :class="{ 'is-active': route.name === 'about' }">
+          {{ $t('nav.about') }}
+        </router-link>
+        <button v-if="isLoggedIn" type="button" class="nav-tour" :title="$t('nav.tour')" @click="openTour">
+          <Compass class="nav-link-icon" aria-hidden="true" />
+          <span class="nav-tour-label">{{ $t('nav.tour') }}</span>
+        </button>
         <LanguageSelector />
         <router-link v-if="isGuest" to="/register" class="nav-logout nav-upgrade">
           {{ $t('guest.create_account') }}
@@ -327,6 +348,10 @@ watch(() => route.fullPath, closeMenus);
         <component :is="item.icon" class="mobile-more-icon" aria-hidden="true" />
         <span>{{ $t(`nav.${item.key}`) }}</span>
       </router-link>
+      <button type="button" class="mobile-more-link" role="menuitem" @click="openTour">
+        <Compass class="mobile-more-icon" aria-hidden="true" />
+        <span>{{ $t('nav.tour') }}</span>
+      </button>
       <router-link v-if="isGuest" to="/register" class="mobile-more-link" role="menuitem">
         <Menu class="mobile-more-icon" aria-hidden="true" />
         <span>{{ $t('guest.create_account') }}</span>
@@ -551,6 +576,43 @@ watch(() => route.fullPath, closeMenus);
   text-decoration: none;
 }
 
+.nav-about,
+.nav-tour {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--foreground) 55%, transparent);
+  background: none;
+  border: none;
+  padding: 8px 2px;
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.nav-about:hover,
+.nav-tour:hover,
+.nav-about.is-active {
+  color: var(--foreground);
+  border-bottom-color: var(--secondary);
+}
+
+.nav-tour .nav-link-icon {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 1180px) {
+  .nav-tour-label {
+    display: none;
+  }
+}
+
 .mobile-tabs {
   display: none;
 }
@@ -569,7 +631,9 @@ watch(() => route.fullPath, closeMenus);
     margin-left: auto;
   }
 
-  .nav-logout {
+  .nav-logout,
+  .nav-about,
+  .nav-tour {
     display: none;
   }
 

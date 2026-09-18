@@ -27,7 +27,7 @@
       <div v-else-if="hasData" class="space-y-6 animate-fade-in">
 
         <!-- Summary Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" data-tour="stats-summary">
           <!-- Total Exercises -->
           <div
             class="bg-white dark:bg-zinc-900/60 p-6 rounded-xl shadow-sm shadow-zinc-200/50 border border-zinc-200 dark:border-white/10 dark:shadow-none flex flex-col items-center text-center hover:scale-[1.02] transition-all duration-300 dark:hover:bg-white/5 dark:hover:border-white/20">

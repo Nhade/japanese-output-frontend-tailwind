@@ -7,12 +7,14 @@ import TheFooter from './components/TheFooter.vue';
 import ToastNotification from './components/ToastNotification.vue';
 import GuestBanner from './components/GuestBanner.vue';
 import PreviewLimitDialog from './components/PreviewLimitDialog.vue';
+import AboutDrawer from './components/about/AboutDrawer.vue';
 import { UNAUTHORIZED_EVENT } from './lib/api';
+import { installTour, startTour } from './lib/tour';
 import { useAuthStore } from './stores/auth';
 import { useToastStore } from './stores/toast';
 import { useThemeStore } from './stores/theme';
 
-const { locale } = useI18n();
+const { locale, t, te } = useI18n();
 const toastStore = useToastStore();
 const route = useRoute();
 const router = useRouter();
@@ -27,6 +29,16 @@ function onUnauthorized() {
     router.replace({ name: 'preview', query: { expired: '1' } });
   }
 }
+
+// The guided tour needs the router (it moves between pages) and i18n.
+installTour({ router, t, te });
+
+// `/preview` lands on Today with `?tour=1`; strip the flag and start.
+watch(() => route.query.tour, (value) => {
+  if (value !== '1' || !authStore.isAuthenticated) return;
+  const { tour: _tour, ...rest } = route.query;
+  router.replace({ path: route.path, query: rest }).then(() => startTour());
+}, { immediate: true });
 
 // Theme must initialize once at app mount so bare routes (Login,
 // Register — no TheHeader) get the correct theme class too. Previously
@@ -73,6 +85,7 @@ watch(locale, (newLocale) => {
     </main>
     <TheFooter v-if="!hideChrome" />
     <PreviewLimitDialog />
+    <AboutDrawer />
   </div>
 </template>
 

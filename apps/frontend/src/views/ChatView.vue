@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import SettingsModal from '../components/SettingsModal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
+import { useTourStore } from '../stores/tour';
 import { apiJson } from '../lib/api';
 
 interface FeedbackCorrection {
@@ -169,6 +170,14 @@ function toggleFeedback(index: number) {
     msg.showFeedback = !msg.showFeedback;
   }
 }
+
+// Guided tour: send a prepared message (a sentence with a deliberate
+// mistake, or a prompt injection for the safeguard demo).
+const tour = useTourStore();
+tour.registerHandler('chat:send', async (payload) => {
+  await sendMessage(String(payload ?? ''));
+});
+onUnmounted(() => tour.unregisterHandler('chat:send'));
 
 onMounted(async () => {
   const saved = localStorage.getItem(chatStorageKey.value) ?? localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -352,7 +361,7 @@ watch(messages, (val) => {
           </div>
 
           <!-- Composer ------------------------------------------- -->
-          <div class="ch-composer">
+          <div class="ch-composer" data-tour="chat-composer">
             <div class="ch-composer-eyebrow">
               <span class="eyebrow-sm">{{ $t('chat.compose_eyebrow') }}</span>
               <span class="ch-composer-hint">{{ $t('chat.compose_hint') }}</span>

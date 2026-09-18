@@ -67,7 +67,7 @@ const secondaryActions = [
 <template>
   <main class="today-shell ei-shell-bg text-foreground">
     <section class="today-page">
-      <header class="today-hero">
+      <header class="today-hero" data-tour="today-hero">
         <div class="today-hero-copy">
           <div class="eyebrow eyebrow-kohaku">{{ $t('today.eyebrow') }}</div>
           <h1 class="today-h1">{{ $t('today.heading') }}</h1>
@@ -90,7 +90,7 @@ const secondaryActions = [
         </RouterLink>
       </section>
 
-      <section class="today-actions" :aria-label="$t('today.primary_actions')">
+      <section class="today-actions" data-tour="today-actions" :aria-label="$t('today.primary_actions')">
         <RouterLink
           v-for="action in primaryActions"
           :key="action.to"

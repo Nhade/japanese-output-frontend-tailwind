@@ -3,6 +3,8 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { apiBlob, apiJson } from '../lib/api';
+import { waitUntil } from '../lib/tour';
+import { useTourStore } from '../stores/tour';
 
 interface Paragraph {
   text: string;
@@ -231,6 +233,14 @@ function openArticle(entry: ListEntry | null) {
 }
 
 // -- lifecycle ----------------------------------------------------
+// Guided tour: translate the first paragraph once the article has loaded.
+const tour = useTourStore();
+tour.registerHandler('reader:translate-first', async () => {
+  await waitUntil(() => !loading.value && !!article.value, 10000);
+  const first = article.value?.paragraphs[0];
+  if (first && !first.showTranslation) await toggleTranslation(0);
+});
+
 onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
@@ -240,6 +250,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  tour.unregisterHandler('reader:translate-first');
   window.removeEventListener('scroll', onScroll);
   if (currentAudio.value) {
     currentAudio.value.pause();
@@ -314,6 +325,7 @@ watch(() => route.params.id, async (newId) => {
               v-for="(para, i) in article.paragraphs"
               :key="i"
               :data-p-idx="i"
+              :data-tour="i === 0 ? 'reader-paragraph' : undefined"
               class="paragraph-wrap"
               :class="{
                 'is-active': playingIndex === i || para.showTranslation || hoveredIndex === i,
