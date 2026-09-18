@@ -3,8 +3,10 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import { useAuthStore } from '../stores/auth';
+import { useTourStore } from '../stores/tour';
 import { apiJson } from '../lib/api';
 import { safeMarkdown } from '../lib/markdown';
+import { waitUntil } from '../lib/tour';
 
 interface SimilarPast {
   log_id: string;
@@ -190,8 +192,18 @@ function handleDialogKeydown(e: KeyboardEvent) {
 }
 
 // -------- Lifecycle ----------------------------------------------
+// Guided tour: generate (or reopen) the review, then resolve once the
+// visitor closes the letter so the tour can resume behind it.
+const tour = useTourStore();
+async function tourGenerateReview() {
+  if (dailyReview.value) openReview();
+  else await generateReview();
+  await waitUntil(() => !showReviewDialog.value, 10 * 60 * 1000);
+}
+
 onMounted(async () => {
   window.addEventListener('keydown', handleDialogKeydown);
+  tour.registerHandler('mistakes:generate-review', tourGenerateReview);
   if (!auth.user_id) {
     error.value = t('mistakes.login_required');
     isLoading.value = false;
@@ -207,6 +219,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  tour.unregisterHandler('mistakes:generate-review');
   window.removeEventListener('keydown', handleDialogKeydown);
   if (stepInterval) clearInterval(stepInterval);
 });
@@ -237,6 +250,7 @@ onUnmounted(() => {
         v-if="!isLoading && mistakes.length > 0"
         type="button"
         class="review-card"
+        data-tour="mistakes-review"
         :class="{ 'is-ready': !!dailyReview, 'is-working': isAgentWorking }"
         :disabled="isAgentWorking"
         @click="onReviewCardClick"
@@ -330,7 +344,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Spread entries ------------------------------------ -->
-      <div v-else class="errata-list">
+      <div v-else class="errata-list" data-tour="mistakes-list">
         <article
           v-for="(m, i) in filtered"
           :key="m.log_id"

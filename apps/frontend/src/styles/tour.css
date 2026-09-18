@@ -1,0 +1,176 @@
+/* ------------------------------------------------------------------ */
+/*  Guided tour — driver.js popover restyled to the editorial tokens   */
+/*  (paper surface, serif copy, small-caps sans controls).             */
+/* ------------------------------------------------------------------ */
+
+.driver-popover.shiori-tour {
+  --driver-popover-font-family: var(--font-serif);
+  min-width: 300px;
+  max-width: 380px;
+  padding: 22px 24px 18px;
+  color: var(--foreground);
+  background: var(--surface-container-lowest);
+  border: 1px solid color-mix(in oklab, var(--foreground) 12%, transparent);
+  border-radius: 4px;
+  box-shadow:
+    0 32px 64px -24px color-mix(in oklab, var(--foreground) 22%, transparent),
+    0 4px 12px -6px color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+
+.shiori-tour .driver-popover-title {
+  padding-right: 28px;
+  font-family: var(--font-serif);
+  font-size: 1.28rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--foreground);
+}
+
+.shiori-tour .driver-popover-description {
+  margin-top: 8px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: color-mix(in oklab, var(--foreground) 68%, transparent);
+}
+
+.shiori-tour .driver-popover-close-btn {
+  color: color-mix(in oklab, var(--foreground) 45%, transparent);
+  top: 8px;
+  right: 8px;
+}
+
+.shiori-tour .driver-popover-close-btn:hover,
+.shiori-tour .driver-popover-close-btn:focus {
+  color: var(--foreground);
+}
+
+/* Arrow colour must match the paper surface; driver only paints one side. */
+.shiori-tour .driver-popover-arrow-side-left { border-left-color: var(--surface-container-lowest); }
+.shiori-tour .driver-popover-arrow-side-right { border-right-color: var(--surface-container-lowest); }
+.shiori-tour .driver-popover-arrow-side-top { border-top-color: var(--surface-container-lowest); }
+.shiori-tour .driver-popover-arrow-side-bottom { border-bottom-color: var(--surface-container-lowest); }
+
+.shiori-tour .driver-popover-footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.shiori-tour .driver-popover-progress-text {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--secondary);
+}
+
+.shiori-tour .driver-popover-footer-btn {
+  font-family: var(--font-sans);
+  font-size: 0.64rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 7px 12px;
+  color: var(--foreground);
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--foreground) 22%, transparent);
+  border-radius: 2px;
+  text-shadow: none;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.shiori-tour .driver-popover-footer-btn:hover,
+.shiori-tour .driver-popover-footer-btn:focus {
+  background: var(--surface-container-low);
+}
+
+.shiori-tour .driver-popover-next-btn {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.shiori-tour .driver-popover-next-btn:hover,
+.shiori-tour .driver-popover-next-btn:focus {
+  background: var(--primary-container);
+  border-color: var(--primary-container);
+}
+
+.shiori-tour .driver-popover-navigation-btns button + button {
+  margin-left: 8px;
+}
+
+/* Extra controls the runner injects under the description ------------- */
+.shiori-tour-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 18px;
+  margin-top: 14px;
+}
+
+.shiori-tour-btn {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: color-mix(in oklab, var(--foreground) 70%, transparent);
+  background: none;
+  border: none;
+  border-bottom: 2px solid var(--secondary);
+  padding: 2px 0;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.shiori-tour-btn:hover {
+  color: var(--foreground);
+}
+
+.shiori-tour-btn.is-primary {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.shiori-tour-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.shiori-tour-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: var(--surface-container-low);
+  border-left: 2px solid var(--secondary);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.shiori-tour-toggle input {
+  margin-top: 3px;
+  accent-color: var(--primary);
+}
+
+.shiori-tour-toggle-hint {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.82rem;
+  color: color-mix(in oklab, var(--foreground) 60%, transparent);
+}
+
+@media (max-width: 520px) {
+  .driver-popover.shiori-tour {
+    min-width: 0;
+    max-width: calc(100vw - 24px);
+  }
+}

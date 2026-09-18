@@ -52,7 +52,7 @@ async function start() {
 
   try {
     await auth.startGuestSession();
-    router.replace({ name: 'today' });
+    router.replace({ name: 'today', query: { tour: '1' } });
   } catch (err) {
     failed.value = true;
     if (err instanceof ApiError) {

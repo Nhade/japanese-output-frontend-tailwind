@@ -124,6 +124,13 @@ async function login() {
           {{ $t('guest.login_cta') }} →
         </router-link>
       </div>
+
+      <div class="auth-toggle">
+        <span>{{ $t('about.login_line') }}</span>
+        <router-link to="/about" class="auth-toggle-link">
+          {{ $t('about.login_cta') }} →
+        </router-link>
+      </div>
     </form>
   </AuthLayout>
 </template>

@@ -23,7 +23,9 @@
         "practice_desc": "Final-exam MCQs and lesson drills",
         "mistakes_desc": "Revisit recent misses",
         "statistics_desc": "Accuracy and activity",
-        "more": "More"
+        "more": "More",
+        "about": "About",
+        "tour": "Tour"
     },
     "common": {
         "language": "Language",
@@ -501,5 +503,194 @@
         "limit_guest_forbidden_title": "Not available in the preview",
         "limit_guest_forbidden_body": "Importing videos pulls a transcript and generates exercises with the LLM, so it is reserved for account holders.",
         "limit_keep_browsing": "Keep browsing"
+    },
+    "about": {
+        "eyebrow": "About Shiori",
+        "title": "Real Japanese, feedback that explains itself.",
+        "lede": "Shiori (栞, “bookmark”) is a Japanese learning workspace built around reading real text and getting corrections that say why. It started as a course project on combining deterministic language processing with large language models, and it has stayed a place to try ideas about what an AI tutor should and should not do.",
+        "cta_guest": "Explore as a guest",
+        "cta_signin": "Sign in",
+        "cta_tour": "Take the tour",
+        "cta_source": "Source on GitHub",
+        "cta_today": "Back to Today",
+        "cta_register": "Create account",
+        "contents": "Contents",
+        "try": "Try it",
+        "how": "How it works",
+        "note_label": "Under the hood",
+        "closing_title": "Where to go next",
+        "closing_body": "The guest preview has sample history loaded so every page has something to show. If you want your own work kept, create an account: it takes a username and a password, nothing else.",
+        "drawer_eyebrow": "Learn more",
+        "drawer_full": "Read the full page",
+        "drawer_close": "Close",
+        "login_line": "Curious what this is?",
+        "login_cta": "About Shiori",
+        "sections": {
+            "overview": {
+                "title": "The loop",
+                "lede": "Read something real, answer a short prompt, get an explanation, and let your mistakes shape what comes next. Every feature here is one turn of that loop.",
+                "b1": "Reading material comes from real NHK articles, segmented into paragraphs and sentences.",
+                "b2": "Exercises are generated from those sentences and graded with rules first, a language model second.",
+                "b3": "A learner profile keeps accuracy by part of speech and JLPT level and rotates a focus area, which the tutor and the daily review read.",
+                "note": "Vue 3 single-page app, Flask API, SQLite. The model layer is provider-agnostic. Frontend on Cloudflare Pages, API on a small Hetzner VM behind Caddy."
+            },
+            "exercise": {
+                "title": "Daily exercise",
+                "lede": "One fill-in-the-blank prompt at a time, cut from a real sentence, with a Chinese gloss as the hint.",
+                "b1": "Blanks are chosen deterministically: morphological analysis with janome picks a particle, verb form, or vocabulary item, cross-checked against a JLPT word list.",
+                "b2": "Grading is hybrid. Both answers are normalised to kana with pykakasi and compared exactly; only a miss goes to the language model.",
+                "b3": "The model classifies the miss (typo, vocabulary, particle, conjugation, unnatural) and writes a short note. Each type carries a fixed deduction, so the score is rule-based even when the judgement is not.",
+                "note": "A second, longer call writes the full explanation on request. The grader runs on the balanced tier in JSON mode with retries."
+            },
+            "tutor": {
+                "title": "Tutor's desk",
+                "lede": "Write in Japanese and get a reply in Japanese, with corrections in the margin instead of a red pen over everything.",
+                "b1": "The prompt is built from your learner profile: estimated level, weak points, the current focus, and how strict you asked the feedback to be.",
+                "b2": "Corrections are capped per turn and quote only the minimal wrong part, so one message never turns into a lecture.",
+                "b3": "The reply and the corrections come back as one JSON object, which is what lets the page render them as separate layers.",
+                "note": "A LangGraph pipeline: safety check, context assembly, model call. The last twenty turns travel with each message."
+            },
+            "safety": {
+                "title": "Guardrails",
+                "lede": "Free text reaches a classifier before it reaches the tutor.",
+                "b1": "A separate safeguard model checks every message and answer against a written policy: prompt injection, role changes, off-topic requests, and attempts to break the output format.",
+                "b2": "A violation gets a polite refusal in Japanese and a note explaining why; nothing else is generated.",
+                "b3": "The tour lets you try it with a classic “ignore all previous instructions” message.",
+                "note": "The safeguard is a small policy model on Groq, kept separate from the tiered registry so it can be swapped or disabled independently."
+            },
+            "review": {
+                "title": "Daily review letter",
+                "lede": "Once you have made a few mistakes today, three agents write you a short letter about them.",
+                "b1": "The Observer reads today's misses and names the patterns.",
+                "b2": "The Tutor drafts a supportive review around those patterns.",
+                "b3": "The Editor polishes it into a structured note with examples.",
+                "note": "Sequential LangGraph agents on the highest-quality tier; the whole letter takes about twenty seconds. If a later step fails, the best earlier draft is returned."
+            },
+            "memory": {
+                "title": "Learner profile and mistake memory",
+                "lede": "The parts that remember you: a profile the tutor reads, and a history the grader can search.",
+                "b1": "The profile tracks accuracy by part of speech and JLPT level, derives weak and strong points, and rotates a focus area after five attempts.",
+                "b2": "Each miss can be embedded with a multilingual sentence model, so a new mistake can be matched against your own earlier ones and annotated when a pattern repeats.",
+                "b3": "Retrieval runs over your history, not over textbooks: the model already knows the grammar, but only your log knows what you keep getting wrong.",
+                "note": "Embeddings are multilingual-e5 vectors stored next to each answer; similarity is a dot product in SQLite plus NumPy. Pattern notes appear once your history has been embedded."
+            },
+            "reading": {
+                "title": "Reading room",
+                "lede": "Real articles, one paragraph at a time, with translation and audio in the margin.",
+                "b1": "Articles are split into paragraphs; each one can be translated or read aloud on its own.",
+                "b2": "Translation goes through Google Cloud Translation, with the language model as a fallback if that fails.",
+                "b3": "Audio is generated on demand with a text-to-speech model.",
+                "note": "New articles are not being added at the moment, so the reading room is a fixed archive kept for practice."
+            },
+            "video": {
+                "title": "Listening",
+                "lede": "A YouTube video becomes a transcript, cloze prompts at the right timestamp, and comprehension questions.",
+                "b1": "The transcript is fetched and sentences are turned into timestamped blanks with the same cloze rules as the daily exercise.",
+                "b2": "Comprehension questions and their explanations are generated by the model; importing new videos is reserved for account holders.",
+                "note": "Import is slow and the transcript fetch is often blocked from cloud servers, which is why the preview shows existing videos only."
+            },
+            "practice": {
+                "title": "Textbook drills",
+                "lede": "The one corner of Shiori that never asks a model at answer time.",
+                "b1": "Lesson decks are fill-in-the-blank and vocabulary drills built from CSVs curated from the course textbook.",
+                "b2": "The final-exam deck is a multiple-choice bank verified against the printed answer keys, with model-generated practice items behind a toggle.",
+                "b3": "Deterministic checking, kana readings accepted, misses reviewed at the end of a session.",
+                "note": "Content is in Traditional Chinese, matching the textbook. A separate note on how the practice questions were generated is in the works."
+            },
+            "models": {
+                "title": "Models and tiers",
+                "lede": "No single model: three tiers, each mapped to whichever provider fits.",
+                "b1": "Quality for the daily review, balanced for grading and chat, fast reserved for cheap classification.",
+                "b2": "Each tier can point at OpenAI-compatible endpoints, Anthropic, Gemini, or a local Ollama, so the app runs against a lab server or a cloud API without code changes.",
+                "b3": "JSON-mode calls retry with cleanup on malformed output; sampling temperature is only set where determinism matters, since reasoning models reject it.",
+                "note": "Today: Gemini Flash on the balanced tier, GPT-5.5 on the quality tier, a Groq policy model for the safeguard, OpenAI for speech."
+            },
+            "preview": {
+                "title": "About this preview",
+                "lede": "Guests get a real but temporary desk.",
+                "b1": "A guest is a 24-hour account with a curated sample history loaded, so the review pages have something to show within seconds.",
+                "b2": "Each guest has a fixed budget of model calls, and everything a guest does is deleted after seven days.",
+                "b3": "Creating an account from the preview keeps your own answers and drops the sample rows.",
+                "note": "Nothing beyond the guest's own answers is stored; there is no email, tracking, or third-party analytics."
+            }
+        }
+    },
+    "tour": {
+        "buttons": {
+            "next": "Next",
+            "prev": "Back",
+            "done": "Finish",
+            "learn_more": "Learn more",
+            "working": "Working…",
+            "done_action": "Done ✓",
+            "action_failed": "That failed, try again",
+            "assisted_label": "Assist me: fill in the Japanese for me",
+            "assisted_hint": "The tour switches prompts to multiple choice, opens translations, and offers one-click sample inputs."
+        },
+        "steps": {
+            "welcome": {
+                "title": "Welcome to Shiori",
+                "body": "This is a guest desk with sample history loaded, so every page has something to show. The tour takes about five minutes and touches each part of the loop. Nothing you do here is kept beyond 7 days."
+            },
+            "today_actions": {
+                "title": "Four ways in",
+                "body": "Daily exercise, textbook practice, reading, and the tutor. Every step of this tour has a “Learn more” that opens the technical notes beside the page."
+            },
+            "exercise_prompt": {
+                "title": "A sentence from real news",
+                "body": "The blank was cut from an NHK sentence by morphological analysis, not by a model. The hint is a Chinese gloss of the whole sentence.",
+                "body_assisted": "The blank was cut from an NHK sentence by morphological analysis, not by a model. We switched the prompt to multiple choice so you do not need to type Japanese."
+            },
+            "exercise_answer": {
+                "title": "Answer it, or miss on purpose",
+                "body": "Use the button below to submit a deliberately wrong choice. A miss is where the interesting part happens.",
+                "action": "Try a wrong answer"
+            },
+            "exercise_feedback": {
+                "title": "How the miss was graded",
+                "body": "The answer was first compared by rules (kana-normalised exact match). Because it missed, the model classified the error and wrote the note in the margin. The deduction comes from the error type, not from the model.",
+                "action": "Explain in full"
+            },
+            "mistakes": {
+                "title": "Your errata",
+                "body": "Every miss lands here with its correction and note. The badges mark the sample history this preview came with; the filter groups misses by error type."
+            },
+            "review": {
+                "title": "The daily review letter",
+                "body": "Three agents in sequence (Observer, Tutor, Editor) write a short letter about today's misses on the highest-quality model. It takes about twenty seconds.",
+                "action": "Generate the review"
+            },
+            "tutor": {
+                "title": "The tutor's desk",
+                "body": "Write in Japanese; corrections appear as a margin note under your message, limited to a few per turn and shaped by your profile. The button sends a sentence with a deliberate particle mistake.",
+                "action": "Send a sentence with a mistake"
+            },
+            "safety": {
+                "title": "Try to break it",
+                "body": "Every message passes a separate safeguard classifier first. Send a prompt injection and watch it get refused.",
+                "action": "Try a prompt injection"
+            },
+            "reading": {
+                "title": "The reading room",
+                "body": "Real NHK articles, paragraph by paragraph. The archive is fixed for now: new articles are not being added.",
+                "action": "Open the lead article"
+            },
+            "reader": {
+                "title": "Margin tools",
+                "body": "Each paragraph can be translated or read aloud on its own. Translation goes through Google Cloud Translation with a model fallback; audio is text-to-speech.",
+                "action": "Translate this paragraph"
+            },
+            "progress": {
+                "title": "What the system remembers",
+                "body": "Accuracy by part of speech and level, an activity log, and a rotating focus area that the tutor and the review read from."
+            },
+            "end": {
+                "title": "That's the loop",
+                "body": "Reading, a prompt, an explanation, and a memory of what went wrong. The About page has the technical notes in one place; the source is on GitHub. Creating an account keeps your own work.",
+                "about": "Read the About page",
+                "github": "Source on GitHub",
+                "account": "Create account"
+            }
+        }
     }
 }

@@ -14,8 +14,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 import { useToastStore } from '@/stores/toast';
+import { useTourStore } from '@/stores/tour';
 import { apiJson } from '@/lib/api';
 import { safeMarkdown } from '@/lib/markdown';
+import { waitUntil } from '@/lib/tour';
 
 interface Exercise {
   exercise_id: string;
@@ -302,13 +304,52 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+// ---- Guided-tour handlers ------------------------------------------------
+// The tour drives this page for visitors who cannot type Japanese: switch to
+// multiple choice, submit a deliberately wrong choice (so the grader and the
+// margin note show up), and open the full explanation.
+const tour = useTourStore();
+
+async function waitForExercise() {
+  await waitUntil(() => !isLoading.value && !!exercise.value, 10000);
+}
+
+async function tourSwitchToMcq() {
+  if (exerciseMode.value !== 'mcq') switchMode('mcq');
+  await waitForExercise();
+}
+
+async function tourAnswerWrong() {
+  await tourSwitchToMcq();
+  if (!exercise.value || feedback.value) return;
+  const correct = exercise.value.correct_answer;
+  const wrong = choices.value.find((c) => c !== correct) ?? choices.value[0];
+  if (!wrong) return;
+  selectedChoice.value = wrong;
+  await handleAnswerSubmit();
+}
+
+async function tourExplainDetailed() {
+  if (!feedback.value || feedback.value.is_correct) return;
+  if (detailedFeedback.value) showDetailModal.value = true;
+  else await fetchDetailedFeedback();
+  // Resolve once the visitor closes the explanation, so the tour can resume.
+  await waitUntil(() => !showDetailModal.value, 10 * 60 * 1000);
+}
+
 onMounted(() => {
   fetchNewExercise();
   window.addEventListener('keydown', handleKeydown);
+  tour.registerHandler('exercise:mcq', tourSwitchToMcq);
+  tour.registerHandler('exercise:wrong-answer', tourAnswerWrong);
+  tour.registerHandler('exercise:explain-detailed', tourExplainDetailed);
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
+  tour.unregisterHandler('exercise:mcq');
+  tour.unregisterHandler('exercise:wrong-answer');
+  tour.unregisterHandler('exercise:explain-detailed');
 });
 </script>
 
@@ -349,6 +390,7 @@ onUnmounted(() => {
           <section
             :key="'verso-' + exercise.exercise_id + '-' + blankState"
             class="verso anim-page-turn"
+            data-tour="exercise-prompt"
           >
             <div class="eyebrow verso-eyebrow">
               {{ feedback ? $t('exercise.eyebrow_your_reading') : $t('exercise.eyebrow_fill_blank') }}
@@ -389,6 +431,7 @@ onUnmounted(() => {
           <section
             :key="'recto-' + exercise.exercise_id + '-' + blankState + '-' + exerciseMode"
             class="recto"
+            data-tour="exercise-answer"
             :class="{ 'is-feedback': !!feedback }"
           >
             <!-- Typing initial -->

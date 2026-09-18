@@ -92,6 +92,13 @@ const router = createRouter({
       name: 'preview',
       component: () => import('../views/PreviewEntryView.vue'),
       meta: { hideChrome: true }
+    },
+    {
+      // Public: what Shiori is and how each part works. Target of the
+      // tour's "Learn more" links and the landing page for cold visits.
+      path: '/about',
+      name: 'about',
+      component: () => import('../views/AboutView.vue')
     }
   ]
 })
@@ -104,8 +111,16 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    // A guest whose preview expired gets a fresh one; everyone else signs in.
-    next(authStore.lastSessionWasGuest ? { name: 'preview', query: { expired: '1' } } : { name: 'login' })
+    if (authStore.lastSessionWasGuest) {
+      // A guest whose preview expired gets a fresh one.
+      next({ name: 'preview', query: { expired: '1' } })
+    } else if (to.name === 'today') {
+      // A cold visit to the root lands on the public About page, which
+      // offers the guest preview and sign-in, instead of a login wall.
+      next({ name: 'about' })
+    } else {
+      next({ name: 'login' })
+    }
   } else {
     next()
   }
