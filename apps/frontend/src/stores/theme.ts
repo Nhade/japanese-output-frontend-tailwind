@@ -6,17 +6,16 @@ export const useThemeStore = defineStore('theme', () => {
 
     // Initialize theme
     const initTheme = () => {
-        // 1. Check localStorage
-        const storedTheme = localStorage.getItem('theme')
-        if (storedTheme) {
-            theme.value = storedTheme
-        } else {
-            // 2. Fallback to system preference
-            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                theme.value = 'dark'
-            } else {
-                theme.value = 'light'
-            }
+        // Dark mode is disabled until a dark palette exists (see
+        // shiori-design-system.md §7). Only a few legacy views carry `dark:`
+        // utilities, so honouring the OS preference produced half-styled
+        // pages (near-white headings on the paper background). Always render
+        // light and drop any previously persisted preference.
+        theme.value = 'light'
+        try {
+            localStorage.removeItem('theme')
+        } catch {
+            /* storage may be unavailable (private mode) — non-fatal */
         }
         applyTheme()
     }

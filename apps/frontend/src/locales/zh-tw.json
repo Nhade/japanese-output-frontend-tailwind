@@ -207,12 +207,7 @@
         "date": "日期",
         "filter_all": "全部",
         "clear_filters": "清除篩選",
-        "morning_edition": "早報",
-        "afternoon_edition": "午報",
-        "evening_edition": "晚報",
-        "issue_no": "第 {n} 期",
         "top_story": "頭條報導",
-        "todays_edition": "今日版面",
         "articles_count": "共 {n} 篇",
         "min_read": "約 {n} 分鐘",
         "empty_desk": "今日書桌靜悄悄，沒有符合條件的文章。",
@@ -224,7 +219,11 @@
         "hide": "隱藏",
         "stop": "停止",
         "end_of_article": "文章終了",
-        "end_note": "本篇為學習用途編輯。請朗讀與精讀並行，逐步培養語感。"
+        "end_note": "本篇為學習用途編輯。請朗讀與精讀並行，逐步培養語感。",
+        "archive_edition": "典藏版",
+        "newest_article": "最新文章：{date}",
+        "archive_note": "目前暫停新增文章，這些典藏文章保留供閱讀練習使用。",
+        "archive_section": "典藏文章"
     },
     "video": {
         "title": "影片學習",

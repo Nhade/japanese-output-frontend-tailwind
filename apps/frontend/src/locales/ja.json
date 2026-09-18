@@ -207,12 +207,7 @@
         "date": "日付",
         "filter_all": "すべて",
         "clear_filters": "絞り込みを解除",
-        "morning_edition": "朝刊",
-        "afternoon_edition": "昼刊",
-        "evening_edition": "夕刊",
-        "issue_no": "第{n}号",
         "top_story": "本日の一面",
-        "todays_edition": "本日の記事",
         "articles_count": "記事 {n} 本",
         "min_read": "約{n}分",
         "empty_desk": "今日の机は静かです。条件に一致する記事はありません。",
@@ -224,7 +219,11 @@
         "hide": "隠す",
         "stop": "停止",
         "end_of_article": "記事 了",
-        "end_note": "本稿は学習用に編集されたものです。音読と精読を重ねて、語感を身につけてください。"
+        "end_note": "本稿は学習用に編集されたものです。音読と精読を重ねて、語感を身につけてください。",
+        "archive_edition": "アーカイブ版",
+        "newest_article": "最新の記事：{date}",
+        "archive_note": "現在、新しい記事の追加は停止しています。このアーカイブは読解練習のために残しています。",
+        "archive_section": "アーカイブの記事"
     },
     "video": {
         "title": "動画学習",

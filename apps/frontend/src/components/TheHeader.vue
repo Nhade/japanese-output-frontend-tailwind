@@ -14,7 +14,6 @@ import {
 } from 'lucide-vue-next';
 import { useAuthStore } from '../stores/auth';
 
-import ThemeToggle from './ThemeToggle.vue';
 import LanguageSelector from './LanguageSelector.vue';
 
 const authStore = useAuthStore();
@@ -160,8 +159,13 @@ function primaryTarget(item: NavItem): string {
   return item.to ?? item.children?.[0]?.to ?? '/';
 }
 
-function toggleTopMenu(id: string) {
-  openTopMenu.value = openTopMenu.value === id ? null : id;
+// Keyboard users open a group by focusing its trigger; close it once focus
+// leaves the whole <li> (trigger + menu), not when it moves between them.
+function onNavFocusOut(event: FocusEvent, id: string) {
+  const host = event.currentTarget as HTMLElement | null;
+  const next = event.relatedTarget as Node | null;
+  if (host && next && host.contains(next)) return;
+  if (openTopMenu.value === id) openTopMenu.value = null;
 }
 
 function closeMenus() {
@@ -188,6 +192,7 @@ watch(() => route.fullPath, closeMenus);
           :class="{ 'has-menu': item.children }"
           @mouseenter="item.children && (openTopMenu = item.id)"
           @mouseleave="item.children && (openTopMenu = null)"
+          @focusout="item.children && onNavFocusOut($event, item.id)"
         >
           <router-link
             v-if="!item.children"
@@ -200,17 +205,23 @@ watch(() => route.fullPath, closeMenus);
           </router-link>
 
           <template v-else>
-            <button
-              type="button"
+            <!--
+              Hover reveals the group menu; clicking the trigger navigates to
+              the group's first page instead of toggling, so a click that
+              follows the hover no longer closes the menu that just opened.
+              Focus opens it for keyboard users; focusout on the <li> closes it.
+            -->
+            <router-link
+              :to="primaryTarget(item)"
               class="nav-link nav-menu-trigger"
               :class="{ 'is-active': isActive(item), 'is-open': openTopMenu === item.id }"
               :aria-expanded="openTopMenu === item.id"
               aria-haspopup="menu"
-              @click="toggleTopMenu(item.id)"
+              @focus="openTopMenu = item.id"
             >
               <component :is="item.icon" class="nav-link-icon" aria-hidden="true" />
               <span>{{ $t(`nav.${item.key}`) }}</span>
-            </button>
+            </router-link>
 
             <div
               v-if="openTopMenu === item.id"
@@ -260,7 +271,6 @@ watch(() => route.fullPath, closeMenus);
 
       <div class="nav-tail">
         <LanguageSelector />
-        <ThemeToggle />
         <button
           v-if="isLoggedIn"
           type="button"
