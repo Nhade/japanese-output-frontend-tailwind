@@ -1,13 +1,19 @@
 """Japanese → target-language translation with a resilient fallback chain.
 
-Primary: Google Cloud Translation v2 (service-account credentials via
-``GOOGLE_APPLICATION_CREDENTIALS``). Fallback: the BALANCED LLM tier. The
-fallback exists because the Google path fails outright when the project's
-quota or billing lapses (observed as ``403 User Rate Limit Exceeded``), and
-the reader's Translate button must keep working through that.
+Order of preference:
 
-After a Google failure the service skips Google for a cooldown window so a
-quota outage doesn't add a failing round-trip (plus a stack trace) to every
+1. Google Cloud Translation v2 (Basic) with an API key, ``GOOGLE_TRANSLATE_API_KEY``.
+   A plain REST call, so translation can bill to the same GCP project as the
+   Gemini tier without a service-account file on the box.
+2. Google Cloud Translation v2 through Application Default Credentials,
+   ``GOOGLE_APPLICATION_CREDENTIALS`` (the original service-account route).
+3. The BALANCED LLM tier.
+
+The LLM fallback exists because the Google path fails outright when the
+project's quota or billing lapses (observed as ``403 User Rate Limit
+Exceeded``), and the reader's Translate button must keep working through
+that. After a Google failure the service skips Google for a cooldown window
+so an outage doesn't add a failing round-trip (plus a stack trace) to every
 paragraph translation.
 """
 import html
@@ -15,6 +21,7 @@ import logging
 import os
 import time
 
+import requests
 from google.cloud import translate_v2 as translate
 
 from ai_core import Tier, query_llm
@@ -30,30 +37,35 @@ class TranslationError(RuntimeError):
 
 
 GOOGLE_COOLDOWN_SECONDS = 300
+GOOGLE_V2_ENDPOINT = "https://translation.googleapis.com/language/translate/v2"
+GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY", "").strip()
 _google_paused_until = 0.0
 
-try:
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS']
-except KeyError:
-    logger.warning("Google Cloud Translation API credentials not found. Falling back to the LLM translator.")
+translate_client = None
+if GOOGLE_TRANSLATE_API_KEY:
+    logger.info("Translation: Google Cloud Translation v2 via API key")
+else:
+    if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+        logger.warning(
+            "No Google translation credentials (GOOGLE_TRANSLATE_API_KEY or GOOGLE_APPLICATION_CREDENTIALS); "
+            "falling back to the LLM translator."
+        )
+    try:
+        translate_client = translate.Client()
+    except Exception as e:
+        logger.warning(f"Translation client failed to initialize: {e}")
+        translate_client = None
 
-try:
-    translate_client = translate.Client()
-except Exception as e:
-    logger.warning(f"Translation client failed to initialize: {e}")
-    translate_client = None
 
-
-# BCP-47-ish codes the frontend sends (lower-cased) → names the LLM prompt uses.
+# The frontend's selectable locales (en / ja / zh-tw) plus the aliases the
+# reader sends for Traditional Chinese. Unknown codes pass through unchanged
+# so the LLM still sees what was asked for.
 _LANGUAGE_NAMES = {
     "zh-tw": "Traditional Chinese (繁體中文)",
     "zh-hant": "Traditional Chinese (繁體中文)",
     "zh": "Traditional Chinese (繁體中文)",
-    "zh-cn": "Simplified Chinese (简体中文)",
-    "zh-hans": "Simplified Chinese (简体中文)",
     "en": "English",
     "ja": "Japanese",
-    "ko": "Korean",
 }
 
 
@@ -61,16 +73,40 @@ def _language_name(target: str) -> str:
     return _LANGUAGE_NAMES.get(target.lower(), target)
 
 
+def _google_v2_with_api_key(text: str, target: str) -> str:
+    # The key travels in a header, never in the URL, so request/exception
+    # messages (which quote the URL) can be logged without leaking it.
+    response = requests.post(
+        GOOGLE_V2_ENDPOINT,
+        headers={"x-goog-api-key": GOOGLE_TRANSLATE_API_KEY},
+        json={"q": text, "source": "ja", "target": target, "format": "text"},
+        timeout=15,
+    )
+    if response.status_code >= 400:
+        try:
+            detail = response.json().get("error", {}).get("message", "")
+        except ValueError:
+            detail = ""
+        raise RuntimeError(f"Google Translation HTTP {response.status_code} {detail}".strip())
+    return response.json()["data"]["translations"][0]["translatedText"]
+
+
 def _translate_with_google(text: str, target: str) -> str | None:
     """Return Google's translation, or None when unavailable or failing."""
     global _google_paused_until
 
-    if translate_client is None or time.monotonic() < _google_paused_until:
+    if time.monotonic() < _google_paused_until:
         return None
 
     try:
-        result = translate_client.translate(text, target_language=target, source_language='ja')
-        return html.unescape(result['translatedText'])
+        if GOOGLE_TRANSLATE_API_KEY:
+            translated = _google_v2_with_api_key(text, target)
+        elif translate_client is not None:
+            result = translate_client.translate(text, target_language=target, source_language='ja')
+            translated = result['translatedText']
+        else:
+            return None
+        return html.unescape(translated)
     except Exception as exc:
         _google_paused_until = time.monotonic() + GOOGLE_COOLDOWN_SECONDS
         logger.warning(

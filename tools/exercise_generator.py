@@ -3,18 +3,18 @@ import uuid
 import random
 import re
 from datetime import datetime
-from google.cloud import translate_v2 as translate
 
 from config import settings
 from services.cloze import make_cloze
+from translation_service import translate_text
 
 def translate_to_traditional_chinese(text: str) -> str:
     """
-    Translates a string from Japanese to Traditional Chinese with Google's Cloud Translation API.
+    Japanese -> Traditional Chinese through translation_service, so hint
+    generation follows the same credential order (API key, service account,
+    LLM fallback) as the reader's Translate button.
     """
-    translate_client = translate.Client()
-    result = translate_client.translate(text, target_language='zh-TW', source_language='ja')
-    return result['translatedText']
+    return translate_text(text, target='zh-TW')
 
 def create_database_tables(cursor):
     """

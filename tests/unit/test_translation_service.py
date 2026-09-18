@@ -19,11 +19,21 @@ class _FakeGoogleClient:
         return {"translatedText": self.result}
 
 
+class _FakeResponse:
+    def __init__(self, status_code: int, payload: dict):
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
 @pytest.fixture()
 def svc(monkeypatch):
-    # Force the module to import without real Google credentials, then give
-    # each test a clean cooldown state.
+    # Import without real Google credentials of either kind, then give each
+    # test a clean cooldown state.
     monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+    monkeypatch.setenv("GOOGLE_TRANSLATE_API_KEY", "")
     sys.modules.pop("translation_service", None)
     module = importlib.import_module("translation_service")
     module._google_paused_until = 0.0
@@ -41,6 +51,21 @@ def _capture_llm(monkeypatch, svc, reply="翻譯結果"):
     monkeypatch.setattr(svc, "query_llm", fake_query_llm)
     return calls
 
+
+def _capture_rest(monkeypatch, svc, response: _FakeResponse):
+    calls: list[dict] = []
+
+    def fake_post(url, **kwargs):
+        calls.append({"url": url, **kwargs})
+        return response
+
+    monkeypatch.setattr(svc.requests, "post", fake_post)
+    return calls
+
+
+# ---------------------------------------------------------------------------
+# Service-account (ADC) path
+# ---------------------------------------------------------------------------
 
 def test_google_result_is_used_and_unescaped(svc, monkeypatch):
     monkeypatch.setattr(svc, "translate_client", _FakeGoogleClient(result="A &amp; B"))
@@ -67,12 +92,69 @@ def test_google_failure_falls_back_to_llm_and_pauses_google(svc, monkeypatch):
     assert llm_calls[0]["messages"][-1] == {"role": "user", "content": "今日は暑いですね。"}
 
 
+# ---------------------------------------------------------------------------
+# API-key (REST) path
+# ---------------------------------------------------------------------------
+
+def test_api_key_path_calls_rest_with_key_in_header(svc, monkeypatch):
+    monkeypatch.setattr(svc, "GOOGLE_TRANSLATE_API_KEY", "test-key")
+    # The ADC client must not be touched once a key is configured.
+    monkeypatch.setattr(svc, "translate_client", _FakeGoogleClient(error=AssertionError("ADC client used")))
+    llm_calls = _capture_llm(monkeypatch, svc)
+    rest_calls = _capture_rest(
+        monkeypatch, svc,
+        _FakeResponse(200, {"data": {"translations": [{"translatedText": "今天很熱。"}]}}),
+    )
+
+    assert svc.translate_text("今日は暑いですね。", "zh-TW") == "今天很熱。"
+
+    assert llm_calls == []
+    assert len(rest_calls) == 1
+    call = rest_calls[0]
+    assert call["url"] == svc.GOOGLE_V2_ENDPOINT
+    assert call["headers"] == {"x-goog-api-key": "test-key"}
+    assert call["json"] == {"q": "今日は暑いですね。", "source": "ja", "target": "zh-TW", "format": "text"}
+    assert "key" not in call.get("params", {})
+
+
+def test_api_key_http_error_falls_back_without_leaking_the_key(svc, monkeypatch, caplog):
+    monkeypatch.setattr(svc, "GOOGLE_TRANSLATE_API_KEY", "super-secret-key")
+    llm_calls = _capture_llm(monkeypatch, svc, reply="It is hot today.")
+    rest_calls = _capture_rest(
+        monkeypatch, svc,
+        _FakeResponse(403, {"error": {"message": "Cloud Translation API has not been used in project 123"}}),
+    )
+
+    with caplog.at_level("WARNING", logger="translation_service"):
+        assert svc.translate_text("今日は暑いですね。", "en") == "It is hot today."
+        assert svc.translate_text("明日も暑い。", "en") == "It is hot today."
+
+    assert len(rest_calls) == 1, "Google is skipped during the cooldown after a failure"
+    assert len(llm_calls) == 2
+    assert "HTTP 403" in caplog.text
+    assert "has not been used" in caplog.text
+    assert "super-secret-key" not in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# LLM fallback
+# ---------------------------------------------------------------------------
+
 def test_missing_google_client_uses_llm(svc, monkeypatch):
     monkeypatch.setattr(svc, "translate_client", None)
     llm_calls = _capture_llm(monkeypatch, svc, reply="It is hot today.")
 
     assert svc.translate_text("今日は暑いですね。", "en") == "It is hot today."
     assert "English" in llm_calls[0]["messages"][0]["content"]
+
+
+def test_unknown_target_code_is_passed_through_to_the_prompt(svc, monkeypatch):
+    monkeypatch.setattr(svc, "translate_client", None)
+    llm_calls = _capture_llm(monkeypatch, svc, reply="…")
+
+    svc.translate_text("こんにちは", "fr")
+
+    assert "into fr." in llm_calls[0]["messages"][0]["content"]
 
 
 def test_llm_failure_raises_translation_error(svc, monkeypatch):
