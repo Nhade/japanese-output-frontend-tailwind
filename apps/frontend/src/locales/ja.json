@@ -475,5 +475,31 @@
         "mistakes_desc": "間違えた回答に戻り、毎日の復習を作成します。",
         "progress_title": "進捗を確認",
         "progress_desc": "正答率、活動、弱点を確認します。"
+    },
+    "guest": {
+        "banner_eyebrow": "プレビュー",
+        "banner_text": "ゲストとしてサンプル履歴つきで閲覧中です。ここでの記録は7日後に削除されます。",
+        "create_account": "アカウント作成",
+        "end_preview": "プレビューを終了",
+        "login_line": "まずは見てみたい？",
+        "login_cta": "ゲストで試す",
+        "register_note": "プレビュー中の記録は新しいアカウントに引き継がれ、サンプルの記録は削除されます。",
+        "sample_note": "プレビュー用にサンプル履歴が含まれています。",
+        "sample_badge": "サンプル",
+        "entry_opening": "読書室を開いています…",
+        "entry_sub": "サンプル履歴つきのゲスト用デスクを準備しています。アカウントは不要です。",
+        "entry_expired": "プレビューの有効期限が切れました。新しいセッションを開始します。",
+        "entry_failed_title": "プレビューを開始できませんでした",
+        "entry_failed": "現在ゲストセッションを開始できません。しばらくしてからもう一度お試しください。",
+        "entry_disabled": "ゲストプレビューは現在停止中です。サインインまたはアカウント作成はご利用いただけます。",
+        "entry_retry": "もう一度",
+        "entry_sign_in": "サインイン",
+        "limit_preview_limit_title": "プレビューの上限に達しました",
+        "limit_preview_limit_body": "ゲストセッションでは、デモの費用を抑えるためAI呼び出し回数に上限があります。続けるには無料のアカウントを作成してください。",
+        "limit_preview_busy_title": "プレビューが混み合っています",
+        "limit_preview_busy_body": "現在ゲストセッションが多すぎます。しばらくしてからもう一度お試しいただくか、アカウントを作成してください。",
+        "limit_guest_forbidden_title": "プレビューでは利用できません",
+        "limit_guest_forbidden_body": "動画のインポートは字幕の取得とLLMによる問題生成を行うため、アカウントをお持ちの方のみ利用できます。",
+        "limit_keep_browsing": "閲覧を続ける"
     }
 }

@@ -1,0 +1,302 @@
+{
+  "version": 1,
+  "notes": "Curated sample history for guest preview accounts. exercise_id values reference the production exercise bank; entries whose exercise is missing are skipped at seed time. Wrong answers are plausible learner errors with grader-style Traditional Chinese feedback; scores follow the grader's deduction table (particle -5, conjugation -10, vocab -2). Timestamps are relative to seeding time: minutes_ago for today, otherwise days_ago + local hour/minute.",
+  "entries": [
+    {
+      "exercise_id": "340b1176-5faa-44c7-9a3e-713ee4b89e2c",
+      "minutes_ago": 38,
+      "user_answer": "に",
+      "is_correct": false,
+      "error_type": "particle",
+      "score": 95,
+      "feedback": "「気をつける」是固定搭配，助詞應為「を」；用「に」會讓這個慣用語失去原本的意思。"
+    },
+    {
+      "exercise_id": "d63b6149-8726-4ca1-bd82-f679736a72ea",
+      "minutes_ago": 30,
+      "user_answer": "が",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "7d3fb45c-4791-4482-ab0b-99fba2bd8a18",
+      "minutes_ago": 21,
+      "user_answer": "防いで",
+      "is_correct": false,
+      "error_type": "conjugation",
+      "score": 90,
+      "feedback": "「〜には」前面要接辭書形「防ぐ」；「防いで」是て形，不能直接接「には」。"
+    },
+    {
+      "exercise_id": "701ed0de-d85d-4cb7-8656-4cce2c1910a1",
+      "minutes_ago": 12,
+      "user_answer": "うち",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "b4f89832-c522-4c9c-85f2-c25cd10f964e",
+      "days_ago": 1,
+      "hour": 21,
+      "minute": 5,
+      "user_answer": "な",
+      "is_correct": false,
+      "error_type": "particle",
+      "score": 95,
+      "feedback": "「非常」要以副詞形「非常に」修飾形容詞「激しい」；「非常な」無法直接修飾。"
+    },
+    {
+      "exercise_id": "83469b83-79aa-4a3c-ab6b-74fa63b569f0",
+      "days_ago": 1,
+      "hour": 21,
+      "minute": 12,
+      "user_answer": "も",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "3ab4abfa-6823-4d7b-a6c2-9e3e1884dbc6",
+      "days_ago": 2,
+      "hour": 20,
+      "minute": 27,
+      "user_answer": "行い",
+      "is_correct": false,
+      "error_type": "conjugation",
+      "score": 90,
+      "feedback": "接「た」時要用促音便「行っ」；「行い」是連用形，不能直接接「た」。"
+    },
+    {
+      "exercise_id": "3b47ebc6-ac26-4664-8641-3017a1b77488",
+      "days_ago": 2,
+      "hour": 20,
+      "minute": 35,
+      "user_answer": "て",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "64addbe7-90d5-48ae-b900-2897b73bd893",
+      "days_ago": 3,
+      "hour": 20,
+      "minute": 42,
+      "user_answer": "で",
+      "is_correct": false,
+      "error_type": "particle",
+      "score": 95,
+      "feedback": "「全面的」是な形容詞，修飾動詞「協力する」時要接「に」，不是「で」。"
+    },
+    {
+      "exercise_id": "ff83beb1-f36f-45e3-954d-2d6ab0c8f1e4",
+      "days_ago": 3,
+      "hour": 21,
+      "minute": 5,
+      "user_answer": "確定",
+      "is_correct": false,
+      "error_type": "vocab",
+      "score": 98,
+      "feedback": "「確定」是定案、決定的意思；表示查證到有改善要用「確認」。"
+    },
+    {
+      "exercise_id": "4dc61e30-f541-410f-a400-f2d7ad696b48",
+      "days_ago": 4,
+      "hour": 22,
+      "minute": 1,
+      "user_answer": "いる",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "98972b37-afba-4877-83dc-08086c765c23",
+      "days_ago": 5,
+      "hour": 22,
+      "minute": 10,
+      "user_answer": "が",
+      "is_correct": false,
+      "error_type": "particle",
+      "score": 95,
+      "feedback": "「影響」是名詞，前面的修飾語要用「の」連接；用「が」會讓句子結構不成立。"
+    },
+    {
+      "exercise_id": "cfd5d064-530d-4b82-9cd0-21ff55059a55",
+      "days_ago": 5,
+      "hour": 22,
+      "minute": 16,
+      "user_answer": "て",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "e62383d9-ee36-4eda-a015-0dccece34b5d",
+      "days_ago": 6,
+      "hour": 21,
+      "minute": 12,
+      "user_answer": "覆い",
+      "is_correct": false,
+      "error_type": "conjugation",
+      "score": 90,
+      "feedback": "被動形要用未然形「覆わ」＋「れる」；「覆い」是連用形，無法構成被動。"
+    },
+    {
+      "exercise_id": "9941d17f-a934-47ab-8037-d4577431f082",
+      "days_ago": 7,
+      "hour": 20,
+      "minute": 5,
+      "user_answer": "に",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "4293ace0-413b-422c-b3ea-89331d771d08",
+      "days_ago": 7,
+      "hour": 19,
+      "minute": 58,
+      "user_answer": "に",
+      "is_correct": false,
+      "error_type": "particle",
+      "score": 95,
+      "feedback": "表示感染的來源要用「から」；「に」會變成感染的對象，語意剛好相反。"
+    },
+    {
+      "exercise_id": "b1975c0c-5249-469b-beb7-63fcdf28994a",
+      "days_ago": 7,
+      "hour": 20,
+      "minute": 11,
+      "user_answer": "この",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "34b35c84-23d0-4db8-98ec-0251c3e41f5f",
+      "days_ago": 8,
+      "hour": 21,
+      "minute": 40,
+      "user_answer": "いる",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "e27f326d-46b1-4a37-a366-ea542fc630fe",
+      "days_ago": 9,
+      "hour": 21,
+      "minute": 31,
+      "user_answer": "が",
+      "is_correct": false,
+      "error_type": "particle",
+      "score": 95,
+      "feedback": "「超える」是他動詞，被超過的數量要用「を」標示；「が」會把它變成主語。"
+    },
+    {
+      "exercise_id": "6c150d8f-de8b-48a3-ad36-38dd0283e535",
+      "days_ago": 9,
+      "hour": 21,
+      "minute": 44,
+      "user_answer": "共同",
+      "is_correct": false,
+      "error_type": "vocab",
+      "score": 98,
+      "feedback": "「共同」語意相近，但警方與消防聯合勘驗的固定說法是「合同で」。"
+    },
+    {
+      "exercise_id": "8e346919-4021-43a3-ae8c-4fea864c89de",
+      "days_ago": 10,
+      "hour": 20,
+      "minute": 15,
+      "user_answer": "を",
+      "is_correct": false,
+      "error_type": "particle",
+      "score": 95,
+      "feedback": "「〜に変わる」是自動詞，表示變化的結果；「を変える」才是他動詞的用法。"
+    },
+    {
+      "exercise_id": "fca2ea67-c82b-4bbc-aa4f-57bf9bd1360d",
+      "days_ago": 10,
+      "hour": 20,
+      "minute": 22,
+      "user_answer": "も",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "ceaf7e36-cc83-41a9-8c95-f65c7e0414d2",
+      "days_ago": 11,
+      "hour": 21,
+      "minute": 55,
+      "user_answer": "日",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "f4a5c73a-30a2-45af-8cb7-e6b14996c99a",
+      "days_ago": 12,
+      "hour": 21,
+      "minute": 47,
+      "user_answer": "へ",
+      "is_correct": false,
+      "error_type": "particle",
+      "score": 95,
+      "feedback": "「から〜まで」是表示範圍的固定搭配；「へ」只表示方向，不能表示範圍。"
+    },
+    {
+      "exercise_id": "0c6fe3cf-fc2f-4c98-83e1-12e474340502",
+      "days_ago": 12,
+      "hour": 21,
+      "minute": 52,
+      "user_answer": "で",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "88dcbaa8-dbb9-442a-b18c-71548b1fd963",
+      "days_ago": 13,
+      "hour": 20,
+      "minute": 36,
+      "user_answer": "とても",
+      "is_correct": false,
+      "error_type": "vocab",
+      "score": 98,
+      "feedback": "「とても」只表示程度；原句強調今年「尤其」熱，要用「特に」。"
+    },
+    {
+      "exercise_id": "9ab8bcbe-c9c8-459b-97e0-79e34802406b",
+      "days_ago": 13,
+      "hour": 20,
+      "minute": 41,
+      "user_answer": "は",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "2fa2f6a9-8ef2-45b9-9097-683c04bcb268",
+      "days_ago": 14,
+      "hour": 22,
+      "minute": 3,
+      "user_answer": "て",
+      "is_correct": false,
+      "error_type": "particle",
+      "score": 95,
+      "feedback": "前面已有「帰ったり」，並列動作要用「〜たり〜たりする」；て形無法與之呼應。"
+    },
+    {
+      "exercise_id": "8f05d099-4e00-4142-9655-7eb32b140f22",
+      "days_ago": 14,
+      "hour": 22,
+      "minute": 8,
+      "user_answer": "あり",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "963eb866-e16c-4f2e-828f-e4e9c2b25818",
+      "days_ago": 15,
+      "hour": 21,
+      "minute": 18,
+      "user_answer": "約束",
+      "is_correct": true
+    },
+    {
+      "exercise_id": "0b257c12-fdeb-4c98-ba83-c07c1f8676e0",
+      "days_ago": 16,
+      "hour": 21,
+      "minute": 20,
+      "user_answer": "厳しい",
+      "is_correct": false,
+      "error_type": "conjugation",
+      "score": 90,
+      "feedback": "接「なる」時，い形容詞要改成「〜く」；「厳しい」不能直接接「なる」。"
+    },
+    {
+      "exercise_id": "f83e88b4-81d0-4b77-9311-260913dc4bfd",
+      "days_ago": 16,
+      "hour": 21,
+      "minute": 27,
+      "user_answer": "する",
+      "is_correct": true
+    }
+  ]
+}

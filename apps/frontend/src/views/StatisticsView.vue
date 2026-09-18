@@ -12,6 +12,9 @@
           <p class="text-zinc-500 dark:text-zinc-400 mt-1">
             {{ $t('statistics.subtitle') }}
           </p>
+          <p v-if="auth.isGuest" class="text-zinc-500 mt-1 text-sm italic">
+            {{ $t('guest.sample_note') }}
+          </p>
         </div>
       </div>
 

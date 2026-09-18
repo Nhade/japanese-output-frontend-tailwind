@@ -475,5 +475,31 @@
         "mistakes_desc": "Return to missed answers and generate a daily review.",
         "progress_title": "Check progress",
         "progress_desc": "Scan accuracy, activity, and weak areas over time."
+    },
+    "guest": {
+        "banner_eyebrow": "Preview",
+        "banner_text": "You're browsing as a guest with sample history loaded. Nothing you do here is kept beyond 7 days.",
+        "create_account": "Create account",
+        "end_preview": "End preview",
+        "login_line": "Just looking?",
+        "login_cta": "Explore as a guest",
+        "register_note": "Your preview history moves to the new account. The sample entries are removed.",
+        "sample_note": "Includes sample history so the preview has something to show.",
+        "sample_badge": "Sample",
+        "entry_opening": "Opening the reading room…",
+        "entry_sub": "Setting up a guest desk with sample history. No account needed.",
+        "entry_expired": "Your preview session ended. Starting a fresh one.",
+        "entry_failed_title": "The preview could not start",
+        "entry_failed": "We couldn't start a guest session right now. Please try again in a moment.",
+        "entry_disabled": "The guest preview is switched off at the moment. You can still sign in or create an account.",
+        "entry_retry": "Try again",
+        "entry_sign_in": "Sign in",
+        "limit_preview_limit_title": "Preview limit reached",
+        "limit_preview_limit_body": "Guest sessions include a fixed budget of AI calls so the demo stays affordable. Create a free account to keep going.",
+        "limit_preview_busy_title": "The preview is busy",
+        "limit_preview_busy_body": "Too many guest sessions are active right now. Please try again later, or create an account.",
+        "limit_guest_forbidden_title": "Not available in the preview",
+        "limit_guest_forbidden_body": "Importing videos pulls a transcript and generates exercises with the LLM, so it is reserved for account holders.",
+        "limit_keep_browsing": "Keep browsing"
     }
 }

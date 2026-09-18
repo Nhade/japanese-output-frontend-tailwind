@@ -20,7 +20,18 @@ export class ApiError extends Error {
 const API_BASE_URL = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '').replace(/\/+$/, '');
 export const SESSION_TOKEN_STORAGE_KEY = 'shiori-session-token';
 export const SESSION_USER_ID_STORAGE_KEY = 'shiori-user-id';
+export const SESSION_GUEST_STORAGE_KEY = 'shiori-session-guest';
 export const UNAUTHORIZED_EVENT = 'shiori:unauthorized';
+// Raised when the API refuses a guest action (429 preview_limit / preview_busy,
+// 403 guest_forbidden) so a single dialog can handle it app-wide.
+export const PREVIEW_BLOCKED_EVENT = 'shiori:preview-blocked';
+export const PREVIEW_BLOCK_CODES = new Set(['preview_limit', 'preview_busy', 'guest_forbidden']);
+
+export interface PreviewBlockedDetail {
+  code: string;
+  action?: string;
+  message: string;
+}
 
 function normalizePath(path: string): string {
   return path.startsWith('/') ? path : `/${path}`;
@@ -55,10 +66,19 @@ export function setSessionToken(token: string | null): void {
   }
 }
 
-function clearPersistedSession(): void {
+function clearPersistedSession(code?: string): void {
   setSessionToken(null);
   localStorage.removeItem(SESSION_USER_ID_STORAGE_KEY);
-  window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+  localStorage.removeItem(SESSION_GUEST_STORAGE_KEY);
+  window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT, { detail: { code } }));
+}
+
+function errorField(data: unknown, field: string): string | undefined {
+  if (data && typeof data === 'object' && field in data) {
+    const value = (data as Record<string, unknown>)[field];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return undefined;
 }
 
 async function parseResponse(response: Response): Promise<unknown> {
@@ -117,8 +137,17 @@ export async function apiFetch(path: string, options: ApiRequestOptions = {}): P
 
   if (!response.ok) {
     const data = await parseResponse(response);
+    const code = errorField(data, 'code');
     if (response.status === 401 && token) {
-      clearPersistedSession();
+      clearPersistedSession(code);
+    }
+    if ((response.status === 429 || response.status === 403) && code && PREVIEW_BLOCK_CODES.has(code)) {
+      const detail: PreviewBlockedDetail = {
+        code,
+        action: errorField(data, 'action'),
+        message: errorMessage(data, ''),
+      };
+      window.dispatchEvent(new CustomEvent<PreviewBlockedDetail>(PREVIEW_BLOCKED_EVENT, { detail }));
     }
     throw new ApiError(errorMessage(data, `Request failed with ${response.status}`), response.status, data);
   }

@@ -21,6 +21,7 @@ const router = useRouter();
 const route = useRoute();
 
 const isLoggedIn = computed(() => authStore.isAuthenticated);
+const isGuest = computed(() => authStore.isGuest);
 const openTopMenu = ref<string | null>(null);
 const mobileMoreOpen = ref(false);
 
@@ -271,8 +272,11 @@ watch(() => route.fullPath, closeMenus);
 
       <div class="nav-tail">
         <LanguageSelector />
+        <router-link v-if="isGuest" to="/register" class="nav-logout nav-upgrade">
+          {{ $t('guest.create_account') }}
+        </router-link>
         <button
-          v-if="isLoggedIn"
+          v-else-if="isLoggedIn"
           type="button"
           class="nav-logout"
           @click="logout"
@@ -323,9 +327,13 @@ watch(() => route.fullPath, closeMenus);
         <component :is="item.icon" class="mobile-more-icon" aria-hidden="true" />
         <span>{{ $t(`nav.${item.key}`) }}</span>
       </router-link>
+      <router-link v-if="isGuest" to="/register" class="mobile-more-link" role="menuitem">
+        <Menu class="mobile-more-icon" aria-hidden="true" />
+        <span>{{ $t('guest.create_account') }}</span>
+      </router-link>
       <button type="button" class="mobile-more-link" role="menuitem" @click="logout">
         <Menu class="mobile-more-icon" aria-hidden="true" />
-        <span>{{ $t('nav.logout') }}</span>
+        <span>{{ isGuest ? $t('guest.end_preview') : $t('nav.logout') }}</span>
       </button>
     </div>
   </nav>
@@ -535,6 +543,12 @@ watch(() => route.fullPath, closeMenus);
 .nav-logout:hover {
   color: var(--foreground);
   border-bottom-color: var(--secondary);
+}
+
+.nav-upgrade {
+  color: var(--primary);
+  border-bottom-color: var(--secondary);
+  text-decoration: none;
 }
 
 .mobile-tabs {
