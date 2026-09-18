@@ -75,6 +75,7 @@ class Settings:
     flask_debug: bool
     session_secret: str
     session_max_age_seconds: int
+    guest_preview_enabled: bool
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -85,6 +86,7 @@ class Settings:
             flask_debug=flask_debug,
             session_secret=_resolve_session_secret(flask_debug),
             session_max_age_seconds=int(os.getenv("SHIORI_SESSION_MAX_AGE_SECONDS", str(60 * 60 * 24 * 30))),
+            guest_preview_enabled=_bool_env("SHIORI_GUEST_PREVIEW_ENABLED", True),
         )
 
 

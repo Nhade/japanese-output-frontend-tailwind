@@ -475,5 +475,31 @@
         "mistakes_desc": "回到答錯內容，產生每日複習。",
         "progress_title": "查看進度",
         "progress_desc": "檢視正確率、活動紀錄與弱點。"
+    },
+    "guest": {
+        "banner_eyebrow": "預覽",
+        "banner_text": "您正以訪客身分瀏覽，已載入範例學習紀錄。這裡的資料 7 天後會自動刪除。",
+        "create_account": "建立帳號",
+        "end_preview": "結束預覽",
+        "login_line": "只是想先看看？",
+        "login_cta": "以訪客身分體驗",
+        "register_note": "預覽期間的紀錄會轉移到新帳號，範例紀錄則會移除。",
+        "sample_note": "為了讓預覽有內容可看，這裡包含範例紀錄。",
+        "sample_badge": "範例",
+        "entry_opening": "正在開啟閱覽室…",
+        "entry_sub": "正在準備含範例紀錄的訪客書桌，不需要帳號。",
+        "entry_expired": "預覽時間已結束，正在開始新的預覽。",
+        "entry_failed_title": "無法開始預覽",
+        "entry_failed": "目前無法開始訪客預覽，請稍後再試。",
+        "entry_disabled": "訪客預覽目前已關閉，您仍可以登入或建立帳號。",
+        "entry_retry": "再試一次",
+        "entry_sign_in": "登入",
+        "limit_preview_limit_title": "已達預覽上限",
+        "limit_preview_limit_body": "為了控制展示成本，訪客的 AI 呼叫次數有固定上限。建立免費帳號即可繼續使用。",
+        "limit_preview_busy_title": "預覽目前繁忙",
+        "limit_preview_busy_body": "目前訪客人數過多，請稍後再試，或建立帳號。",
+        "limit_guest_forbidden_title": "預覽模式無法使用",
+        "limit_guest_forbidden_body": "匯入影片需要擷取字幕並由 LLM 生成練習，因此僅開放給帳號使用者。",
+        "limit_keep_browsing": "繼續瀏覽"
     }
 }

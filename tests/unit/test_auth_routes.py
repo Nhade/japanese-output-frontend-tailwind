@@ -71,7 +71,7 @@ def test_protected_me_route_accepts_valid_token(backend_app, client, monkeypatch
     res = client.get("/api/users/me", headers=_auth(_token(backend_app, "u1")))
 
     assert res.status_code == 200
-    assert res.get_json() == {"user_id": "u1"}
+    assert res.get_json() == {"user_id": "u1", "guest": False}
 
 
 @pytest.mark.parametrize(

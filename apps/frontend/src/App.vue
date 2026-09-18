@@ -1,23 +1,43 @@
 <script setup>
-import { computed, onMounted, watch } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import TheHeader from './components/TheHeader.vue';
 import TheFooter from './components/TheFooter.vue';
 import ToastNotification from './components/ToastNotification.vue';
+import GuestBanner from './components/GuestBanner.vue';
+import PreviewLimitDialog from './components/PreviewLimitDialog.vue';
+import { UNAUTHORIZED_EVENT } from './lib/api';
+import { useAuthStore } from './stores/auth';
 import { useToastStore } from './stores/toast';
 import { useThemeStore } from './stores/theme';
 
 const { locale } = useI18n();
 const toastStore = useToastStore();
 const route = useRoute();
+const router = useRouter();
 const themeStore = useThemeStore();
+const authStore = useAuthStore();
+
+// The auth store clears the session on 401 (its listener is registered in
+// main.ts, so it runs first). If that session was a guest preview, restart
+// the preview instead of dropping the visitor on the login form.
+function onUnauthorized() {
+  if (authStore.lastSessionWasGuest && route.name !== 'preview') {
+    router.replace({ name: 'preview', query: { expired: '1' } });
+  }
+}
 
 // Theme must initialize once at app mount so bare routes (Login,
 // Register — no TheHeader) get the correct theme class too. Previously
 // TheHeader owned this and bare routes shipped with no class at all.
 onMounted(() => {
   themeStore.initTheme();
+  window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+});
+
+onUnmounted(() => {
+  window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
 });
 
 // Routes (Login, Register) set meta.hideChrome to opt out of the
@@ -44,6 +64,7 @@ watch(locale, (newLocale) => {
     <ToastNotification :show="toastStore.show" :message="toastStore.message" :type="toastStore.type"
       @close="toastStore.close" />
     <main class="main-content" :class="{ 'has-chrome': !hideChrome }">
+      <GuestBanner v-if="!hideChrome && authStore.isGuest" />
       <router-view v-slot="{ Component }">
         <transition name="page" mode="out-in">
           <component :is="Component" />
@@ -51,6 +72,7 @@ watch(locale, (newLocale) => {
       </router-view>
     </main>
     <TheFooter v-if="!hideChrome" />
+    <PreviewLimitDialog />
   </div>
 </template>
 

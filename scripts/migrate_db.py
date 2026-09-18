@@ -96,10 +96,36 @@ def _migration_003_indexes(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_004_guest_preview(conn: sqlite3.Connection) -> None:
+    """Guest accounts (users.is_guest / guest_expires_at), sample-history flag, usage counters.
+
+    Mirrors ``guest_service.ensure_guest_schema`` (the startup safety net);
+    keep the two in sync.
+    """
+    if _table_exists(conn, "users"):
+        _add_column_if_missing(conn, "users", "is_guest", "INTEGER NOT NULL DEFAULT 0")
+        _add_column_if_missing(conn, "users", "guest_expires_at", "TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_users_guest_created ON users(is_guest, created_timestamp)")
+    if _table_exists(conn, "answer_log"):
+        _add_column_if_missing(conn, "answer_log", "is_sample", "INTEGER NOT NULL DEFAULT 0")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS usage_counters (
+            subject TEXT NOT NULL,
+            action TEXT NOT NULL,
+            window_start TEXT NOT NULL,
+            count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (subject, action, window_start)
+        )
+        """
+    )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "answer_log feedback fields", _migration_001_answer_log_feedback),
     Migration(2, "answer_log embedding fields", _migration_002_answer_log_embeddings),
     Migration(3, "hot-path indexes", _migration_003_indexes),
+    Migration(4, "guest preview accounts", _migration_004_guest_preview),
 )
 
 

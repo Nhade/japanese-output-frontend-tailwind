@@ -25,6 +25,7 @@ interface Mistake {
   score?: number | null;
   error_type?: string | null;
   similar_past?: SimilarPast[];
+  is_sample?: boolean;
 }
 
 const BLANK_MARKER = '[＿＿＿]';
@@ -220,6 +221,7 @@ onUnmounted(() => {
           <div>
             <div class="practice-eyebrow">{{ $t('mistakes.eyebrow') }}</div>
             <h1 class="practice-h1">{{ $t('mistakes.heading') }}</h1>
+            <p v-if="auth.isGuest" class="practice-sample-note">{{ $t('guest.sample_note') }}</p>
           </div>
           <div v-if="!isLoading && mistakes.length > 0" class="practice-stats">
             <div class="pstat">
@@ -336,8 +338,9 @@ onUnmounted(() => {
         >
           <span class="errata-num">{{ String(i + 1).padStart(2, '0') }}</span>
 
-          <div v-if="m.error_type" class="errata-head">
-            <span class="errata-type-en">{{ localizedErrorType(m.error_type) }}</span>
+          <div v-if="m.error_type || m.is_sample" class="errata-head">
+            <span v-if="m.error_type" class="errata-type-en">{{ localizedErrorType(m.error_type) }}</span>
+            <span v-if="m.is_sample" class="errata-sample">{{ $t('guest.sample_badge') }}</span>
           </div>
 
           <div class="errata-body">
@@ -962,5 +965,27 @@ onUnmounted(() => {
 .review-fade-leave-to .review-scroll {
   opacity: 0;
   transform: translateY(8px) scale(0.98);
+}
+
+/* Guest preview: sample-history note and per-entry badge --------- */
+.practice-sample-note {
+  margin: 8px 0 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.92rem;
+  color: color-mix(in oklab, var(--foreground) 58%, transparent);
+}
+.errata-sample {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 1px 6px;
+  font-family: var(--font-sans);
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--secondary);
+  border: 1px solid color-mix(in oklab, var(--secondary) 45%, transparent);
+  border-radius: 2px;
+  vertical-align: middle;
 }
 </style>

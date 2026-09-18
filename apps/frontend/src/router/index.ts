@@ -84,6 +84,14 @@ const router = createRouter({
       name: 'practice',
       component: () => import('../views/PracticeView.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      // Public entry for the guest preview (linked from outside). Mints a
+      // guest session and forwards to Today; see PreviewEntryView.
+      path: '/preview',
+      name: 'preview',
+      component: () => import('../views/PreviewEntryView.vue'),
+      meta: { hideChrome: true }
     }
   ]
 })
@@ -96,7 +104,8 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next({ name: 'login' })
+    // A guest whose preview expired gets a fresh one; everyone else signs in.
+    next(authStore.lastSessionWasGuest ? { name: 'preview', query: { expired: '1' } } : { name: 'login' })
   } else {
     next()
   }

@@ -126,14 +126,26 @@ def get_json_body() -> dict:
 
 
 class AuthError(Exception):
-    def __init__(self, message: str = "Authentication required", status_code: int = 401):
+    def __init__(self, message: str = "Authentication required", status_code: int = 401, code: str | None = None):
         super().__init__(message)
         self.message = message
         self.status_code = status_code
+        self.code = code
 
 
 def _auth_error_response(error: AuthError):
-    return jsonify({"error": error.message}), error.status_code
+    payload = {"error": error.message}
+    if error.code:
+        payload["code"] = error.code
+    return jsonify(payload), error.status_code
+
+
+def _row_value(row, key: str, default=None):
+    """Read a column from a sqlite Row, tolerating fakes/rows without it."""
+    try:
+        return row[key]
+    except (KeyError, IndexError, TypeError):
+        return default
 
 
 def issue_session_token(user_id: str) -> str:
@@ -170,14 +182,27 @@ def require_current_user_id() -> str:
 
     conn = get_db_connection()
     try:
-        user = conn.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        user = conn.execute(
+            "SELECT is_guest, guest_expires_at FROM users WHERE user_id = ?", (user_id,)
+        ).fetchone()
     finally:
         conn.close()
     if user is None:
         raise AuthError("Invalid session")
 
+    is_guest = bool(_row_value(user, "is_guest", 0))
+    expires_at = _row_value(user, "guest_expires_at")
+    if is_guest and guest_session_expired(expires_at):
+        raise AuthError("Preview session ended", 401, code="guest_expired")
+
     g.current_user_id = user_id
+    g.current_user_is_guest = is_guest
+    g.current_user_guest_expires_at = expires_at if is_guest else None
     return user_id
+
+
+def current_user_is_guest() -> bool:
+    return bool(getattr(g, "current_user_is_guest", False))
 
 
 def require_route_user(user_id: str) -> str:
@@ -197,6 +222,71 @@ def auth_required(fn):
         return fn(*args, **kwargs)
 
     return wrapper
+
+
+_GUEST_BLOCK_MESSAGES = {
+    "preview_limit": ("This preview has used up its budget for this feature. Create an account to keep going.", 429),
+    "preview_busy": ("The preview is busy right now. Please try again later or create an account.", 429),
+    "guest_forbidden": ("This feature is not available in the guest preview.", 403),
+}
+
+
+def _guest_blocked_response(code: str, action: str | None = None):
+    message, status = _GUEST_BLOCK_MESSAGES[code]
+    payload = {"error": message, "code": code}
+    if action:
+        payload["action"] = action
+    return jsonify(payload), status
+
+
+def _meter_guest(action: str):
+    """Count one guest use of ``action``; return an error response when over budget."""
+    if not current_user_is_guest():
+        return None
+    conn = get_db_connection()
+    try:
+        code = check_guest_action(conn, g.current_user_id, action)
+    finally:
+        conn.close()
+    return _guest_blocked_response(code, action) if code else None
+
+
+def guest_limited(action: str):
+    """``auth_required`` plus the per-session and shared guest budgets for ``action``."""
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            try:
+                require_current_user_id()
+            except AuthError as exc:
+                return _auth_error_response(exc)
+            blocked = _meter_guest(action)
+            if blocked is not None:
+                return blocked
+            return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def _client_ip() -> str:
+    # gunicorn only listens on loopback behind Caddy, so X-Forwarded-For is trusted.
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def _guest_id_from_request() -> str | None:
+    """Return the guest's user id when the request carries a valid guest session."""
+    if not _bearer_token():
+        return None
+    try:
+        user_id = require_current_user_id()
+    except AuthError:
+        return None
+    return user_id if current_user_is_guest() else None
 
 
 @app.errorhandler(AuthError)
@@ -289,7 +379,7 @@ def get_mistakes(user_id=None):
     try:
         mistakes = conn.execute('''
             SELECT al.log_id, e.question_sentence, al.user_answer, e.correct_answer,
-                   al.feedback, al.score, al.error_type
+                   al.feedback, al.score, al.error_type, al.is_sample
             FROM answer_log al
             JOIN exercise e ON al.exercise_id = e.exercise_id
             WHERE al.user_id = ? AND al.is_correct = 0
@@ -299,6 +389,7 @@ def get_mistakes(user_id=None):
         result = []
         for m in mistakes:
             row = dict(m)
+            row["is_sample"] = bool(row.get("is_sample"))
             try:
                 row["similar_past"] = find_top_similar_mistakes(conn, m["log_id"], top_k=3)
             except Exception as e:
@@ -314,6 +405,13 @@ from agent_service import generate_daily_review_agent
 from ai_service import chat_with_ai, evaluate_submission, get_detailed_feedback
 from embedding_service import ensure_embedding_columns
 from graphs.video_graph import check_comprehension_answer, generate_comprehension_questions
+from guest_service import (
+    count_active_guests,
+    create_guest,
+    ensure_guest_schema,
+    guest_session_expired,
+    upgrade_guest,
+)
 from learner_service import (
     backfill_learner_profile,
     create_learner_tables,
@@ -321,6 +419,7 @@ from learner_service import (
     update_learner_profile,
     update_learner_settings,
 )
+from usage_limits import check_guest_action, consume, guest_creation_limits, window_key
 from video_service import create_video_tables, import_video
 
 # Initialize Learner Tables
@@ -330,6 +429,7 @@ try:
         create_learner_tables(conn)
         create_video_tables(conn)
         ensure_embedding_columns(conn)
+        ensure_guest_schema(conn)
     finally:
         conn.close()
 except Exception:
@@ -337,7 +437,7 @@ except Exception:
 
 
 @app.route('/api/exercise/submit', methods=['POST'])
-@auth_required
+@guest_limited("submit")
 def submit_answer():
     """
     Submit an answer for an exercise.
@@ -415,7 +515,7 @@ def submit_answer():
     })
 
 @app.route('/api/exercise/explain', methods=['POST'])
-@auth_required
+@guest_limited("explain")
 def explain_answer():
     """
     Request AI evaluation for a specific submission log.
@@ -476,7 +576,7 @@ def explain_answer():
         conn.close()
 
 @app.route('/api/exercise/explain-detailed', methods=['POST'])
-@auth_required
+@guest_limited("explain_detailed")
 def explain_answer_detailed():
     """
     Request detailed grammatical explanation for a submission.
@@ -518,7 +618,7 @@ def explain_answer_detailed():
         conn.close()
 
 @app.route('/api/chat/send', methods=['POST'])
-@auth_required
+@guest_limited("chat")
 def chat_send():
     """
     Send a message to the AI chat interface.
@@ -553,6 +653,45 @@ def chat_send():
     result = chat_with_ai(message, history, locale, learner_profile)
     return jsonify(result)
 
+@app.route('/api/guest/session', methods=['POST'])
+def create_guest_session():
+    """Mint a short-lived guest account, seeded with sample history by default.
+
+    Guests are real users flagged is_guest=1 (see guest_service), so every
+    other route works unchanged; the budgets in usage_limits keep the LLM
+    spend bounded. Returns a normal session token.
+    """
+    if not settings.guest_preview_enabled:
+        return jsonify({"error": "Guest preview is disabled", "code": "preview_disabled"}), 404
+
+    data = get_json_body()
+    seed_history = data.get("seed_history", True) is not False
+    per_ip_per_hour, max_active = guest_creation_limits()
+
+    conn = get_db_connection()
+    try:
+        allowed, _ = consume(conn, f"ip:{_client_ip()}", "guest_create", per_ip_per_hour, window_key("hour"))
+        if not allowed:
+            return _guest_blocked_response("preview_busy")
+        if count_active_guests(conn) >= max_active:
+            return _guest_blocked_response("preview_busy")
+        info = create_guest(conn, seed_history=seed_history)
+    finally:
+        conn.close()
+
+    logger.info(
+        f"Guest session created user={info['user_id'][:8]} sample_rows={info['sample_rows']} "
+        f"referrer={request.headers.get('Referer', '-')} ua={request.user_agent.string[:120]}"
+    )
+    return jsonify({
+        "user_id": info["user_id"],
+        "token": issue_session_token(info["user_id"]),
+        "guest": True,
+        "expires_at": info["expires_at"],
+        "sample_history": info["sample_rows"] > 0,
+    }), 201
+
+
 @app.route('/api/users/register', methods=['POST'])
 def register_user():
     """
@@ -574,9 +713,23 @@ def register_user():
         if conn.execute('SELECT user_id FROM users WHERE username = ?', (username,)).fetchone() is not None:
             return jsonify({"error": "Username already occupied"}), 400
 
+        hashed_password = password_hash.hash(password)
+
+        # A guest who registers keeps their preview account: the row is
+        # converted in place (sample history dropped) instead of creating a
+        # second user, so what they did during the preview carries over.
+        upgrading_guest_id = _guest_id_from_request()
+        if upgrading_guest_id:
+            upgrade_guest(conn, upgrading_guest_id, username, hashed_password)
+            return jsonify({
+                "message": "Account created from your preview session",
+                "user_id": upgrading_guest_id,
+                "token": issue_session_token(upgrading_guest_id),
+                "upgraded": True,
+            }), 200
+
         # Insert the new user
         user_id = str(uuid.uuid4())
-        hashed_password = password_hash.hash(password)
         created_timestamp = datetime.now().isoformat()
         try:
             conn.execute('INSERT INTO users (user_id, username, password_hash, created_timestamp) VALUES (?, ?, ?, ?)', (user_id, username, hashed_password, created_timestamp))
@@ -648,7 +801,10 @@ def login_user():
 @app.route('/api/users/me', methods=['GET'])
 @auth_required
 def get_current_user():
-    return jsonify({"user_id": require_current_user_id()})
+    payload = {"user_id": require_current_user_id(), "guest": current_user_is_guest()}
+    if payload["guest"]:
+        payload["expires_at"] = getattr(g, "current_user_guest_expires_at", None)
+    return jsonify(payload)
 
 
 @app.route('/api/statistics/me', methods=['GET'])
@@ -931,6 +1087,8 @@ def get_video_exercises(video_id):
 @auth_required
 def import_video_route():
     """Import a video from a YouTube URL."""
+    if current_user_is_guest():
+        return _guest_blocked_response("guest_forbidden", "video_import")
     data = get_json_body()
     url = data.get('url', '').strip()
 
@@ -1002,7 +1160,7 @@ def submit_video_answer():
 
 
 @app.route('/api/videos/<video_id>/comprehension', methods=['POST'])
-@auth_required
+@guest_limited("video_comprehension")
 def generate_video_comprehension(video_id):
     """Generate AI comprehension questions for a video."""
     conn = get_db_connection()
@@ -1035,7 +1193,7 @@ def generate_video_comprehension(video_id):
 
 
 @app.route('/api/videos/comprehension/check', methods=['POST'])
-@auth_required
+@guest_limited("video_comprehension_check")
 def check_video_comprehension():
     """Check a comprehension answer."""
     data = get_json_body()
@@ -1074,7 +1232,7 @@ def check_video_comprehension():
 
 
 @app.route('/api/translate', methods=['POST'])
-@auth_required
+@guest_limited("translate")
 def translate_paragraph():
     """
     Translate a specific text segment.
@@ -1096,7 +1254,7 @@ def translate_paragraph():
     return jsonify({"translated_text": translated})
 
 @app.route('/api/tts', methods=['POST'])
-@auth_required
+@guest_limited("tts")
 def get_tts():
     """
     Generate Text-to-Speech audio for a given text.
@@ -1130,6 +1288,9 @@ def get_daily_review(user_id=None):
         JSON: {"review": markdown_string}
     """
     user_id = require_current_user_id() if user_id is None else require_route_user(user_id)
+    blocked = _meter_guest("daily_review")
+    if blocked is not None:
+        return blocked
     try:
         review_content = generate_daily_review_agent(user_id, DATABASE_PATH)
         return jsonify({"review": review_content})

@@ -19,11 +19,13 @@ py-modules = [
     "config",
     "db",
     "embedding_service",
+    "guest_service",
     "learner_service",
     "logging_config",
     "personal_rag",
     "translation_service",
     "tts_service",
+    "usage_limits",
     "video_service",
 ]
 packages = ["graphs", "services"]

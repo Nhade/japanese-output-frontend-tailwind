@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 import { apiJson } from '../lib/api';
+import { useAuthStore } from '../stores/auth';
 
 import AuthLayout from '../components/AuthLayout.vue';
 
 const { t } = useI18n();
+const router = useRouter();
+const auth = useAuthStore();
 
 const username = ref('');
 const password = ref('');
@@ -41,10 +45,16 @@ async function register() {
   message.value = '';
   isSubmitting.value = true;
   try {
-    const data = await apiJson<{ message: string }>('/api/users/register', {
+    const data = await apiJson<{ message: string; token?: string; user_id?: string }>('/api/users/register', {
       method: 'POST',
       body: { username: username.value, password: password.value },
     });
+    if (data.token && data.user_id) {
+      // A guest preview was upgraded in place: stay signed in as the new account.
+      auth.login(data.user_id, data.token, false);
+      router.push('/');
+      return;
+    }
     message.value = data.message;
   } catch (err) {
     error.value = err instanceof Error && err.message ? err.message : t('auth.error_generic');
@@ -61,6 +71,7 @@ async function register() {
       <span class="emphasis">{{ $t('auth.begin_habit_emphasis') }}</span>{{ $t('auth.begin_habit_suffix') }}
     </h2>
     <p class="auth-sub">{{ $t('auth.register_sub') }}</p>
+    <p v-if="auth.isGuest" class="auth-margin-note auth-upgrade-note">{{ $t('guest.register_note') }}</p>
 
     <form class="auth-form" @submit.prevent="register">
       <div
@@ -217,6 +228,10 @@ async function register() {
 /* Register-specific CTA override — sits closer to the margin note
    above (shared .auth-cta has a larger default top margin). */
 .auth-cta { margin-top: 4px; }
+
+.auth-upgrade-note {
+  margin: 14px 0 0;
+}
 
 .auth-success {
   padding: 14px 18px;

@@ -63,7 +63,12 @@ class TestMigrateConnection(unittest.TestCase):
 
         self.assertEqual([m.version for m in applied], [m.version for m in MIGRATIONS])
         self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], MIGRATIONS[-1].version)
-        self.assertTrue({"feedback", "score", "error_type", "embedding", "embedding_model"} <= _columns(conn, "answer_log"))
+        self.assertTrue(
+            {"feedback", "score", "error_type", "embedding", "embedding_model", "is_sample"} <= _columns(conn, "answer_log")
+        )
+        self.assertIn("usage_counters", {
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        })
         self.assertTrue(
             {
                 "idx_answer_log_user_wrong_ts",
