@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
 import { useI18n } from 'vue-i18n';
 
@@ -88,6 +88,7 @@ const exerciseMode = ref<'typing' | 'mcq'>('typing');
 const selectedChoice = ref<string | null>(null);
 const choices = ref<string[]>([]);
 const isExplaining = ref(false);
+const isSubmitting = ref(false);
 // Drives the full-spread page-leaf flip overlay on Next. A ~520ms timeout
 // covers the swap, giving the eye a single "leaf turning" moment instead of
 // a hard-cut between exercises.
@@ -160,7 +161,7 @@ function switchMode(mode: string) {
 }
 
 async function handleAnswerSubmit() {
-  if (!exercise.value) return;
+  if (!exercise.value || isSubmitting.value || feedback.value) return;
   if (exerciseMode.value === 'mcq') {
     if (!selectedChoice.value) return;
     userAnswer.value = selectedChoice.value;
@@ -168,6 +169,7 @@ async function handleAnswerSubmit() {
     if (!userAnswer.value.trim()) return;
   }
 
+  isSubmitting.value = true;
   try {
     const result = await apiJson<Feedback>('/api/exercise/submit', {
       method: 'POST',
@@ -245,6 +247,8 @@ async function handleAnswerSubmit() {
     }
   } catch (error) {
     console.error('Failed to submit answer:', error);
+  } finally {
+    isSubmitting.value = false;
   }
 }
 
@@ -309,9 +313,16 @@ function handleKeydown(event: KeyboardEvent) {
 // multiple choice, submit a deliberately wrong choice (so the grader and the
 // margin note show up), and open the full explanation.
 const tour = useTourStore();
+let mounted = true;
+watchEffect(() => {
+  tour.exerciseFeedbackReady = !!feedback.value;
+  tour.exerciseCanExplain = !!feedback.value?.log_id && !feedback.value.is_correct;
+  tour.exerciseBusy = isLoading.value || isSubmitting.value || isExplaining.value;
+});
 
 async function waitForExercise() {
-  await waitUntil(() => !isLoading.value && !!exercise.value, 10000);
+  const ready = await waitUntil(() => !mounted || !isLoading.value, 10000);
+  if (!ready || !mounted || !exercise.value) throw new Error('Exercise unavailable');
 }
 
 async function tourSwitchToMcq() {
@@ -320,21 +331,24 @@ async function tourSwitchToMcq() {
 }
 
 async function tourAnswerWrong() {
+  if (feedback.value) return;
   await tourSwitchToMcq();
   if (!exercise.value || feedback.value) return;
   const correct = exercise.value.correct_answer;
   const wrong = choices.value.find((c) => c !== correct) ?? choices.value[0];
-  if (!wrong) return;
+  if (!wrong) throw new Error('No sample answer available');
   selectedChoice.value = wrong;
   await handleAnswerSubmit();
+  if (!feedback.value) throw new Error('Answer submission failed');
 }
 
 async function tourExplainDetailed() {
   if (!feedback.value || feedback.value.is_correct) return;
   if (detailedFeedback.value) showDetailModal.value = true;
   else await fetchDetailedFeedback();
+  if (!showDetailModal.value) throw new Error('Explanation unavailable');
   // Resolve once the visitor closes the explanation, so the tour can resume.
-  await waitUntil(() => !showDetailModal.value, 10 * 60 * 1000);
+  await waitUntil(() => !mounted || !showDetailModal.value, 10 * 60 * 1000);
 }
 
 onMounted(() => {
@@ -346,6 +360,10 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  mounted = false;
+  tour.exerciseFeedbackReady = false;
+  tour.exerciseCanExplain = false;
+  tour.exerciseBusy = false;
   window.removeEventListener('keydown', handleKeydown);
   tour.unregisterHandler('exercise:mcq');
   tour.unregisterHandler('exercise:wrong-answer');
@@ -455,7 +473,7 @@ onUnmounted(() => {
                   type="submit"
                   variant="shiori"
                   size="auto"
-                  :disabled="!userAnswer.trim()"
+                  :disabled="!userAnswer.trim() || isSubmitting"
                 >
                   {{ $t('exercise.check_answer') }}
                 </Button>
@@ -506,7 +524,7 @@ onUnmounted(() => {
                   type="button"
                   variant="shiori"
                   size="auto"
-                  :disabled="!selectedChoice"
+                  :disabled="!selectedChoice || isSubmitting"
                   @click="handleAnswerSubmit"
                 >
                   {{ $t('exercise.check_answer') }}

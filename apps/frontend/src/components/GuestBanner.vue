@@ -1,8 +1,7 @@
 <script setup lang="ts">
 // Slim strip shown above every chrome'd view while a guest session is
-// active. It says what a guest is looking at (sample history), what happens
-// to their data (purged after 7 days), and offers the two exits: keep the
-// history by registering, or end the preview.
+// active. It identifies the temporary session and sample history, and offers
+// two exits: keep the user's answers by registering, or end the preview.
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 

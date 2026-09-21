@@ -25,6 +25,14 @@ export const useTourStore = defineStore('tour', () => {
   /** "Assist me": switch prompts to multiple choice, open translations, offer one-click inputs. */
   const assisted = ref(readAssisted())
   const active = ref(false)
+  const stepIndex = ref<number | null>(null)
+  const inlineStep = ref<number | null>(null)
+  const busy = ref(false)
+  const actionState = ref<'idle' | 'working' | 'done' | 'failed'>('idle')
+  const exerciseFeedbackReady = ref(false)
+  const exerciseCanExplain = ref(false)
+  const exerciseBusy = ref(false)
+  const chatBusy = ref(false)
   /** About section shown in the Learn-more drawer, or null when closed. */
   const drawerSection = ref<string | null>(null)
 
@@ -66,6 +74,14 @@ export const useTourStore = defineStore('tour', () => {
   return {
     assisted,
     active,
+    stepIndex,
+    inlineStep,
+    busy,
+    actionState,
+    exerciseFeedbackReady,
+    exerciseCanExplain,
+    exerciseBusy,
+    chatBusy,
     drawerSection,
     setAssisted,
     registerHandler,

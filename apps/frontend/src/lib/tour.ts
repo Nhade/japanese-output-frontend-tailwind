@@ -5,7 +5,7 @@
 // a navigation, injects "Try it" / "Learn more" buttons into the popovers,
 // and pauses the tour (destroying the driver) while a modal or the About
 // drawer is open, resuming at the right step afterwards.
-import { watch } from 'vue';
+import { nextTick, watch, watchEffect } from 'vue';
 import type { Router } from 'vue-router';
 import {
   driver,
@@ -48,6 +48,9 @@ export interface TourStepDef {
   action?: TourAction;
   /** Handler run automatically on entering the step when "Assist me" is on. */
   onEnterAssisted?: string;
+  /** Render controls in the chat layout, leaving replies unobstructed. */
+  inline?: boolean;
+  requiresFeedback?: boolean;
   side?: Side;
   align?: Alignment;
 }
@@ -79,6 +82,7 @@ export const TOUR_STEPS: readonly TourStepDef[] = [
   },
   {
     id: 'exercise_feedback',
+    requiresFeedback: true,
     route: '/study/exercise',
     element: '[data-tour="exercise-answer"]',
     learnMore: 'models',
@@ -96,6 +100,7 @@ export const TOUR_STEPS: readonly TourStepDef[] = [
   },
   {
     id: 'tutor',
+    inline: true,
     route: '/chat',
     element: '[data-tour="chat-composer"]',
     learnMore: 'tutor',
@@ -104,6 +109,7 @@ export const TOUR_STEPS: readonly TourStepDef[] = [
   },
   {
     id: 'safety',
+    inline: true,
     route: '/chat',
     element: '[data-tour="chat-composer"]',
     learnMore: 'safety',
@@ -146,7 +152,11 @@ let deps: TourDeps | null = null;
 let drv: Driver | null = null;
 let started = false;
 let pausing = false;
-let navigating = false;
+let session = 0;
+let internalNavigation = 0;
+let stopControls: (() => void) | undefined;
+let stopDrawer: (() => void) | undefined;
+let removeRouteHook: (() => void) | undefined;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -154,15 +164,30 @@ let navigating = false;
 
 export function installTour(dependencies: TourDeps): void {
   deps = dependencies;
+  removeRouteHook?.();
+  removeRouteHook = dependencies.router.afterEach((to, from) => {
+    if (to.path !== from.path && !internalNavigation && useTourStore().active) stopTour();
+  });
 }
 
 export function startTour(index = 0): void {
   if (!deps) return;
-  void run(index);
+  stopTour();
+  useTourStore().active = true;
+  void goTo(index);
 }
 
 export function stopTour(): void {
-  drv?.destroy();
+  session++;
+  stopDrawer?.();
+  stopDrawer = undefined;
+  suspendDriver();
+  const store = useTourStore();
+  store.active = false;
+  store.stepIndex = null;
+  store.busy = false;
+  store.actionState = 'idle';
+  store.closeDrawer();
 }
 
 export function isTourDone(): boolean {
@@ -204,52 +229,83 @@ export function waitUntil(predicate: () => boolean, timeoutMs = 8000): Promise<b
 // Runner
 // ---------------------------------------------------------------------------
 
-async function run(index: number): Promise<void> {
-  if (!deps) return;
-  const store = useTourStore();
-  if (drv) {
-    pausing = true;
-    drv.destroy();
-    pausing = false;
-  }
-  drv = driver(buildConfig(store));
+function suspendDriver(): void {
+  stopControls?.();
+  stopControls = undefined;
+  pausing = true;
+  drv?.destroy();
+  drv = null;
   started = false;
-  store.active = true;
-  if (import.meta.env.DEV) {
-    // Handy while debugging the tour from the browser console.
-    (window as unknown as { __shioriTour?: Driver }).__shioriTour = drv;
-  }
-  await goTo(index);
+  pausing = false;
+  useTourStore().inlineStep = null;
 }
 
-async function goTo(index: number): Promise<void> {
-  if (!deps || !drv) return;
+function isCurrent(ticket: number): boolean {
+  return ticket === session && useTourStore().active;
+}
+
+async function navigate<T>(work: () => Promise<T>): Promise<T> {
+  internalNavigation++;
+  try {
+    return await work();
+  } finally {
+    internalNavigation--;
+  }
+}
+
+async function goTo(index: number, direction: 1 | -1 = 1): Promise<void> {
+  if (!deps || !useTourStore().active) return;
   const def = TOUR_STEPS[index];
   if (!def) {
     finish();
     return;
   }
   const store = useTourStore();
-  const instance = drv;
+  const ticket = session;
+  store.busy = true;
+  try {
+    await navigate(() => ensureRoute(def, store));
+    if (!isCurrent(ticket)) return;
+    if (def.element) await waitFor(def.element);
+    if (!isCurrent(ticket)) return;
 
-  await ensureRoute(def, store);
-  if (def.element) await waitFor(def.element);
-  if (drv !== instance) return; // closed or restarted while we were waiting
-
-  if (started) {
-    instance.moveTo(index);
-  } else {
-    instance.drive(index);
-    started = true;
-  }
-
-  if (def.onEnterAssisted && store.assisted && store.hasHandler(def.onEnterAssisted)) {
-    try {
+    // Prepare the view before driver.js captures its DOM element. Switching
+    // exercise mode replaces the spread, so refreshing the old node cannot work.
+    if (def.onEnterAssisted && store.assisted && store.hasHandler(def.onEnterAssisted)) {
       await store.runAction(def.onEnterAssisted);
-    } catch (err) {
-      console.warn('[tour] assisted action failed', err);
+      await nextTick();
     }
-    if (drv === instance) instance.refresh();
+    if (!isCurrent(ticket)) return;
+    if (def.element && !await waitFor(def.element)) {
+      if (isCurrent(ticket)) await goTo(index + direction, direction);
+      return;
+    }
+    if (!isCurrent(ticket)) return;
+    // Next may skip the exercise, and Back may remount it with no answer.
+    // Neither route should describe feedback that does not exist.
+    if (def.requiresFeedback && !store.exerciseFeedbackReady) {
+      await goTo(index + direction, direction);
+      return;
+    }
+    if (store.stepIndex !== index) store.actionState = 'idle';
+    store.stepIndex = index;
+    if (def.inline) {
+      suspendDriver();
+      store.inlineStep = index;
+      return;
+    }
+    store.inlineStep = null;
+    if (!drv) drv = driver(buildConfig(store));
+    if (started) drv.moveTo(index);
+    else {
+      drv.drive(index);
+      started = true;
+    }
+  } catch (err) {
+    console.warn('[tour] navigation failed', err);
+    if (isCurrent(ticket)) store.actionState = 'failed';
+  } finally {
+    if (isCurrent(ticket)) store.busy = false;
   }
 }
 
@@ -279,24 +335,21 @@ async function ensureRoute(def: TourStepDef, store: TourStore): Promise<void> {
 }
 
 async function advance(delta: 1 | -1): Promise<void> {
-  if (!drv || navigating) return;
-  const current = drv.getActiveIndex() ?? 0;
+  const store = useTourStore();
+  if (!store.active || controlsBusy(store) || store.stepIndex === null) return;
+  const current = store.stepIndex;
   const next = current + delta;
   if (next >= TOUR_STEPS.length) {
     finish();
     return;
   }
   if (next < 0) return;
-  navigating = true;
-  try {
-    await goTo(next);
-  } finally {
-    navigating = false;
-  }
+  await goTo(next, delta);
 }
 
 function finish(): void {
-  drv?.destroy();
+  markDone();
+  stopTour();
 }
 
 function markDone(): void {
@@ -307,36 +360,52 @@ function markDone(): void {
   }
 }
 
-/** Destroy the driver, wait for `pending` (a modal being closed), then resume. */
-async function pauseFor(pending: Promise<void>, resumeAt: number): Promise<void> {
-  if (drv) {
-    pausing = true;
-    drv.destroy();
-    pausing = false;
-  }
-  try {
-    await pending;
-  } catch (err) {
-    console.warn('[tour] paused action failed', err);
-  }
-  await run(resumeAt);
-}
-
 function openLearnMore(sectionId: string, resumeAt: number, store: TourStore): void {
-  if (drv) {
-    pausing = true;
-    drv.destroy();
-    pausing = false;
-  }
+  if (controlsBusy(store)) return;
+  const ticket = session;
+  const path = deps!.router.currentRoute.value.path;
+  suspendDriver();
+  stopDrawer?.();
   store.openDrawer(sectionId);
-  const stop = watch(
+  stopDrawer = watch(
     () => store.drawerSection,
     (value) => {
       if (value !== null) return;
-      stop();
-      void run(resumeAt);
+      stopDrawer?.();
+      stopDrawer = undefined;
+      if (isCurrent(ticket) && deps!.router.currentRoute.value.path === path) void goTo(resumeAt);
     },
   );
+}
+
+export function controlsBusy(store = useTourStore()): boolean {
+  const id = TOUR_STEPS[store.stepIndex ?? -1]?.id;
+  return store.busy || (id?.startsWith('exercise_') ? store.exerciseBusy : false)
+    || ((id === 'tutor' || id === 'safety') && store.chatBusy);
+}
+
+export function nextTourStep(): void { void advance(1); }
+export function previousTourStep(): void { void advance(-1); }
+export function learnMore(): void {
+  const store = useTourStore();
+  const index = store.stepIndex;
+  const section = TOUR_STEPS[index ?? -1]?.learnMore;
+  if (index !== null && section) openLearnMore(section, index, store);
+}
+
+function actionAvailable(def: TourStepDef, store: TourStore): boolean {
+  return !!def.action && store.hasHandler(def.action.name)
+    && (def.action.name !== 'exercise:explain-detailed' || store.exerciseCanExplain);
+}
+
+export function tourActionLabel(): string {
+  const store = useTourStore();
+  const def = TOUR_STEPS[store.stepIndex ?? -1];
+  if (!deps || !def?.action) return '';
+  if (store.actionState === 'working') return deps.t('tour.buttons.working');
+  if (store.actionState === 'done') return deps.t('tour.buttons.done_action');
+  if (store.actionState === 'failed') return deps.t('tour.buttons.action_failed');
+  return deps.t(def.action.labelKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -374,9 +443,8 @@ function buildConfig(store: TourStore): Config {
     },
     onDestroyed: () => {
       if (pausing) return;
-      markDone();
-      store.active = false;
       drv = null;
+      finish();
     },
     onPopoverRender: (popover, opts) => {
       decoratePopover(popover, opts.state.activeIndex ?? 0, store);
@@ -439,12 +507,15 @@ function decoratePopover(popover: PopoverDOM, index: number, store: TourStore): 
   const row = document.createElement('div');
   row.className = 'shiori-tour-actions';
 
-  if (def.action && store.hasHandler(def.action.name)) {
+  let actionButton: HTMLButtonElement | undefined;
+  let learnButton: HTMLButtonElement | undefined;
+  if (def.action && actionAvailable(def, store)) {
     const action = def.action;
     const button = makeButton(t(action.labelKey), true);
     button.addEventListener('click', () => {
-      void runStepAction(action, button, index, store);
+      void performTourAction();
     });
+    actionButton = button;
     row.appendChild(button);
   }
 
@@ -452,6 +523,7 @@ function decoratePopover(popover: PopoverDOM, index: number, store: TourStore): 
     const sectionId = def.learnMore;
     const button = makeButton(t('tour.buttons.learn_more'));
     button.addEventListener('click', () => openLearnMore(sectionId, index, store));
+    learnButton = button;
     row.appendChild(button);
   }
 
@@ -477,25 +549,47 @@ function decoratePopover(popover: PopoverDOM, index: number, store: TourStore): 
   }
 
   if (row.childElementCount > 0) anchor.insertAdjacentElement('afterend', row);
+  stopControls?.();
+  stopControls = watchEffect(() => {
+    const busy = controlsBusy(store);
+    popover.previousButton.disabled = busy || index === 0;
+    popover.nextButton.disabled = busy;
+    popover.nextButton.textContent = t(index === TOUR_STEPS.length - 1 ? 'tour.buttons.done'
+      : def.id === 'exercise_answer' && !store.exerciseFeedbackReady ? 'tour.buttons.skip_exercise' : 'tour.buttons.next');
+    if (learnButton) learnButton.disabled = busy;
+    if (actionButton) {
+      actionButton.disabled = busy || store.actionState === 'done' || !actionAvailable(def, store);
+      actionButton.textContent = tourActionLabel();
+    }
+  });
 }
 
-async function runStepAction(action: TourAction, button: HTMLButtonElement, index: number, store: TourStore): Promise<void> {
-  const { t } = deps!;
-  button.disabled = true;
-  button.textContent = t('tour.buttons.working');
+export async function performTourAction(): Promise<void> {
+  const store = useTourStore();
+  const index = store.stepIndex;
+  if (!store.active || controlsBusy(store) || index === null || store.actionState === 'done') return;
+  const def = TOUR_STEPS[index];
+  if (!actionAvailable(def, store)) return;
+  const action = def.action!;
+  const ticket = session;
+  store.busy = true;
+  store.actionState = 'working';
+  if (action.pauses) suspendDriver();
   try {
-    if (action.pauses) {
-      await pauseFor(store.runAction(action.name, action.payload), action.advance ? index + 1 : index);
-      return;
-    }
-    await store.runAction(action.name, action.payload);
+    const run = () => store.runAction(action.name, action.payload);
+    if (action.name === 'news:open-lead') await navigate(run);
+    else await run();
+    if (!isCurrent(ticket) || store.stepIndex !== index) return;
+    store.actionState = 'done';
+    if (action.advance || action.pauses) await goTo(action.advance ? index + 1 : index);
     drv?.refresh();
-    button.textContent = t('tour.buttons.done_action');
-    if (action.advance) await advance(1);
   } catch (err) {
     console.warn('[tour] action failed', err);
-    button.disabled = false;
-    button.textContent = t('tour.buttons.action_failed');
+    if (!isCurrent(ticket)) return;
+    store.actionState = 'failed';
+    if (action.pauses) await goTo(index);
+  } finally {
+    if (isCurrent(ticket)) store.busy = false;
   }
 }
 

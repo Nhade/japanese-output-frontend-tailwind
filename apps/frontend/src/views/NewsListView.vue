@@ -99,14 +99,15 @@ function clearFilters() {
 }
 
 function openArticle(a: Article) {
-  router.push(`/news/${a.article_id}`);
+  return router.push(`/news/${a.article_id}`);
 }
 
 // Guided tour: open the lead article once the list has loaded.
 const tour = useTourStore();
 tour.registerHandler('news:open-lead', async () => {
   await waitUntil(() => !loading.value, 10000);
-  if (leadArticle.value) openArticle(leadArticle.value);
+  if (!leadArticle.value) throw new Error('No article available');
+  await openArticle(leadArticle.value);
 });
 
 onMounted(() => {

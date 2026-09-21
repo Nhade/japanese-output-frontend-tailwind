@@ -31,8 +31,8 @@ onMounted(async () => {
   <main class="about-shell ei-shell-bg text-foreground">
     <div class="about-page">
       <header class="about-hero">
-        <div class="eyebrow eyebrow-kohaku">{{ $t('about.eyebrow') }}</div>
         <h1 class="about-h1">{{ $t('about.title') }}</h1>
+        <p class="about-subtitle">{{ $t('about.subtitle') }}</p>
         <p class="about-hero-lede">{{ $t('about.lede') }}</p>
 
         <div class="about-ctas">
@@ -123,6 +123,14 @@ onMounted(async () => {
   font-size: 1.08rem;
   line-height: 1.7;
   color: color-mix(in oklab, var(--foreground) 66%, transparent);
+}
+
+.about-subtitle {
+  margin: 0 0 14px;
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  line-height: 1.5;
+  color: var(--foreground);
 }
 
 .about-ctas {
