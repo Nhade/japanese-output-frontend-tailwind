@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import SettingsModal from '../components/SettingsModal.vue';
+import TourChatPanel from '../components/about/TourChatPanel.vue';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
+import { useTourStore } from '../stores/tour';
 import { apiJson } from '../lib/api';
 
 interface FeedbackCorrection {
@@ -80,6 +82,13 @@ const headerDate = computed(() => {
   return `${dateStr} · ${timeStr}`;
 });
 
+// The backend's safeguard refusal carries a fixed English note and no
+// corrections; show the localized refusal instead of that note plus a
+// contradictory "no errors, good job".
+function isSafetyRefusal(feedback?: Feedback): boolean {
+  return !!feedback?.overall?.includes?.('Safety violation');
+}
+
 function localizedFocusTag(tag: string): string {
   return t(`pos.${tag.toLowerCase()}`, tag);
 }
@@ -101,13 +110,13 @@ async function scrollToBottom() {
 
 async function sendMessage(rawText?: string) {
   const text = (rawText ?? inputMessage.value).trim();
-  if (!text || isLoading.value) return;
+  if (!text || isLoading.value) return false;
+  isLoading.value = true;
   inputMessage.value = '';
 
   const nowISO = new Date().toISOString();
   messages.value.push({ role: 'user', content: text, time: nowISO });
   await scrollToBottom();
-  isLoading.value = true;
 
   try {
     const historyPayload = messages.value.map(m => ({
@@ -124,7 +133,7 @@ async function sendMessage(rawText?: string) {
       },
     });
 
-    if (data.feedback?.overall?.includes?.('Safety violation')) {
+    if (isSafetyRefusal(data.feedback)) {
       toastStore.trigger(t('chat.safety_violation'), 'error');
     }
 
@@ -143,6 +152,7 @@ async function sendMessage(rawText?: string) {
       content: data.response || t('chat.error_response'),
       time: new Date().toISOString(),
     });
+    return true;
   } catch (err) {
     console.error('Chat error:', err);
     messages.value.push({
@@ -150,6 +160,7 @@ async function sendMessage(rawText?: string) {
       content: t('chat.error_response'),
       time: new Date().toISOString(),
     });
+    return false;
   } finally {
     isLoading.value = false;
     await scrollToBottom();
@@ -169,6 +180,18 @@ function toggleFeedback(index: number) {
     msg.showFeedback = !msg.showFeedback;
   }
 }
+
+// Guided tour: send a prepared message (a sentence with a deliberate
+// mistake, or a prompt injection for the safeguard demo).
+const tour = useTourStore();
+watchEffect(() => { tour.chatBusy = isLoading.value; });
+tour.registerHandler('chat:send', async (payload) => {
+  if (!await sendMessage(String(payload ?? ''))) throw new Error('Chat message failed');
+});
+onUnmounted(() => {
+  tour.unregisterHandler('chat:send');
+  tour.chatBusy = false;
+});
 
 onMounted(async () => {
   const saved = localStorage.getItem(chatStorageKey.value) ?? localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -221,7 +244,7 @@ watch(messages, (val) => {
 
 <template>
   <main class="chat-shell ei-shell-bg text-foreground">
-    <div class="ch-workspace-page">
+    <div class="ch-workspace-page" :class="{ 'has-tour': tour.inlineStep !== null }">
       <!-- Unified masthead ---------------------------------------- -->
       <header class="ch-header">
         <div class="ch-header-lede">
@@ -267,6 +290,7 @@ watch(messages, (val) => {
       </header>
 
       <SettingsModal :show="showSettings" @close="showSettings = false" />
+      <TourChatPanel />
 
       <!-- Desk workspace ------------------------------------------ -->
       <div class="ch-workspace ch-workspace-desk">
@@ -316,7 +340,10 @@ watch(messages, (val) => {
 
                   <div v-if="msg.showFeedback" class="ch-inline-feedback">
                     <div class="ch-margin-eyebrow">{{ $t('chat.tutors_note') }}</div>
-                    <p v-if="msg.feedback.overall" class="ch-margin-overall">
+                    <p v-if="isSafetyRefusal(msg.feedback)" class="ch-margin-overall">
+                      {{ $t('chat.safety_violation') }}
+                    </p>
+                    <p v-else-if="msg.feedback.overall" class="ch-margin-overall">
                       {{ msg.feedback.overall }}
                     </p>
                     <ul
@@ -332,7 +359,7 @@ watch(messages, (val) => {
                         <div class="ch-corr-note">{{ c.explanation }}</div>
                       </li>
                     </ul>
-                    <div v-else class="ch-margin-empty">{{ $t('chat.no_errors') }}</div>
+                    <div v-else-if="!isSafetyRefusal(msg.feedback)" class="ch-margin-empty">{{ $t('chat.no_errors') }}</div>
                   </div>
                 </div>
               </div>
@@ -352,7 +379,7 @@ watch(messages, (val) => {
           </div>
 
           <!-- Composer ------------------------------------------- -->
-          <div class="ch-composer">
+          <div class="ch-composer" data-tour="chat-composer">
             <div class="ch-composer-eyebrow">
               <span class="eyebrow-sm">{{ $t('chat.compose_eyebrow') }}</span>
               <span class="ch-composer-hint">{{ $t('chat.compose_hint') }}</span>
@@ -444,6 +471,8 @@ watch(messages, (val) => {
   flex-direction: column;
   min-height: 0;
 }
+.ch-workspace-page.has-tour { height: auto; min-height: calc(100dvh - var(--app-chrome-h)); }
+.has-tour .ch-stream { flex: none; min-height: 240px; max-height: 55dvh; }
 @media (max-width: 900px) {
   .ch-workspace-page { padding: 0 20px; height: auto; min-height: calc(100vh - var(--app-chrome-h)); }
 }

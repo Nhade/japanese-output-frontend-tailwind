@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
 import { useI18n } from 'vue-i18n';
 
@@ -14,8 +14,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 import { useToastStore } from '@/stores/toast';
+import { useTourStore } from '@/stores/tour';
 import { apiJson } from '@/lib/api';
 import { safeMarkdown } from '@/lib/markdown';
+import { waitUntil } from '@/lib/tour';
 
 interface Exercise {
   exercise_id: string;
@@ -86,6 +88,7 @@ const exerciseMode = ref<'typing' | 'mcq'>('typing');
 const selectedChoice = ref<string | null>(null);
 const choices = ref<string[]>([]);
 const isExplaining = ref(false);
+const isSubmitting = ref(false);
 // Drives the full-spread page-leaf flip overlay on Next. A ~520ms timeout
 // covers the swap, giving the eye a single "leaf turning" moment instead of
 // a hard-cut between exercises.
@@ -158,7 +161,7 @@ function switchMode(mode: string) {
 }
 
 async function handleAnswerSubmit() {
-  if (!exercise.value) return;
+  if (!exercise.value || isSubmitting.value || feedback.value) return;
   if (exerciseMode.value === 'mcq') {
     if (!selectedChoice.value) return;
     userAnswer.value = selectedChoice.value;
@@ -166,6 +169,7 @@ async function handleAnswerSubmit() {
     if (!userAnswer.value.trim()) return;
   }
 
+  isSubmitting.value = true;
   try {
     const result = await apiJson<Feedback>('/api/exercise/submit', {
       method: 'POST',
@@ -243,6 +247,8 @@ async function handleAnswerSubmit() {
     }
   } catch (error) {
     console.error('Failed to submit answer:', error);
+  } finally {
+    isSubmitting.value = false;
   }
 }
 
@@ -302,13 +308,80 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+// ---- Guided-tour handlers ------------------------------------------------
+// The tour drives this page for visitors who cannot type Japanese: switch to
+// multiple choice, submit a deliberately wrong answer (so the grader and the
+// margin note show up), and open the full explanation.
+const tour = useTourStore();
+let mounted = true;
+watchEffect(() => {
+  tour.exerciseFeedbackReady = !!feedback.value;
+  tour.exerciseCanExplain = !!feedback.value?.log_id && !feedback.value.is_correct;
+  tour.exerciseBusy = isLoading.value || isSubmitting.value || isExplaining.value;
+});
+
+async function waitForExercise() {
+  const ready = await waitUntil(() => !mounted || !isLoading.value, 10000);
+  if (!ready || !mounted || !exercise.value) throw new Error('Exercise unavailable');
+}
+
+async function tourSwitchToMcq() {
+  if (exerciseMode.value !== 'mcq') switchMode('mcq');
+  await waitForExercise();
+}
+
+async function tourAnswerWrong() {
+  if (feedback.value) return;
+  await waitForExercise();
+  if (!exercise.value || feedback.value) return;
+  if (exerciseMode.value === 'mcq') {
+    const correct = exercise.value.correct_answer;
+    const wrong = choices.value.find((c) => c !== correct) ?? choices.value[0];
+    if (!wrong) throw new Error('No sample answer available');
+    selectedChoice.value = wrong;
+  } else {
+    // Typing prompts carry no choices. Borrow a distractor for this same
+    // exercise so the sentence the visitor has been reading stays on screen.
+    const exerciseId = exercise.value.exercise_id;
+    const data = await apiJson<Exercise>('/api/exercise/random', {
+      query: { mode: 'mcq', exercise_id: exerciseId },
+    });
+    if (data.exercise_id !== exerciseId) throw new Error('Requested exercise unavailable');
+    const wrong = data.choices?.find((c) => c !== data.correct_answer);
+    if (!wrong) throw new Error('No sample answer available');
+    if (!mounted || exercise.value?.exercise_id !== exerciseId || feedback.value) return;
+    userAnswer.value = wrong;
+  }
+  await handleAnswerSubmit();
+  if (!feedback.value) throw new Error('Answer submission failed');
+}
+
+async function tourExplainDetailed() {
+  if (!feedback.value || feedback.value.is_correct) return;
+  if (detailedFeedback.value) showDetailModal.value = true;
+  else await fetchDetailedFeedback();
+  if (!showDetailModal.value) throw new Error('Explanation unavailable');
+  // Resolve once the visitor closes the explanation, so the tour can resume.
+  await waitUntil(() => !mounted || !showDetailModal.value, 10 * 60 * 1000);
+}
+
 onMounted(() => {
   fetchNewExercise();
   window.addEventListener('keydown', handleKeydown);
+  tour.registerHandler('exercise:mcq', tourSwitchToMcq);
+  tour.registerHandler('exercise:wrong-answer', tourAnswerWrong);
+  tour.registerHandler('exercise:explain-detailed', tourExplainDetailed);
 });
 
 onUnmounted(() => {
+  mounted = false;
+  tour.exerciseFeedbackReady = false;
+  tour.exerciseCanExplain = false;
+  tour.exerciseBusy = false;
   window.removeEventListener('keydown', handleKeydown);
+  tour.unregisterHandler('exercise:mcq');
+  tour.unregisterHandler('exercise:wrong-answer');
+  tour.unregisterHandler('exercise:explain-detailed');
 });
 </script>
 
@@ -342,13 +415,14 @@ onUnmounted(() => {
         </header>
 
         <!-- Spread — verso (prompt) | gutter | recto (response) -->
-        <article class="spread">
+        <article class="spread" data-tour="exercise-spread">
           <div class="gutter" aria-hidden="true" />
 
           <!-- Verso — prompt -->
           <section
             :key="'verso-' + exercise.exercise_id + '-' + blankState"
             class="verso anim-page-turn"
+            data-tour="exercise-prompt"
           >
             <div class="eyebrow verso-eyebrow">
               {{ feedback ? $t('exercise.eyebrow_your_reading') : $t('exercise.eyebrow_fill_blank') }}
@@ -389,6 +463,7 @@ onUnmounted(() => {
           <section
             :key="'recto-' + exercise.exercise_id + '-' + blankState + '-' + exerciseMode"
             class="recto"
+            data-tour="exercise-answer"
             :class="{ 'is-feedback': !!feedback }"
           >
             <!-- Typing initial -->
@@ -412,7 +487,7 @@ onUnmounted(() => {
                   type="submit"
                   variant="shiori"
                   size="auto"
-                  :disabled="!userAnswer.trim()"
+                  :disabled="!userAnswer.trim() || isSubmitting"
                 >
                   {{ $t('exercise.check_answer') }}
                 </Button>
@@ -463,7 +538,7 @@ onUnmounted(() => {
                   type="button"
                   variant="shiori"
                   size="auto"
-                  :disabled="!selectedChoice"
+                  :disabled="!selectedChoice || isSubmitting"
                   @click="handleAnswerSubmit"
                 >
                   {{ $t('exercise.check_answer') }}

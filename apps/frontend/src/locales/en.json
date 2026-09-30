@@ -23,7 +23,9 @@
         "practice_desc": "Final-exam MCQs and lesson drills",
         "mistakes_desc": "Revisit recent misses",
         "statistics_desc": "Accuracy and activity",
-        "more": "More"
+        "more": "More",
+        "about": "About",
+        "tour": "Tour"
     },
     "common": {
         "language": "Language",
@@ -478,7 +480,7 @@
     },
     "guest": {
         "banner_eyebrow": "Preview",
-        "banner_text": "You're browsing as a guest with sample history loaded. Nothing you do here is kept beyond 7 days.",
+        "banner_text": "You're using a temporary guest session with sample history. Create an account to keep your own answers.",
         "create_account": "Create account",
         "end_preview": "End preview",
         "login_line": "Just looking?",
@@ -486,8 +488,8 @@
         "register_note": "Your preview history moves to the new account. The sample entries are removed.",
         "sample_note": "Includes sample history so the preview has something to show.",
         "sample_badge": "Sample",
-        "entry_opening": "Opening the reading room…",
-        "entry_sub": "Setting up a guest desk with sample history. No account needed.",
+        "entry_opening": "Starting the guest preview…",
+        "entry_sub": "Loading a temporary session with sample history. No registration needed.",
         "entry_expired": "Your preview session ended. Starting a fresh one.",
         "entry_failed_title": "The preview could not start",
         "entry_failed": "We couldn't start a guest session right now. Please try again in a moment.",
@@ -501,5 +503,202 @@
         "limit_guest_forbidden_title": "Not available in the preview",
         "limit_guest_forbidden_body": "Importing videos pulls a transcript and generates exercises with the LLM, so it is reserved for account holders.",
         "limit_keep_browsing": "Keep browsing"
+    },
+    "about": {
+        "eyebrow": "About Shiori",
+        "title": "About Shiori",
+        "subtitle": "A Japanese learning workspace for Traditional Chinese speakers, built around reading, practice, and feedback.",
+        "lede": "Shiori (栞, “bookmark”) began as a course project exploring how rule-based language processing and large language models can support language learning.",
+        "cta_guest": "Explore as a guest",
+        "cta_signin": "Sign in",
+        "cta_tour": "Take the tour",
+        "cta_source": "Source on GitHub",
+        "cta_today": "Back to Today",
+        "cta_register": "Create account",
+        "contents": "Contents",
+        "try": "Try it",
+        "how": "How it works",
+        "note_label": "Technical details",
+        "closing_title": "Where to go next",
+        "closing_body": "The guest preview includes sample learning history. Register during your preview to keep your own answers and remove the sample entries. Registration requires a username and password.",
+        "drawer_eyebrow": "Learn more",
+        "drawer_full": "Read the full page",
+        "drawer_close": "Close",
+        "login_line": "Learn about the app",
+        "login_cta": "About Shiori",
+        "sections": {
+            "overview": {
+                "title": "How Shiori works",
+                "lede": "Read Japanese articles, complete exercises, and review explanations of your mistakes. The tutor uses your learning history to tailor its replies and feedback.",
+                "b1": "Reading material comes from real NHK articles, segmented into paragraphs and sentences.",
+                "b2": "Exercises are generated from those sentences and graded with rules first, a language model second.",
+                "b3": "Your learner profile tracks accuracy by part of speech and JLPT level and selects a practice focus for the tutor. The daily review summarizes today's incorrect answers.",
+                "note": "Vue 3 single-page app, Flask API, SQLite. The model layer is provider-agnostic. Frontend on Cloudflare Pages, API on a small Hetzner VM behind Caddy."
+            },
+            "exercise": {
+                "title": "Daily exercise",
+                "lede": "Practice with fill-in-the-blank questions from news articles. Each question includes a Chinese translation as a hint.",
+                "b1": "Janome uses morphological analysis to identify words and their grammatical roles. Rules and a JLPT vocabulary list identify eligible words; one is selected at random for the blank.",
+                "b2": "Answers are first converted to kana with pykakasi and compared with the reference answer. An answer that does not match is then sent to the language model for evaluation.",
+                "b3": "The model identifies an error type, such as a typo, word choice, particle, conjugation, or unnatural expression, and writes a short explanation. A fixed deduction for that error type determines the score.",
+                "note": "You can request a separate, detailed explanation with grammar notes and examples. The evaluator uses the balanced model tier and retries malformed JSON responses."
+            },
+            "tutor": {
+                "title": "Tutor's desk",
+                "lede": "Chat in Japanese and read corrections alongside your messages.",
+                "b1": "The prompt is built from your learner profile: estimated level, weak points, the current focus, and how strict you asked the feedback to be.",
+                "b2": "The prompt asks for a limited number of corrections per message and for each correction to quote only the relevant text.",
+                "b3": "The model returns the reply and corrections in a JSON object so the page can display them separately.",
+                "note": "A LangGraph workflow handles the safety check, learner context, and model call. Up to twenty recent history messages are included with each request."
+            },
+            "safety": {
+                "title": "Input checks",
+                "lede": "A separate model can check input before chat replies or exercise explanations are generated.",
+                "b1": "When enabled and available, the safeguard checks chat messages and answers sent for AI evaluation. It looks for prompt injection, attempts to change the tutor's role, off-topic requests, and instructions that alter the output format.",
+                "b2": "If the safeguard flags an input, the app returns a refusal instead of generating the requested reply or explanation.",
+                "b3": "The tour includes a sample request that asks the tutor to ignore its instructions and write code, so you can see how the app responds.",
+                "note": "The safeguard uses a Groq model configured separately from the other model tiers. Checks can be disabled; requests also continue if the classifier is unavailable or fails."
+            },
+            "review": {
+                "title": "Daily review",
+                "lede": "Generate a summary of today's incorrect answers, with explanations and suggested practice.",
+                "b1": "The Observer analyzes today's incorrect answers for recurring error patterns.",
+                "b2": "The Tutor drafts a review with explanations and a suggested practice direction.",
+                "b3": "The Editor checks the draft and formats it for reading.",
+                "note": "Three LangGraph stages run in sequence using the quality model tier. Generation time varies. If a later stage fails, the available earlier output is returned."
+            },
+            "memory": {
+                "title": "Learner profile and mistake history",
+                "lede": "The tutor uses your learner profile to adjust its feedback. Similar earlier mistakes can also be added to exercise explanations.",
+                "b1": "The profile tracks accuracy by part of speech and JLPT level and identifies stronger and weaker areas. The practice focus changes after five answers in the current focus area.",
+                "b2": "A multilingual model can turn mistake text into numerical vectors called embeddings, which allow the system to search for similar earlier answers.",
+                "b3": "The search uses your own answer history to identify repeated mistakes and add a note linking them to earlier attempts.",
+                "note": "Multilingual-e5 embeddings are stored with answer records in SQLite and compared using NumPy dot products. Similarity notes require the relevant history to have embeddings."
+            },
+            "reading": {
+                "title": "News reading",
+                "lede": "Read Japanese news articles with translation and audio controls for each paragraph.",
+                "b1": "Articles are split into paragraphs; each one can be translated or read aloud on its own.",
+                "b2": "Translation goes through Google Cloud Translation, with the language model as a fallback if that fails.",
+                "b3": "Audio is generated on demand with a text-to-speech model.",
+                "note": "New articles are not being added at the moment, so the news section is a fixed archive kept for practice."
+            },
+            "video": {
+                "title": "Listening",
+                "lede": "Study YouTube videos with transcripts, timestamped fill-in-the-blank exercises, and comprehension questions.",
+                "b1": "The transcript is fetched and sentences are turned into timestamped blanks with the same cloze rules as the daily exercise.",
+                "b2": "Comprehension questions and their explanations are generated by the model; importing new videos is reserved for account holders.",
+                "note": "Import is slow and the transcript fetch is often blocked from cloud servers, which is why the preview shows existing videos only."
+            },
+            "practice": {
+                "title": "Textbook drills",
+                "lede": "Practice with a fixed question bank. Answers are checked without making a model call.",
+                "b1": "Lesson decks are fill-in-the-blank and vocabulary drills built from CSVs curated from the course textbook.",
+                "b2": "The final-exam deck contains multiple-choice questions checked against the printed answer keys. A toggle also enables additional model-generated practice questions.",
+                "b3": "Answers are checked against stored solutions, with kana alternatives accepted where supported. You can review incorrect answers at the end of a session.",
+                "note": "Content is in Traditional Chinese, matching the textbook. A separate note on how the practice questions were generated is in the works."
+            },
+            "models": {
+                "title": "Models and tiers",
+                "lede": "Model calls are grouped into three tiers that can be configured for different providers and tasks.",
+                "b1": "Daily reviews use the quality tier; grading and chat use the balanced tier. The fast tier is reserved for lightweight tasks.",
+                "b2": "Each tier can point at OpenAI-compatible endpoints, Anthropic, Gemini, or a local Ollama, so the app runs against a lab server or a cloud API without code changes.",
+                "b3": "Responses expected to contain JSON are parsed and cleaned up, with retries if parsing fails. Calls use the model's default sampling settings unless a temperature is explicitly supplied.",
+                "note": "Model assignments are configured on the server and can vary by deployment. The safeguard uses Groq, and speech generation uses OpenAI."
+            },
+            "preview": {
+                "title": "About this preview",
+                "lede": "Try the app in a temporary guest session without registering.",
+                "b1": "Guest sessions last 24 hours and include sample answer history for exploring the mistakes and statistics pages.",
+                "b2": "Guests have usage limits for each feature. Guest accounts older than seven days are cleaned up when a new guest session is created.",
+                "b3": "Registering during an active preview keeps your own answers and removes the sample entries.",
+                "note": "The server stores answers, learner profiles, and usage counters. Rate limiting uses IP addresses, and server logs include request metadata. Chat history is stored in your browser and is not removed by server cleanup."
+            }
+        }
+    },
+    "tour": {
+        "buttons": {
+            "next": "Next",
+            "prev": "Back",
+            "done": "Finish",
+            "learn_more": "Learn more",
+            "working": "Working…",
+            "done_action": "Done ✓",
+            "action_failed": "That failed, try again",
+            "assisted_label": "Use multiple choice and automatic translations (helpful if you don't read Japanese)",
+            "assisted_hint": "Switches exercises to multiple choice and translates the first article paragraph. The tour's sample buttons work either way.",
+            "skip_exercise": "Skip exercise",
+            "show_instructions": "Show instructions",
+            "hide_instructions": "Hide instructions"
+        },
+        "steps": {
+            "welcome": {
+                "title": "Welcome to Shiori",
+                "body": "Shiori is a Japanese learning app for Traditional Chinese speakers. This tour walks through exercises, mistake review, chat, and reading. It uses your current account, so answers the tour submits for you are saved to your history. Entries preloaded in the guest preview are labeled “Sample”."
+            },
+            "today_actions": {
+                "title": "Choose a study activity",
+                "body": "Start an exercise, practice textbook questions, read an article, or open the tutor. During the tour, “Learn more” opens details about the current feature."
+            },
+            "exercise_prompt": {
+                "title": "An exercise from a news article",
+                "body": "This is a fill-in-the-blank question. Morphological analysis splits an NHK sentence into words and tags their grammatical roles; rules then pick one word to blank out.",
+                "body_assisted": "This is a fill-in-the-blank question. Morphological analysis splits an NHK sentence into words and tags their grammatical roles; rules then pick one word to blank out. It has been switched to multiple choice, so you can answer without typing Japanese."
+            },
+            "exercise_answer": {
+                "title": "Try an answer",
+                "body": "Answer it yourself, or use the button below to submit a wrong answer and see the feedback. “Show Hint” shows a Chinese translation of the sentence. If you answer yourself, wait for the feedback before continuing.",
+                "action": "Submit a wrong answer"
+            },
+            "exercise_feedback": {
+                "title": "Check the feedback",
+                "body": "The sentence now shows the submitted answer. An incorrect answer also shows the correction and a short explanation, with a detailed explanation available on request. Answers are first converted to kana and compared with the reference; if they differ, a language model evaluates the answer.",
+                "action": "Read the detailed explanation"
+            },
+            "mistakes": {
+                "title": "Review your mistakes",
+                "body": "Each entry strikes through your answer and shows the correction, the tutor's note, and a score. For common language errors, scores start at 100 and lose 1–10 points depending on the error type, so a wrong answer can still score high. Preloaded entries are labeled “Sample”."
+            },
+            "review": {
+                "title": "Generate a daily review",
+                "body": "Three AI agents work through today's incorrect answers in turn: the Observer looks for recurring errors, the Tutor drafts explanations and practice suggestions, and the Editor formats the result. It takes a little while and opens automatically when ready; close it to return to the tour.",
+                "action": "Generate the review"
+            },
+            "tutor": {
+                "title": "Chat with the tutor",
+                "body": "Write in Japanese to receive a reply and corrections below your message. The tutor uses your profile to tailor its feedback. The sample message includes particle and conjugation mistakes.",
+                "action": "Send the sample message"
+            },
+            "safety": {
+                "title": "Try a prompt injection",
+                "body": "The sample, written in English, asks the tutor to ignore its instructions and write code instead. This technique is called prompt injection. When enabled and available, the separate safeguard checks the request and blocks replies to inputs it flags. Send the sample to see the response.",
+                "action": "Send the sample request"
+            },
+            "reading": {
+                "title": "Browse news articles",
+                "body": "Choose an NHK article to read with paragraph translations and audio. The collection is available for practice, but new articles are not currently being added.",
+                "action": "Open the lead article"
+            },
+            "reader": {
+                "title": "Translate or listen to a paragraph",
+                "body": "Use “Listen” and “Translate” below the paragraph to hear it read aloud or translated. Translation uses Google Cloud Translation with a language-model fallback; audio is generated on request.",
+                "action": "Translate this paragraph"
+            },
+            "progress": {
+                "title": "View your learning progress",
+                "body": "The cards show total exercises, total correct, and average accuracy; the charts below break this down by date, part of speech, and JLPT level. Your learner profile uses this data to guide the tutor's feedback and practice focus."
+            },
+            "end": {
+                "title": "Tour complete",
+                "body": "You can now continue practicing or read more about each feature on the About page. The source code is available on GitHub. Guests can register during the preview to keep their own answers. You can restart the tour anytime from “Tour” in the menu.",
+                "about": "Read the About page",
+                "github": "Source on GitHub",
+                "account": "Create account"
+            }
+        },
+        "status": {
+            "loading": "Tour: loading…",
+            "paused": "Tour paused. When you're done, close the window to continue."
+        }
     }
 }

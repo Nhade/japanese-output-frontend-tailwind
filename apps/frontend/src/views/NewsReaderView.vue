@@ -3,6 +3,8 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { apiBlob, apiJson } from '../lib/api';
+import { TOUR_STEPS, waitUntil } from '../lib/tour';
+import { useTourStore } from '../stores/tour';
 
 interface Paragraph {
   text: string;
@@ -231,6 +233,19 @@ function openArticle(entry: ListEntry | null) {
 }
 
 // -- lifecycle ----------------------------------------------------
+// Guided tour: translate the first paragraph once the article has loaded.
+// While the tour points at that paragraph its margin controls sit inline
+// (inside the highlight) instead of hover-only in the gutter.
+const tour = useTourStore();
+const tourFocus = computed(() => tour.active && TOUR_STEPS[tour.stepIndex ?? -1]?.id === 'reader');
+tour.registerHandler('reader:translate-first', async () => {
+  await waitUntil(() => !loading.value && !!article.value, 10000);
+  const first = article.value?.paragraphs[0];
+  if (first && !first.showTranslation) await toggleTranslation(0);
+  await nextTick();
+  document.querySelector('[data-tour="reader-paragraph"]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+});
+
 onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
@@ -240,6 +255,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  tour.unregisterHandler('reader:translate-first');
   window.removeEventListener('scroll', onScroll);
   if (currentAudio.value) {
     currentAudio.value.pause();
@@ -313,10 +329,16 @@ watch(() => route.params.id, async (newId) => {
             <div
               v-for="(para, i) in article.paragraphs"
               :key="i"
+              :data-tour="i === 0 ? 'reader-paragraph' : undefined"
+            >
+            <!-- Keep driver.js's class on a stable outer node. Hover and
+                 translation updates replace Vue's dynamic class below. -->
+            <div
               :data-p-idx="i"
               class="paragraph-wrap"
               :class="{
                 'is-active': playingIndex === i || para.showTranslation || hoveredIndex === i,
+                'is-tour-focus': i === 0 && tourFocus,
               }"
               @mouseenter="hoveredIndex = i"
               @mouseleave="maybeClearHover(i, $event)"
@@ -370,6 +392,7 @@ watch(() => route.params.id, async (newId) => {
                   {{ para.showTranslation ? $t('news.hide') : $t('news.translate') }}
                 </button>
               </div>
+            </div>
             </div>
           </div>
 
@@ -640,7 +663,18 @@ watch(() => route.params.id, async (newId) => {
 .margin-action svg { width: 12px; height: 12px; opacity: 0.7; flex-shrink: 0; }
 
 /* On narrow viewports where a right-gutter is impractical, drop the
-   margin actions inline underneath the paragraph. */
+   margin actions inline underneath the paragraph. The guided tour does the
+   same for the paragraph it highlights, so the controls sit inside it. */
+.paragraph-wrap.is-tour-focus .margin-actions {
+  position: static;
+  width: auto;
+  padding: 10px 0 0;
+  border-left: none;
+  flex-direction: row;
+  gap: 18px;
+  opacity: 1;
+  transform: none;
+}
 @media (max-width: 960px) {
   .margin-actions {
     position: static;

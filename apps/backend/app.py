@@ -300,6 +300,8 @@ def get_random_exercise():
     Fetch a random exercise from the database.
 
     Supports ?mode=mcq to return a shuffled choices array (1 correct + 3 distractors).
+    In MCQ mode, ?exercise_id=<id> returns that exercise instead of a random
+    one (the guided tour uses it to pick a wrong answer for a typing prompt).
     Typing mode (default) returns the original response shape unchanged.
 
     Returns:
@@ -307,14 +309,18 @@ def get_random_exercise():
               jlpt_level, and choices fields.
     """
     mode = request.args.get('mode', 'typing')
+    requested_id = request.args.get('exercise_id')
     conn = get_db_connection()
     try:
         if mode == 'mcq':
-            exercise = conn.execute(
+            columns = (
                 'SELECT exercise_id, question_sentence, hint_chinese, '
-                'correct_answer, part_of_speech, jlpt_level '
-                'FROM exercise ORDER BY RANDOM() LIMIT 1'
-            ).fetchone()
+                'correct_answer, part_of_speech, jlpt_level FROM exercise '
+            )
+            if requested_id:
+                exercise = conn.execute(columns + 'WHERE exercise_id = ?', (requested_id,)).fetchone()
+            else:
+                exercise = conn.execute(columns + 'ORDER BY RANDOM() LIMIT 1').fetchone()
             if exercise is None:
                 return jsonify({"error": "No exercises found"}), 404
 
