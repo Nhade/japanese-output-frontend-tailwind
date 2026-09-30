@@ -507,7 +507,7 @@
     "about": {
         "eyebrow": "About Shiori",
         "title": "About Shiori",
-        "subtitle": "A Japanese learning workspace for reading, practice, and feedback.",
+        "subtitle": "A Japanese learning workspace for Traditional Chinese speakers, built around reading, practice, and feedback.",
         "lede": "Shiori (栞, “bookmark”) began as a course project exploring how rule-based language processing and large language models can support language learning.",
         "cta_guest": "Explore as a guest",
         "cta_signin": "Sign in",
@@ -576,12 +576,12 @@
                 "note": "Multilingual-e5 embeddings are stored with answer records in SQLite and compared using NumPy dot products. Similarity notes require the relevant history to have embeddings."
             },
             "reading": {
-                "title": "Reading room",
+                "title": "News reading",
                 "lede": "Read Japanese news articles with translation and audio controls for each paragraph.",
                 "b1": "Articles are split into paragraphs; each one can be translated or read aloud on its own.",
                 "b2": "Translation goes through Google Cloud Translation, with the language model as a fallback if that fails.",
                 "b3": "Audio is generated on demand with a text-to-speech model.",
-                "note": "New articles are not being added at the moment, so the reading room is a fixed archive kept for practice."
+                "note": "New articles are not being added at the moment, so the news section is a fixed archive kept for practice."
             },
             "video": {
                 "title": "Listening",
@@ -625,8 +625,8 @@
             "working": "Working…",
             "done_action": "Done ✓",
             "action_failed": "That failed, try again",
-            "assisted_label": "Use multiple choice and automatic translations",
-            "assisted_hint": "Switches exercises to multiple choice and translates the first article paragraph. Sample-answer buttons are available in either mode.",
+            "assisted_label": "Use multiple choice and automatic translations (helpful if you don't read Japanese)",
+            "assisted_hint": "Switches exercises to multiple choice and translates the first article paragraph. The tour's sample buttons work either way.",
             "skip_exercise": "Skip exercise",
             "show_instructions": "Show instructions",
             "hide_instructions": "Hide instructions"
@@ -634,7 +634,7 @@
         "steps": {
             "welcome": {
                 "title": "Welcome to Shiori",
-                "body": "This tour introduces exercises, mistake review, chat, and reading. It uses your current account: answers submitted during the tour, including sample answers, are added to your history. Guest previews also include sample history."
+                "body": "Shiori is a Japanese learning app for Traditional Chinese speakers. This tour walks through exercises, mistake review, chat, and reading. It uses your current account, so answers the tour submits for you are saved to your history. Entries preloaded in the guest preview are labeled “Sample”."
             },
             "today_actions": {
                 "title": "Choose a study activity",
@@ -642,26 +642,26 @@
             },
             "exercise_prompt": {
                 "title": "An exercise from a news article",
-                "body": "Morphological analysis identifies words and their grammatical roles. The exercise rules use this information to select a blank in an NHK sentence. “Show Hint” displays a Chinese translation.",
-                "body_assisted": "This exercise uses morphological analysis and rules to select a blank in an NHK sentence. Assisted mode uses multiple choice so you can answer without typing Japanese."
+                "body": "This is a fill-in-the-blank question. Morphological analysis splits an NHK sentence into words and tags their grammatical roles; rules then pick one word to blank out.",
+                "body_assisted": "This is a fill-in-the-blank question. Morphological analysis splits an NHK sentence into words and tags their grammatical roles; rules then pick one word to blank out. It has been switched to multiple choice, so you can answer without typing Japanese."
             },
             "exercise_answer": {
                 "title": "Try an answer",
-                "body": "Submit your own answer, or use the button below to try an incorrect choice and see the explanation. Wait for the feedback before continuing.",
-                "action": "Try an incorrect answer"
+                "body": "Answer it yourself, or use the button below to submit a wrong answer and see the feedback. “Show Hint” shows a Chinese translation of the sentence. If you answer yourself, wait for the feedback before continuing.",
+                "action": "Submit a wrong answer"
             },
             "exercise_feedback": {
                 "title": "Check the feedback",
-                "body": "Answers are first converted to kana and compared with the reference. If they do not match, the model evaluates the answer and writes a short explanation. The error type determines the deduction. After an incorrect answer, you can request a detailed explanation.",
+                "body": "The sentence now shows the submitted answer. An incorrect answer also shows the correction and a short explanation, with a detailed explanation available on request. Answers are first converted to kana and compared with the reference; if they differ, a language model evaluates the answer.",
                 "action": "Read the detailed explanation"
             },
             "mistakes": {
                 "title": "Review your mistakes",
-                "body": "This page lists incorrect answers with their corrections and available explanations. Filter by error type to review a specific area. In guest previews, sample entries are labeled."
+                "body": "Each entry strikes through your answer and shows the correction, the tutor's note, and a score. For common language errors, scores start at 100 and lose 1–10 points depending on the error type, so a wrong answer can still score high. Preloaded entries are labeled “Sample”."
             },
             "review": {
                 "title": "Generate a daily review",
-                "body": "The Observer, Tutor, and Editor analyze today's incorrect answers, draft a review, and format it. The review uses the quality model tier, and generation time varies. Close the review to return to the tour.",
+                "body": "Three AI agents work through today's incorrect answers in turn: the Observer looks for recurring errors, the Tutor drafts explanations and practice suggestions, and the Editor formats the result. It takes a little while and opens automatically when ready; close it to return to the tour.",
                 "action": "Generate the review"
             },
             "tutor": {
@@ -670,8 +670,8 @@
                 "action": "Send the sample message"
             },
             "safety": {
-                "title": "Try an off-topic request",
-                "body": "The sample asks the tutor to ignore its instructions and write code. This is a prompt injection attempt. When the separate safeguard is enabled and available, it checks the request before a reply is generated. Send the sample to see the response.",
+                "title": "Try a prompt injection",
+                "body": "The sample, written in English, asks the tutor to ignore its instructions and write code instead. This technique is called prompt injection. When enabled and available, the separate safeguard checks the request and blocks replies to inputs it flags. Send the sample to see the response.",
                 "action": "Send the sample request"
             },
             "reading": {
@@ -681,20 +681,24 @@
             },
             "reader": {
                 "title": "Translate or listen to a paragraph",
-                "body": "Each paragraph has translation and audio controls. Translation uses Google Cloud Translation with a language-model fallback. Audio is generated on request.",
+                "body": "Use “Listen” and “Translate” below the paragraph to hear it read aloud or translated. Translation uses Google Cloud Translation with a language-model fallback; audio is generated on request.",
                 "action": "Translate this paragraph"
             },
             "progress": {
                 "title": "View your learning progress",
-                "body": "This page shows accuracy by part of speech and level, along with recent activity. Your learner profile guides the tutor's feedback and practice focus. Daily reviews summarize today's incorrect answers."
+                "body": "The cards show total exercises, total correct, and average accuracy; the charts below break this down by date, part of speech, and JLPT level. Your learner profile uses this data to guide the tutor's feedback and practice focus."
             },
             "end": {
                 "title": "Tour complete",
-                "body": "You can now continue practicing or read more about each feature on the About page. The source code is available on GitHub. Guests can register during the preview to keep their own answers.",
+                "body": "You can now continue practicing or read more about each feature on the About page. The source code is available on GitHub. Guests can register during the preview to keep their own answers. You can restart the tour anytime from “Tour” in the menu.",
                 "about": "Read the About page",
                 "github": "Source on GitHub",
                 "account": "Create account"
             }
+        },
+        "status": {
+            "loading": "Tour: loading…",
+            "paused": "Tour paused. When you're done, close the window to continue."
         }
     }
 }

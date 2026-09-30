@@ -88,6 +88,12 @@ const bulletKeys = computed(() =>
   color: color-mix(in oklab, var(--foreground) 66%, transparent);
 }
 
+/* CJK has no true italic; the synthesized slant is hard to read. */
+.about-lede:lang(zh),
+.about-lede:lang(ja) {
+  font-style: normal;
+}
+
 .about-grid {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);

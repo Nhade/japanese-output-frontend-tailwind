@@ -82,6 +82,13 @@ const headerDate = computed(() => {
   return `${dateStr} · ${timeStr}`;
 });
 
+// The backend's safeguard refusal carries a fixed English note and no
+// corrections; show the localized refusal instead of that note plus a
+// contradictory "no errors, good job".
+function isSafetyRefusal(feedback?: Feedback): boolean {
+  return !!feedback?.overall?.includes?.('Safety violation');
+}
+
 function localizedFocusTag(tag: string): string {
   return t(`pos.${tag.toLowerCase()}`, tag);
 }
@@ -126,7 +133,7 @@ async function sendMessage(rawText?: string) {
       },
     });
 
-    if (data.feedback?.overall?.includes?.('Safety violation')) {
+    if (isSafetyRefusal(data.feedback)) {
       toastStore.trigger(t('chat.safety_violation'), 'error');
     }
 
@@ -333,7 +340,10 @@ watch(messages, (val) => {
 
                   <div v-if="msg.showFeedback" class="ch-inline-feedback">
                     <div class="ch-margin-eyebrow">{{ $t('chat.tutors_note') }}</div>
-                    <p v-if="msg.feedback.overall" class="ch-margin-overall">
+                    <p v-if="isSafetyRefusal(msg.feedback)" class="ch-margin-overall">
+                      {{ $t('chat.safety_violation') }}
+                    </p>
+                    <p v-else-if="msg.feedback.overall" class="ch-margin-overall">
                       {{ msg.feedback.overall }}
                     </p>
                     <ul
@@ -349,7 +359,7 @@ watch(messages, (val) => {
                         <div class="ch-corr-note">{{ c.explanation }}</div>
                       </li>
                     </ul>
-                    <div v-else class="ch-margin-empty">{{ $t('chat.no_errors') }}</div>
+                    <div v-else-if="!isSafetyRefusal(msg.feedback)" class="ch-margin-empty">{{ $t('chat.no_errors') }}</div>
                   </div>
                 </div>
               </div>

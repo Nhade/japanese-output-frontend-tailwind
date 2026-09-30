@@ -344,11 +344,12 @@ onUnmounted(() => {
       </div>
 
       <!-- Spread entries ------------------------------------ -->
-      <div v-else class="errata-list" data-tour="mistakes-list">
+      <div v-else class="errata-list">
         <article
           v-for="(m, i) in filtered"
           :key="m.log_id"
           class="errata-entry"
+          :data-tour="i === 0 ? 'mistakes-entry' : undefined"
         >
           <span class="errata-num">{{ String(i + 1).padStart(2, '0') }}</span>
 

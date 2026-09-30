@@ -310,7 +310,7 @@ function handleKeydown(event: KeyboardEvent) {
 
 // ---- Guided-tour handlers ------------------------------------------------
 // The tour drives this page for visitors who cannot type Japanese: switch to
-// multiple choice, submit a deliberately wrong choice (so the grader and the
+// multiple choice, submit a deliberately wrong answer (so the grader and the
 // margin note show up), and open the full explanation.
 const tour = useTourStore();
 let mounted = true;
@@ -332,12 +332,26 @@ async function tourSwitchToMcq() {
 
 async function tourAnswerWrong() {
   if (feedback.value) return;
-  await tourSwitchToMcq();
+  await waitForExercise();
   if (!exercise.value || feedback.value) return;
-  const correct = exercise.value.correct_answer;
-  const wrong = choices.value.find((c) => c !== correct) ?? choices.value[0];
-  if (!wrong) throw new Error('No sample answer available');
-  selectedChoice.value = wrong;
+  if (exerciseMode.value === 'mcq') {
+    const correct = exercise.value.correct_answer;
+    const wrong = choices.value.find((c) => c !== correct) ?? choices.value[0];
+    if (!wrong) throw new Error('No sample answer available');
+    selectedChoice.value = wrong;
+  } else {
+    // Typing prompts carry no choices. Borrow a distractor for this same
+    // exercise so the sentence the visitor has been reading stays on screen.
+    const exerciseId = exercise.value.exercise_id;
+    const data = await apiJson<Exercise>('/api/exercise/random', {
+      query: { mode: 'mcq', exercise_id: exerciseId },
+    });
+    if (data.exercise_id !== exerciseId) throw new Error('Requested exercise unavailable');
+    const wrong = data.choices?.find((c) => c !== data.correct_answer);
+    if (!wrong) throw new Error('No sample answer available');
+    if (!mounted || exercise.value?.exercise_id !== exerciseId || feedback.value) return;
+    userAnswer.value = wrong;
+  }
   await handleAnswerSubmit();
   if (!feedback.value) throw new Error('Answer submission failed');
 }
@@ -401,7 +415,7 @@ onUnmounted(() => {
         </header>
 
         <!-- Spread — verso (prompt) | gutter | recto (response) -->
-        <article class="spread">
+        <article class="spread" data-tour="exercise-spread">
           <div class="gutter" aria-hidden="true" />
 
           <!-- Verso — prompt -->

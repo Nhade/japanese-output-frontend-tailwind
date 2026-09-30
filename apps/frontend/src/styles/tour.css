@@ -17,6 +17,10 @@
     0 4px 12px -6px color-mix(in oklab, var(--foreground) 10%, transparent);
 }
 
+.driver-popover.shiori-tour.shiori-tour-wide {
+  max-width: 540px;
+}
+
 .shiori-tour .driver-popover-title {
   padding-right: 28px;
   font-family: var(--font-serif);
@@ -168,8 +172,20 @@
   color: color-mix(in oklab, var(--foreground) 60%, transparent);
 }
 
+/* CJK fonts have no italic, so the browser slants the glyphs instead, which
+   is hard to read. Keep Chinese and Japanese copy upright. */
+.shiori-tour .driver-popover-description:lang(zh),
+.shiori-tour .driver-popover-description:lang(ja),
+.shiori-tour-btn:lang(zh),
+.shiori-tour-btn:lang(ja),
+.shiori-tour-toggle-hint:lang(zh),
+.shiori-tour-toggle-hint:lang(ja) {
+  font-style: normal;
+}
+
 @media (max-width: 520px) {
-  .driver-popover.shiori-tour {
+  .driver-popover.shiori-tour,
+  .driver-popover.shiori-tour.shiori-tour-wide {
     min-width: 0;
     max-width: calc(100vw - 24px);
   }

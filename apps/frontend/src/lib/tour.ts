@@ -51,6 +51,8 @@ export interface TourStepDef {
   /** Render controls in the chat layout, leaving replies unobstructed. */
   inline?: boolean;
   requiresFeedback?: boolean;
+  /** Wider (so shorter) popover, for long copy next to a tall element. */
+  wide?: boolean;
   side?: Side;
   align?: Alignment;
 }
@@ -72,24 +74,27 @@ export const TOUR_STEPS: readonly TourStepDef[] = [
     onEnterAssisted: 'exercise:mcq',
     side: 'right',
   },
+  // The next two highlight the whole spread (sentence + answer) with the
+  // popover underneath, so "Show Hint", the hint it reveals in the sentence,
+  // and the submitted answer all stay visible.
   {
     id: 'exercise_answer',
     route: '/study/exercise',
-    element: '[data-tour="exercise-answer"]',
+    element: '[data-tour="exercise-spread"]',
     learnMore: 'exercise',
     action: { name: 'exercise:wrong-answer', labelKey: 'tour.steps.exercise_answer.action', advance: true },
-    side: 'left',
+    side: 'bottom',
   },
   {
     id: 'exercise_feedback',
     requiresFeedback: true,
     route: '/study/exercise',
-    element: '[data-tour="exercise-answer"]',
+    element: '[data-tour="exercise-spread"]',
     learnMore: 'models',
     action: { name: 'exercise:explain-detailed', labelKey: 'tour.steps.exercise_feedback.action', pauses: true },
-    side: 'left',
+    side: 'bottom',
   },
-  { id: 'mistakes', route: '/mistakes', element: '[data-tour="mistakes-list"]', learnMore: 'memory', side: 'top' },
+  { id: 'mistakes', route: '/mistakes', element: '[data-tour="mistakes-entry"]', learnMore: 'memory', wide: true, side: 'bottom' },
   {
     id: 'review',
     route: '/mistakes',
@@ -157,6 +162,8 @@ let internalNavigation = 0;
 let stopControls: (() => void) | undefined;
 let stopDrawer: (() => void) | undefined;
 let removeRouteHook: (() => void) | undefined;
+let scrollSpace: HTMLElement | null = null;
+let targetResize: ResizeObserver | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -187,6 +194,7 @@ export function stopTour(): void {
   store.stepIndex = null;
   store.busy = false;
   store.actionState = 'idle';
+  store.pending = null;
   store.closeDrawer();
 }
 
@@ -230,6 +238,8 @@ export function waitUntil(predicate: () => boolean, timeoutMs = 8000): Promise<b
 // ---------------------------------------------------------------------------
 
 function suspendDriver(): void {
+  targetResize?.disconnect();
+  targetResize = null;
   stopControls?.();
   stopControls = undefined;
   pausing = true;
@@ -238,6 +248,32 @@ function suspendDriver(): void {
   started = false;
   pausing = false;
   useTourStore().inlineStep = null;
+  scrollSpace?.remove();
+  scrollSpace = null;
+}
+
+// A bottom popover can fall back to covering its target near the end of a
+// short page. Reserve scroll space when both fit below the fixed header.
+function makeRoomBelow(element: Element | undefined, step: DriveStep): void {
+  if (!element || step.popover?.side !== 'bottom') return;
+  const popover = document.querySelector('.driver-popover');
+  if (!popover) return;
+  const target = element.getBoundingClientRect();
+  const card = popover.getBoundingClientRect();
+  if (target.bottom <= card.top || card.bottom <= target.top) return;
+  if (target.height + card.height + 112 > window.innerHeight) return;
+  const delta = target.top - 80;
+  if (delta <= 0) return;
+  const remaining = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+  if (remaining < delta) {
+    scrollSpace?.remove();
+    scrollSpace = document.createElement('div');
+    scrollSpace.setAttribute('aria-hidden', 'true');
+    scrollSpace.style.height = `${delta - remaining + 16}px`;
+    document.body.appendChild(scrollSpace);
+  }
+  window.scrollBy({ top: delta, behavior: 'instant' });
+  drv?.refresh();
 }
 
 function isCurrent(ticket: number): boolean {
@@ -253,6 +289,10 @@ async function navigate<T>(work: () => Promise<T>): Promise<T> {
   }
 }
 
+function pageOf(def: TourStepDef | undefined): string | undefined {
+  return def?.route ?? def?.routePrefix;
+}
+
 async function goTo(index: number, direction: 1 | -1 = 1): Promise<void> {
   if (!deps || !useTourStore().active) return;
   const def = TOUR_STEPS[index];
@@ -263,6 +303,17 @@ async function goTo(index: number, direction: 1 | -1 = 1): Promise<void> {
   const store = useTourStore();
   const ticket = session;
   store.busy = true;
+  targetResize?.disconnect();
+  targetResize = null;
+  scrollSpace?.remove();
+  scrollSpace = null;
+  // Moving to another page: take the current popover down rather than leave
+  // it describing the previous step over a page that is still loading.
+  const page = pageOf(def);
+  if (page && page !== pageOf(TOUR_STEPS[store.stepIndex ?? -1])) {
+    suspendDriver();
+    store.pending = 'loading';
+  }
   try {
     await navigate(() => ensureRoute(def, store));
     if (!isCurrent(ticket)) return;
@@ -289,6 +340,11 @@ async function goTo(index: number, direction: 1 | -1 = 1): Promise<void> {
     }
     if (store.stepIndex !== index) store.actionState = 'idle';
     store.stepIndex = index;
+    // Views react to the current step (the reader inlines its controls), so
+    // let them render before driver.js measures the element.
+    await nextTick();
+    if (!isCurrent(ticket)) return;
+    store.pending = null;
     if (def.inline) {
       suspendDriver();
       store.inlineStep = index;
@@ -303,7 +359,10 @@ async function goTo(index: number, direction: 1 | -1 = 1): Promise<void> {
     }
   } catch (err) {
     console.warn('[tour] navigation failed', err);
-    if (isCurrent(ticket)) store.actionState = 'failed';
+    if (!isCurrent(ticket)) return;
+    // With no popover or panel left to show the failure on, end the tour.
+    if (!drv && store.inlineStep === null) stopTour();
+    else store.actionState = 'failed';
   } finally {
     if (isCurrent(ticket)) store.busy = false;
   }
@@ -449,6 +508,18 @@ function buildConfig(store: TourStore): Config {
     onPopoverRender: (popover, opts) => {
       decoratePopover(popover, opts.state.activeIndex ?? 0, store);
     },
+    onHighlighted: (element, step) => {
+      makeRoomBelow(element, step);
+      targetResize?.disconnect();
+      const instance = drv;
+      if (!element || !instance) return;
+      // Hints, feedback, and translations can change the highlighted area
+      // without a window resize. Keep the overlay hole around the controls.
+      targetResize = new ResizeObserver(() => {
+        if (drv === instance) instance.refresh();
+      });
+      targetResize.observe(element);
+    },
   };
 }
 
@@ -466,6 +537,7 @@ function toDriveStep(def: TourStepDef, store: TourStore): DriveStep {
     popover: {
       title: escapeHtml(t(`tour.steps.${def.id}.title`)),
       description: escapeHtml(stepBody(def, store)),
+      popoverClass: def.wide ? 'shiori-tour shiori-tour-wide' : undefined,
       side: def.side,
       align: def.align ?? 'center',
     },
@@ -574,7 +646,10 @@ export async function performTourAction(): Promise<void> {
   const ticket = session;
   store.busy = true;
   store.actionState = 'working';
-  if (action.pauses) suspendDriver();
+  if (action.pauses) {
+    suspendDriver();
+    store.pending = 'paused';
+  }
   try {
     const run = () => store.runAction(action.name, action.payload);
     if (action.name === 'news:open-lead') await navigate(run);

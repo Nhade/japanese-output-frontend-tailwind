@@ -8,6 +8,7 @@ import ToastNotification from './components/ToastNotification.vue';
 import GuestBanner from './components/GuestBanner.vue';
 import PreviewLimitDialog from './components/PreviewLimitDialog.vue';
 import AboutDrawer from './components/about/AboutDrawer.vue';
+import TourStatus from './components/about/TourStatus.vue';
 import { UNAUTHORIZED_EVENT } from './lib/api';
 import { installTour, startTour } from './lib/tour';
 import { useAuthStore } from './stores/auth';
@@ -86,6 +87,7 @@ watch(locale, (newLocale) => {
     <TheFooter v-if="!hideChrome" />
     <PreviewLimitDialog />
     <AboutDrawer />
+    <TourStatus />
   </div>
 </template>
 

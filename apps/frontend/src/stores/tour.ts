@@ -33,6 +33,11 @@ export const useTourStore = defineStore('tour', () => {
   const exerciseCanExplain = ref(false)
   const exerciseBusy = ref(false)
   const chatBusy = ref(false)
+  /**
+   * Why no popover is on screen while the tour is active: 'loading' while
+   * moving to another page, 'paused' while a dialog opened by the tour is up.
+   */
+  const pending = ref<'loading' | 'paused' | null>(null)
   /** About section shown in the Learn-more drawer, or null when closed. */
   const drawerSection = ref<string | null>(null)
 
@@ -82,6 +87,7 @@ export const useTourStore = defineStore('tour', () => {
     exerciseCanExplain,
     exerciseBusy,
     chatBusy,
+    pending,
     drawerSection,
     setAssisted,
     registerHandler,

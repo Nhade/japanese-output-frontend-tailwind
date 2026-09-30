@@ -246,6 +246,14 @@ onMounted(async () => {
   color: color-mix(in oklab, var(--foreground) 64%, transparent);
 }
 
+/* CJK has no true italic; the synthesized slant is hard to read. */
+.about-hero-lede:lang(zh),
+.about-hero-lede:lang(ja),
+.about-closing-body:lang(zh),
+.about-closing-body:lang(ja) {
+  font-style: normal;
+}
+
 @media (max-width: 720px) {
   .about-page {
     padding: 34px 20px 88px;
